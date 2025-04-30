@@ -24,11 +24,11 @@ var exportCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Loading modpack...")
-		pack, err := core.LoadPack()
+		pack, err := fileio.LoadPackFile(viper.GetString("pack-file"))
 		if err != nil {
 			cmdshared.Exitln(err)
 		}
-		index, err := pack.LoadIndex()
+		index, err := fileio.LoadPackIndexFile(&pack)
 		if err != nil {
 			cmdshared.Exitln(err)
 		}

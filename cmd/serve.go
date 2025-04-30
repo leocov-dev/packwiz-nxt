@@ -40,11 +40,11 @@ var serveCmd = &cobra.Command{
 			http.Handle("/", http.FileServer(http.Dir(".")))
 		} else {
 			fmt.Println("Loading modpack...")
-			pack, err := core.LoadPack()
+			pack, err := fileio.LoadPackFile(viper.GetString("pack-file"))
 			if err != nil {
 				cmdshared.Exitln(err)
 			}
-			index, err := pack.LoadIndex()
+			index, err := fileio.LoadPackIndexFile(&pack)
 			if err != nil {
 				cmdshared.Exitln(err)
 			}
@@ -143,11 +143,11 @@ var serveCmd = &cobra.Command{
 
 func doServeRefresh(pack *core.Pack, index *core.Index) error {
 	var err error
-	*pack, err = core.LoadPack()
+	*pack, err = fileio.LoadPackFile(viper.GetString("pack-file"))
 	if err != nil {
 		return err
 	}
-	*index, err = pack.LoadIndex()
+	*index, err = fileio.LoadPackIndexFile(pack)
 	if err != nil {
 		return err
 	}

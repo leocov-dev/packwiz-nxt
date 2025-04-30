@@ -2,15 +2,9 @@ package core
 
 import (
 	"errors"
-	"fmt"
-	"github.com/pelletier/go-toml/v2"
-	"github.com/unascribed/FlexVer/go/flexver"
-	"os"
-	"path/filepath"
-	"strings"
-
 	"github.com/Masterminds/semver/v3"
-	"github.com/spf13/viper"
+	"github.com/unascribed/FlexVer/go/flexver"
+	"path/filepath"
 )
 
 // Pack stores the modpack metadata, usually in pack.toml
@@ -30,7 +24,7 @@ type Pack struct {
 	Export   map[string]map[string]interface{} `toml:"export"`
 	Options  map[string]interface{}            `toml:"options"`
 
-	metaFile string
+	filePath string
 }
 
 const CurrentPackFormat = "packwiz:1.1.0"
@@ -46,70 +40,13 @@ func mustParseConstraint(s string) *semver.Constraints {
 	return c
 }
 
-// LoadPack loads the modpack metadata to a Pack struct
-func LoadPack() (Pack, error) {
-	var modpack Pack
-	packPath := viper.GetString("pack-file")
-	raw, err := os.ReadFile(packPath)
-	if err != nil {
-		return Pack{}, err
-	}
-	if err := toml.Unmarshal(raw, &modpack); err != nil {
-		return Pack{}, err
-	}
-
-	modpack.SetMetafile(packPath)
-
-	// Check pack-format
-	if len(modpack.PackFormat) == 0 {
-		fmt.Println("Modpack manifest has no pack-format field; assuming packwiz:1.1.0")
-		modpack.PackFormat = "packwiz:1.1.0"
-	}
-	// Auto-migrate versions
-	if modpack.PackFormat == "packwiz:1.0.0" {
-		fmt.Println("Automatically migrating pack to packwiz:1.1.0 format...")
-		modpack.PackFormat = "packwiz:1.1.0"
-	}
-	if !strings.HasPrefix(modpack.PackFormat, "packwiz:") {
-		return Pack{}, errors.New("pack-format field does not indicate a valid packwiz pack")
-	}
-	ver, err := semver.StrictNewVersion(strings.TrimPrefix(modpack.PackFormat, "packwiz:"))
-	if err != nil {
-		return Pack{}, fmt.Errorf("pack-format field is not valid semver: %w", err)
-	}
-	if !PackFormatConstraintAccepted.Check(ver) {
-		return Pack{}, errors.New("the modpack is incompatible with this version of packwiz; please update")
-	}
-	if !PackFormatConstraintSuggestUpgrade.Check(ver) {
-		fmt.Println("Modpack has a newer feature number than is supported by this version of packwiz. Update to the latest version of packwiz for new features and bugfixes!")
-	}
-	// TODO: suggest migration if necessary (primarily for 2.0.0)
-
-	// Read options into viper
-	if modpack.Options != nil {
-		err := viper.MergeConfigMap(modpack.Options)
-		if err != nil {
-			return Pack{}, err
-		}
-	}
-
-	if len(modpack.Index.File) == 0 {
-		modpack.Index.File = "index.toml"
-	}
-	return modpack, nil
-}
-
-func (pack *Pack) SetMetafile(metaFile string) {
-	pack.metaFile = metaFile
-}
-
-// LoadIndex attempts to load the index file of this modpack
-func (pack *Pack) LoadIndex() (Index, error) {
+// LoadIndexFile attempts to load the index file of this modpack
+func (pack *Pack) LoadIndexFile() (Index, error) {
 	if filepath.IsAbs(pack.Index.File) {
 		return LoadIndex(pack.Index.File)
 	}
 	fileNative := filepath.FromSlash(pack.Index.File)
-	return LoadIndex(filepath.Join(filepath.Dir(viper.GetString("pack-file")), fileNative))
+	return LoadIndex(filepath.Join(pack.GetPackDir(), fileNative))
 }
 
 func (pack *Pack) RefreshIndexHash(format, hash string) {
@@ -193,7 +130,15 @@ func (pack *Pack) UpdateHash(_, _ string) {
 }
 
 func (pack *Pack) GetFilePath() string {
-	return pack.metaFile
+	return pack.filePath
+}
+
+func (pack *Pack) SetFilePath(path string) {
+	pack.filePath = path
+}
+
+func (pack *Pack) GetPackDir() string {
+	return filepath.Dir(pack.filePath)
 }
 
 func sortAndDedupeVersions(versions []string) {

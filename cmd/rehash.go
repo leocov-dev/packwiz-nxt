@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"github.com/leocov-dev/fork.packwiz/fileio"
+	"github.com/spf13/viper"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
@@ -19,13 +20,13 @@ var rehashCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 
 		// Load pack
-		pack, err := core.LoadPack()
+		pack, err := fileio.LoadPackFile(viper.GetString("pack-file"))
 		if err != nil {
 			cmdshared.Exitln(err)
 		}
 
 		// Load index
-		index, err := pack.LoadIndex()
+		index, err := fileio.LoadPackIndexFile(&pack)
 		if err != nil {
 			cmdshared.Exitln(err)
 		}

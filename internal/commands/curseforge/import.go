@@ -127,7 +127,7 @@ var importCmd = &cobra.Command{
 			}
 		}
 
-		pack, err := core.LoadPack()
+		pack, err := fileio.LoadPackFile(viper.GetString("pack-file"))
 		if err != nil {
 			fmt.Println("Failed to load existing pack, creating a new one...")
 
@@ -170,7 +170,7 @@ var importCmd = &cobra.Command{
 				pack.Versions[component] = version
 			}
 		}
-		index, err := pack.LoadIndex()
+		index, err := fileio.LoadPackIndexFile(&pack)
 		if err != nil {
 			cmdshared.Exitln(err)
 		}

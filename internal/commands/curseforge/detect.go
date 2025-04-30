@@ -3,10 +3,10 @@ package curseforge
 import (
 	"fmt"
 	"github.com/aviddiviner/go-murmur"
-	"github.com/leocov-dev/fork.packwiz/core"
 	"github.com/leocov-dev/fork.packwiz/fileio"
 	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,11 +21,11 @@ var detectCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Loading modpack...")
-		pack, err := core.LoadPack()
+		pack, err := fileio.LoadPackFile(viper.GetString("pack-file"))
 		if err != nil {
 			cmdshared.Exitln(err)
 		}
-		index, err := pack.LoadIndex()
+		index, err := fileio.LoadPackIndexFile(&pack)
 		if err != nil {
 			cmdshared.Exitln(err)
 		}

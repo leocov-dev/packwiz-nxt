@@ -154,10 +154,10 @@ var initCmd = &cobra.Command{
 				pack.Versions[k] = v
 			}
 		}
-		pack.SetMetafile(viper.GetString("pack-file"))
+		pack.SetFilePath(viper.GetString("pack-file"))
 
 		// Refresh the index and pack
-		index, err := pack.LoadIndex()
+		index, err := fileio.LoadPackIndexFile(&pack)
 		if err != nil {
 			cmdshared.Exitln(err)
 		}

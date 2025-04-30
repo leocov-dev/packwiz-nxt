@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/leocov-dev/fork.packwiz/fileio"
 	"sort"
 	"strings"
 
@@ -20,13 +21,13 @@ var listCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 
 		// Load pack
-		pack, err := core.LoadPack()
+		pack, err := fileio.LoadPackFile(viper.GetString("pack-file"))
 		if err != nil {
 			cmdshared.Exitln(err)
 		}
 
 		// Load index
-		index, err := pack.LoadIndex()
+		index, err := fileio.LoadPackIndexFile(&pack)
 		if err != nil {
 			cmdshared.Exitln(err)
 		}

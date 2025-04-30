@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"github.com/leocov-dev/fork.packwiz/fileio"
 	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
+	"github.com/spf13/viper"
 	"os"
 
-	"github.com/leocov-dev/fork.packwiz/core"
 	"github.com/spf13/cobra"
 )
 
@@ -18,11 +18,11 @@ var removeCmd = &cobra.Command{
 	Args:    cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Loading modpack...")
-		pack, err := core.LoadPack()
+		pack, err := fileio.LoadPackFile(viper.GetString("pack-file"))
 		if err != nil {
 			cmdshared.Exitln(err)
 		}
-		index, err := pack.LoadIndex()
+		index, err := fileio.LoadPackIndexFile(&pack)
 		if err != nil {
 			cmdshared.Exitln(err)
 		}

@@ -3,7 +3,6 @@ package migrate
 import (
 	"fmt"
 	packCmd "github.com/leocov-dev/fork.packwiz/cmd"
-	"github.com/leocov-dev/fork.packwiz/core"
 	"github.com/leocov-dev/fork.packwiz/fileio"
 	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 	"github.com/spf13/cobra"
@@ -17,7 +16,7 @@ var minecraftCommand = &cobra.Command{
 	Aliases: []string{"mc"},
 	Args:    cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		modpack, err := core.LoadPack()
+		modpack, err := fileio.LoadPackFile(viper.GetString("pack-file"))
 		if err != nil {
 			// Check if it's a no such file or directory error
 			if os.IsNotExist(err) {

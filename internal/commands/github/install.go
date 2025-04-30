@@ -24,7 +24,7 @@ var installCmd = &cobra.Command{
 	Aliases: []string{"install", "get"},
 	Args:    cobra.ArbitraryArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		pack, err := core.LoadPack()
+		pack, err := fileio.LoadPackFile(viper.GetString("pack-file"))
 		if err != nil {
 			cmdshared.Exitln(err)
 		}
@@ -146,7 +146,7 @@ func installRelease(repo Repo, release Release, regex string, pack core.Pack) er
 
 	// Install the file
 	fmt.Printf("Installing %s from release %s\n", file.Name, release.TagName)
-	index, err := pack.LoadIndex()
+	index, err := fileio.LoadPackIndexFile(&pack)
 	if err != nil {
 		return err
 	}
