@@ -6,7 +6,6 @@ import (
 	"github.com/leocov-dev/fork.packwiz/fileio"
 	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // refreshCmd represents the refresh command
@@ -20,12 +19,7 @@ var refreshCmd = &cobra.Command{
 		if err != nil {
 			cmdshared.Exitln(err)
 		}
-		build, err := cmd.Flags().GetBool("build")
-		if err == nil && build {
-			viper.Set("no-internal-hashes", false)
-		} else if viper.GetBool("no-internal-hashes") {
-			fmt.Println("Note: no-internal-hashes mode is set, no hashes will be saved. Use --build to override this for distribution.")
-		}
+
 		index, err := pack.LoadIndex()
 		if err != nil {
 			cmdshared.Exitln(err)
@@ -55,6 +49,4 @@ var refreshCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(refreshCmd)
-
-	refreshCmd.Flags().Bool("build", false, "Only has an effect in no-internal-hashes mode: generates internal hashes for distribution with packwiz-installer")
 }

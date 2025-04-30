@@ -81,32 +81,29 @@ func (in *Index) updateFileHashGiven(path, format, hash string, markAsMetaFile b
 // updateFile calculates the hash for a given path and updates it in the index
 func (in *Index) updateFile(path string) error {
 	var hashString string
-	if viper.GetBool("no-internal-hashes") {
-		hashString = ""
-	} else {
-		f, err := os.Open(path)
-		if err != nil {
-			return err
-		}
 
-		// Hash usage strategy (may change):
-		// Just use SHA256, overwrite existing hash regardless of what it is
-		// May update later to continue using the same hash that was already being used
-		h, err := GetHashImpl("sha256")
-		if err != nil {
-			_ = f.Close()
-			return err
-		}
-		if _, err := io.Copy(h, f); err != nil {
-			_ = f.Close()
-			return err
-		}
-		err = f.Close()
-		if err != nil {
-			return err
-		}
-		hashString = h.String()
+	f, err := os.Open(path)
+	if err != nil {
+		return err
 	}
+
+	// Hash usage strategy (may change):
+	// Just use SHA256, overwrite existing hash regardless of what it is
+	// May update later to continue using the same hash that was already being used
+	h, err := GetHashImpl("sha256")
+	if err != nil {
+		_ = f.Close()
+		return err
+	}
+	if _, err := io.Copy(h, f); err != nil {
+		_ = f.Close()
+		return err
+	}
+	err = f.Close()
+	if err != nil {
+		return err
+	}
+	hashString = h.String()
 
 	markAsMetaFile := false
 	// If the file has an extension of pw.toml, set markAsMetaFile to true
@@ -271,9 +268,6 @@ func (in *Index) ToWritable() IndexTomlRepresentation {
 
 // RefreshFileWithHash updates a file in the index, given a file hash and whether it should be marked as metafile or not
 func (in *Index) RefreshFileWithHash(path, format, hash string, markAsMetaFile bool) error {
-	if viper.GetBool("no-internal-hashes") {
-		hash = ""
-	}
 	return in.updateFileHashGiven(path, format, hash, markAsMetaFile)
 }
 
