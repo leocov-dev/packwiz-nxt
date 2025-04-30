@@ -22,3 +22,10 @@
 result
 
 dist/
+
+.DS_Store
+.go-version
+bin/
+
+.coverage/
+!.coverage/.keep
