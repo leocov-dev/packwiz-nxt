@@ -132,7 +132,7 @@ func (pack *Pack) UpdateIndexHash() error {
 		_ = f.Close()
 		return err
 	}
-	hashString := h.HashToString(h.Sum(nil))
+	hashString := h.String()
 
 	pack.Index.HashFormat = "sha256"
 	pack.Index.Hash = hashString

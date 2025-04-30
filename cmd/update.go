@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/leocov-dev/fork.packwiz/fileio"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -109,11 +110,13 @@ var UpdateCmd = &cobra.Command{
 					continue
 				}
 				for _, modData := range v {
-					format, hash, err := modData.Write()
+					modWriter := fileio.NewModWriter()
+					format, hash, err := modWriter.Write(modData)
 					if err != nil {
 						fmt.Println(err.Error())
 						continue
 					}
+
 					err = index.RefreshFileWithHash(modData.GetFilePath(), format, hash, true)
 					if err != nil {
 						fmt.Println(err.Error())
@@ -161,10 +164,12 @@ var UpdateCmd = &cobra.Command{
 						cmdshared.Exitln(err)
 					}
 
-					format, hash, err := modData.Write()
+					modWriter := fileio.NewModWriter()
+					format, hash, err := modWriter.Write(&modData)
 					if err != nil {
 						cmdshared.Exitln(err)
 					}
+
 					err = index.RefreshFileWithHash(modPath, format, hash, true)
 					if err != nil {
 						cmdshared.Exitln(err)

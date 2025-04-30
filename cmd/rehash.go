@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/leocov-dev/fork.packwiz/fileio"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
@@ -52,7 +53,9 @@ var rehashCmd = &cobra.Command{
 			} else {
 				dl.Mod.Download.HashFormat = args[0]
 				dl.Mod.Download.Hash = dl.Hashes[args[0]]
-				_, _, err := dl.Mod.Write()
+
+				modWriter := fileio.NewModWriter()
+				_, _, err := modWriter.Write(dl.Mod)
 				if err != nil {
 					cmdshared.Exitf("Error saving mod %s: %v\n", dl.Mod.Name, err)
 				}

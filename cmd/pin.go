@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"github.com/leocov-dev/fork.packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/fileio"
 	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 	"github.com/spf13/cobra"
 )
@@ -26,10 +27,13 @@ func pinMod(args []string, pinned bool) {
 		cmdshared.Exitln(err)
 	}
 	modData.Pin = pinned
-	format, hash, err := modData.Write()
+
+	modWriter := fileio.NewModWriter()
+	format, hash, err := modWriter.Write(&modData)
 	if err != nil {
 		cmdshared.Exitln(err)
 	}
+
 	err = index.RefreshFileWithHash(modPath, format, hash, true)
 	if err != nil {
 		cmdshared.Exitln(err)

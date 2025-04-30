@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/dlclark/regexp2"
 	"github.com/leocov-dev/fork.packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/fileio"
 	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -190,7 +191,8 @@ func installRelease(repo Repo, release Release, regex string, pack core.Pack) er
 	// Current strategy is to go ahead and do stuff without asking, with the assumption that you are using
 	// VCS anyway.
 
-	format, hash, err := modMeta.Write()
+	modWriter := fileio.NewModWriter()
+	format, hash, err := modWriter.Write(&modMeta)
 	if err != nil {
 		return err
 	}

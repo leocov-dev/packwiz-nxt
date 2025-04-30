@@ -106,7 +106,7 @@ func (in *Index) updateFile(path string) error {
 		if err != nil {
 			return err
 		}
-		hashString = h.HashToString(h.Sum(nil))
+		hashString = h.String()
 	}
 
 	markAsMetaFile := false

@@ -3,6 +3,7 @@ package curseforge
 import (
 	"errors"
 	"fmt"
+	"github.com/leocov-dev/fork.packwiz/fileio"
 	"github.com/spf13/viper"
 	"github.com/unascribed/FlexVer/go/flexver"
 	"golang.org/x/exp/slices"
@@ -216,7 +217,8 @@ func createModFile(modInfo modInfo, fileInfo modFileInfo, index *core.Index, opt
 	// Current strategy is to go ahead and do stuff without asking, with the assumption that you are using
 	// VCS anyway.
 
-	format, hash, err := modMeta.Write()
+	modWriter := fileio.NewModWriter()
+	format, hash, err := modWriter.Write(&modMeta)
 	if err != nil {
 		return err
 	}

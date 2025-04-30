@@ -216,7 +216,7 @@ func downloadNewFile(task *downloadTask, cacheFolder string, hashesToObtain []st
 }
 
 func selectPreferredHash(hashes map[string]string) (currHashFormat string, currHash string) {
-	for _, hashFormat := range preferredHashList {
+	for _, hashFormat := range PreferredHashList {
 		if hash, ok := hashes[hashFormat]; ok {
 			currHashFormat = hashFormat
 			currHash = hash
@@ -274,7 +274,7 @@ func teeHashes(hashesToObtain []string, hashes map[string]string,
 		return fmt.Errorf("failed to read file: %w", err)
 	}
 
-	calculatedHash := mainHasher.HashToString(mainHasher.Sum(nil))
+	calculatedHash := mainHasher.String()
 
 	// Check if the hash of the downloaded file matches the expected hash
 	if strings.ToLower(calculatedHash) != strings.ToLower(validateHash) {
@@ -284,7 +284,7 @@ func teeHashes(hashesToObtain []string, hashes map[string]string,
 	}
 
 	for hashFormat, v := range hashers {
-		hashes[hashFormat] = v.HashToString(v.Sum(nil))
+		hashes[hashFormat] = v.String()
 	}
 
 	return nil
@@ -403,13 +403,13 @@ func (c *CacheIndex) rehashFile(cacheHash string, hashFormat string) (string, er
 		return "", err
 	}
 
-	validateHash := validateHasher.HashToString(validateHasher.Sum(nil))
+	validateHash := validateHasher.String()
 	if cacheHash != validateHash {
 		return "", fmt.Errorf(
 			"%s hash of cached file does not match with expected hash!\n read hash: %s\n expected hash: %s\n",
 			cacheHashFormat, validateHash, cacheHash)
 	}
-	return rehashHasher.HashToString(rehashHasher.Sum(nil)), nil
+	return rehashHasher.String(), nil
 }
 
 func (c *CacheIndex) NewHandleFromHashes(hashes map[string]string) (*CacheIndexHandle, bool) {
@@ -459,7 +459,7 @@ func (c *CacheIndex) MoveImportFiles() error {
 			return fmt.Errorf("failed to validate imported file %s: %w", path, err)
 		}
 		handle, exists := c.NewHandleFromHashes(map[string]string{
-			cacheHashFormat: hasher.HashToString(hasher.Sum(nil)),
+			cacheHashFormat: hasher.String(),
 		})
 		if exists {
 			err = file.Close()

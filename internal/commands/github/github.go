@@ -97,7 +97,5 @@ func (u Asset) getSha256() (string, error) {
 
 	mainHasher.Write(body)
 
-	hash := mainHasher.Sum(nil)
-
-	return mainHasher.HashToString(hash), nil
+	return mainHasher.String(), nil
 }

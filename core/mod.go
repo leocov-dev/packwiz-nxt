@@ -2,7 +2,6 @@ package core
 
 import (
 	"errors"
-	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -24,6 +23,9 @@ type Mod struct {
 	updateData map[string]interface{}
 
 	Option *ModOption `toml:"option,omitempty"`
+
+	hashFormat string
+	hash       string
 }
 
 const (
@@ -89,53 +91,41 @@ func (m *Mod) SetMetaPath(metaFile string) string {
 	return m.metaFile
 }
 
-// Write saves the mod file, returning a hash format and the value of the hash of the saved file
-func (m Mod) Write() (string, string, error) {
-	f, err := os.Create(m.metaFile)
-	if err != nil {
-		// Attempt to create the containing directory
-		err2 := os.MkdirAll(filepath.Dir(m.metaFile), os.ModePerm)
-		if err2 == nil {
-			f, err = os.Create(m.metaFile)
-		}
-		if err != nil {
-			return "sha256", "", err
-		}
-	}
-
-	h, err := GetHashImpl("sha256")
-	if err != nil {
-		_ = f.Close()
-		return "", "", err
-	}
-	w := io.MultiWriter(h, f)
-
-	enc := toml.NewEncoder(w)
-	// Disable indentation
-	enc.SetIndentSymbol("")
-	err = enc.Encode(m)
-	hashString := h.HashToString(h.Sum(nil))
-	if err != nil {
-		_ = f.Close()
-		return "sha256", hashString, err
-	}
-	return "sha256", hashString, f.Close()
-}
-
 // GetParsedUpdateData can be used to retrieve updater-specific information after parsing a mod file
-func (m Mod) GetParsedUpdateData(updaterName string) (interface{}, bool) {
+func (m *Mod) GetParsedUpdateData(updaterName string) (interface{}, bool) {
 	upd, ok := m.updateData[updaterName]
 	return upd, ok
 }
 
 // GetFilePath is a clumsy hack that I made because Mod already stores it's path anyway
-func (m Mod) GetFilePath() string {
+func (m *Mod) GetFilePath() string {
 	return m.metaFile
 }
 
 // GetDestFilePath returns the path of the destination file of the mod
-func (m Mod) GetDestFilePath() string {
+func (m *Mod) GetDestFilePath() string {
 	return filepath.Join(filepath.Dir(m.metaFile), filepath.FromSlash(m.FileName))
+}
+
+// UpdateHash updates the hash of a mod file, used with ModWriter
+func (m *Mod) UpdateHash(hashFormat string, hash string) {
+	m.hashFormat = hashFormat
+	m.hash = hash
+}
+
+func (m *Mod) GetHashInfo() (string, string) {
+	return m.hashFormat, m.hash
+}
+
+func (m *Mod) IsMetaFile() bool {
+	return true
+}
+
+func (m *Mod) AppendUpdateData(key string, value interface{}) {
+	if m.updateData == nil {
+		m.updateData = make(map[string]interface{})
+	}
+	m.updateData[key] = value
 }
 
 var slugifyRegex1 = regexp.MustCompile(`\(.*\)`)

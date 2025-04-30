@@ -3,6 +3,7 @@ package url
 import (
 	"fmt"
 	"github.com/leocov-dev/fork.packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/fileio"
 	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -87,10 +88,12 @@ var installCmd = &cobra.Command{
 		destPath := modMeta.SetMetaPath(filepath.Join(viper.GetString("meta-folder-base"), folder,
 			destPathName+core.MetaExtension))
 
-		format, hash, err := modMeta.Write()
+		modWriter := fileio.NewModWriter()
+		format, hash, err := modWriter.Write(&modMeta)
 		if err != nil {
 			cmdshared.Exitln(err)
 		}
+
 		err = index.RefreshFileWithHash(destPath, format, hash, true)
 		if err != nil {
 			cmdshared.Exitln(err)
@@ -130,7 +133,7 @@ func getHash(url string) (string, error) {
 		return "", err
 	}
 
-	return mainHasher.HashToString(mainHasher.Sum(nil)), nil
+	return mainHasher.String(), nil
 }
 
 func init() {

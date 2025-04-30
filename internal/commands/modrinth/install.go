@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/leocov-dev/fork.packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/fileio"
 	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -434,10 +435,12 @@ func createFileMeta(project *modrinthApi.Project, version *modrinthApi.Version, 
 	// Current strategy is to go ahead and do stuff without asking, with the assumption that you are using
 	// VCS anyway.
 
-	format, hash, err := modMeta.Write()
+	modWriter := fileio.NewModWriter()
+	format, hash, err := modWriter.Write(&modMeta)
 	if err != nil {
 		return err
 	}
+
 	return index.RefreshFileWithHash(path, format, hash, true)
 }
 
