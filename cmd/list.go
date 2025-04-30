@@ -2,13 +2,14 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 
-	"github.com/packwiz/packwiz/core"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/leocov-dev/fork.packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 )
 
 // listCmd represents the list command
@@ -21,30 +22,26 @@ var listCmd = &cobra.Command{
 		// Load pack
 		pack, err := core.LoadPack()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 
 		// Load index
 		index, err := pack.LoadIndex()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 
 		// Load mods
 		mods, err := index.LoadAllMods()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 
 		// Filter mods by side
 		if viper.IsSet("list.side") {
 			side := viper.GetString("list.side")
 			if side != core.UniversalSide && side != core.ServerSide && side != core.ClientSide {
-				fmt.Printf("Invalid side %q, must be one of client, server, or both (default)\n", side)
-				os.Exit(1)
+				cmdshared.Exitf("Invalid side %q, must be one of client, server, or both (default)\n", side)
 			}
 
 			i := 0

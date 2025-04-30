@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/packwiz/packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/core"
 	"github.com/spf13/viper"
 )
 

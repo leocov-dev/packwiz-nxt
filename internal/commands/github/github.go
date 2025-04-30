@@ -5,9 +5,9 @@ import (
 	"errors"
 	"io"
 
+	"github.com/leocov-dev/fork.packwiz/cmd"
+	"github.com/leocov-dev/fork.packwiz/core"
 	"github.com/mitchellh/mapstructure"
-	"github.com/packwiz/packwiz/cmd"
-	"github.com/packwiz/packwiz/core"
 	"github.com/spf13/cobra"
 )
 

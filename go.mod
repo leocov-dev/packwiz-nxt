@@ -29,7 +29,6 @@ require (
 require (
 	codeberg.org/jmansfield/go-modrinth v0.6.0
 	github.com/BurntSushi/toml v1.2.1
-	github.com/packwiz/packwiz v0.0.0-20250119231123-241f24b550f6
 	github.com/spf13/pflag v1.0.6
 	github.com/unascribed/FlexVer/go/flexver v1.0.0
 	golang.org/x/exp v0.0.0-20230118134722-a68e582fa157
@@ -41,6 +40,7 @@ require (
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/spf13/afero v1.9.3 // indirect
 	github.com/spf13/cast v1.5.0 // indirect

@@ -16,8 +16,7 @@ func PromptYesNo(prompt string) bool {
 	}
 	answer, err := bufio.NewReader(os.Stdin).ReadString('\n')
 	if err != nil {
-		fmt.Printf("Failed to prompt user: %v\n", err)
-		os.Exit(1)
+		Exitf("Failed to prompt user: %v\n", err)
 	}
 
 	ansNormal := strings.ToLower(strings.TrimSpace(answer))

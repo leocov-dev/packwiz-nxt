@@ -2,12 +2,11 @@ package curseforge
 
 import (
 	"fmt"
-	"os"
-	"strconv"
-
-	"github.com/packwiz/packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 	"github.com/skratchdot/open-golang/open"
 	"github.com/spf13/cobra"
+	"strconv"
 )
 
 // openCmd represents the open command
@@ -20,29 +19,24 @@ var openCmd = &cobra.Command{
 		fmt.Println("Loading modpack...")
 		pack, err := core.LoadPack()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		index, err := pack.LoadIndex()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		resolvedMod, ok := index.FindMod(args[0])
 		if !ok {
 			// TODO: should this auto-refresh?
-			fmt.Println("Can't find this file; please ensure you have run packwiz refresh and use the name of the .pw.toml file (defaults to the project slug)")
-			os.Exit(1)
+			cmdshared.Exitln("Can't find this file; please ensure you have run packwiz refresh and use the name of the .pw.toml file (defaults to the project slug)")
 		}
 		modData, err := core.LoadMod(resolvedMod)
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		updateData, ok := modData.GetParsedUpdateData("curseforge")
 		if !ok {
-			fmt.Println("Can't find CurseForge update metadata for this file")
-			os.Exit(1)
+			cmdshared.Exitln("Can't find CurseForge update metadata for this file")
 		}
 		cfUpdateData := updateData.(cfUpdateData)
 		fmt.Println("Opening browser...")

@@ -3,7 +3,8 @@ package curseforge
 import (
 	"fmt"
 	"github.com/aviddiviner/go-murmur"
-	"github.com/packwiz/packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 	"github.com/spf13/cobra"
 	"os"
 	"path/filepath"
@@ -21,13 +22,11 @@ var detectCmd = &cobra.Command{
 		fmt.Println("Loading modpack...")
 		pack, err := core.LoadPack()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		index, err := pack.LoadIndex()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 
 		// Walk files in the mods folder
@@ -55,8 +54,7 @@ var detectCmd = &cobra.Command{
 			return nil
 		})
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		fmt.Printf("Found %d files, submitting...\n", len(hashes))
 
@@ -87,8 +85,7 @@ var detectCmd = &cobra.Command{
 		}
 		modInfos, err := cfDefaultClient.getModInfoMultiple(ids)
 		if err != nil {
-			fmt.Printf("Failed to retrieve metadata: %v", err)
-			os.Exit(1)
+			cmdshared.Exitf("Failed to retrieve metadata: %v", err)
 		}
 		modInfosMap := make(map[uint32]modInfo)
 		for _, v := range modInfos {
@@ -99,16 +96,14 @@ var detectCmd = &cobra.Command{
 		for _, v := range res.ExactMatches {
 			err = createModFile(modInfosMap[v.ID], v.File, &index, false)
 			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
+				cmdshared.Exitln(err)
 			}
 
 			path, ok := modPaths[v.File.Fingerprint]
 			if ok {
 				err = os.Remove(path)
 				if err != nil {
-					fmt.Println(err)
-					os.Exit(1)
+					cmdshared.Exitln(err)
 				}
 			}
 		}

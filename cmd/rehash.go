@@ -2,13 +2,12 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
-	"github.com/packwiz/packwiz/cmdshared"
-
-	"github.com/packwiz/packwiz/core"
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
+
+	"github.com/leocov-dev/fork.packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 )
 
 // rehashCmd represents the rehash command
@@ -21,33 +20,28 @@ var rehashCmd = &cobra.Command{
 		// Load pack
 		pack, err := core.LoadPack()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 
 		// Load index
 		index, err := pack.LoadIndex()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 
 		// Load mods
 		mods, err := index.LoadAllMods()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 
 		if !slices.Contains([]string{"sha1", "sha512", "sha256"}, args[0]) {
-			fmt.Printf("Hash format '%s' is not supported\n", args[0])
-			os.Exit(1)
+			cmdshared.Exitf("Hash format '%s' is not supported\n", args[0])
 		}
 
 		session, err := core.CreateDownloadSession(mods, []string{args[0]})
 		if err != nil {
-			fmt.Printf("Error retrieving external files: %v\n", err)
-			os.Exit(1)
+			cmdshared.Exitf("Error retrieving external files: %v\n", err)
 		}
 
 		cmdshared.ListManualDownloads(session)
@@ -60,8 +54,7 @@ var rehashCmd = &cobra.Command{
 				dl.Mod.Download.Hash = dl.Hashes[args[0]]
 				_, _, err := dl.Mod.Write()
 				if err != nil {
-					fmt.Printf("Error saving mod %s: %v\n", dl.Mod.Name, err)
-					os.Exit(1)
+					cmdshared.Exitf("Error saving mod %s: %v\n", dl.Mod.Name, err)
 				}
 			}
 			// TODO pass the hash to index instead of recomputing from scratch
@@ -69,32 +62,27 @@ var rehashCmd = &cobra.Command{
 
 		err = session.SaveIndex()
 		if err != nil {
-			fmt.Printf("Error saving cache index: %v\n", err)
-			os.Exit(1)
+			cmdshared.Exitf("Error saving cache index: %v\n", err)
 		}
 
 		err = index.Refresh()
 		if err != nil {
-			fmt.Printf("Error refreshing index: %v\n", err)
-			os.Exit(1)
+			cmdshared.Exitf("Error refreshing index: %v\n", err)
 		}
 
 		err = index.Write()
 		if err != nil {
-			fmt.Printf("Error writing index: %v\n", err)
-			os.Exit(1)
+			cmdshared.Exitf("Error writing index: %v\n", err)
 		}
 
 		err = pack.UpdateIndexHash()
 		if err != nil {
-			fmt.Printf("Error updating index hash: %v\n", err)
-			os.Exit(1)
+			cmdshared.Exitf("Error updating index hash: %v\n", err)
 		}
 
 		err = pack.Write()
 		if err != nil {
-			fmt.Printf("Error writing pack: %v\n", err)
-			os.Exit(1)
+			cmdshared.Exitf("Error writing pack: %v\n", err)
 		}
 	},
 }

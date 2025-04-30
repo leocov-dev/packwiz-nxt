@@ -3,10 +3,9 @@ package packinterop
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
-	"github.com/packwiz/packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 	"io"
-	"os"
 )
 
 func ReadMetadata(s ImportPackSource) ImportPackMetadata {
@@ -14,23 +13,20 @@ func ReadMetadata(s ImportPackSource) ImportPackMetadata {
 	metaFile := s.GetPackFile()
 	rdr, err := metaFile.Open()
 	if err != nil {
-		fmt.Printf("Error reading file: %s\n", err)
-		os.Exit(1)
+		cmdshared.Exitf("Error reading file: %s\n", err)
 	}
 
 	// Read the whole file (as we are going to parse it multiple times)
 	fileData, err := io.ReadAll(rdr)
 	if err != nil {
-		fmt.Printf("Error reading file: %s\n", err)
-		os.Exit(1)
+		cmdshared.Exitf("Error reading file: %s\n", err)
 	}
 
 	// Determine what format the file is
 	var jsonFile map[string]interface{}
 	err = json.Unmarshal(fileData, &jsonFile)
 	if err != nil {
-		fmt.Printf("Error parsing JSON: %s\n", err)
-		os.Exit(1)
+		cmdshared.Exitf("Error parsing JSON: %s\n", err)
 	}
 
 	isManifest := false
@@ -41,8 +37,7 @@ func ReadMetadata(s ImportPackSource) ImportPackMetadata {
 		packMeta := cursePackMeta{importSrc: s}
 		err = json.Unmarshal(fileData, &packMeta)
 		if err != nil {
-			fmt.Printf("Error parsing JSON: %s\n", err)
-			os.Exit(1)
+			cmdshared.Exitf("Error parsing JSON: %s\n", err)
 		}
 		packImport = packMeta
 	} else {
@@ -51,8 +46,7 @@ func ReadMetadata(s ImportPackSource) ImportPackMetadata {
 		packMeta := twitchInstalledPackMeta{importSrc: s}
 		err = json.Unmarshal(fileData, &packMeta)
 		if err != nil {
-			fmt.Printf("Error parsing JSON: %s\n", err)
-			os.Exit(1)
+			cmdshared.Exitf("Error parsing JSON: %s\n", err)
 		}
 		packImport = packMeta
 	}

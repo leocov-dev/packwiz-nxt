@@ -2,12 +2,12 @@ package url
 
 import (
 	"fmt"
-	"github.com/packwiz/packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"io"
 	"net/url"
-	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -21,18 +21,15 @@ var installCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		pack, err := core.LoadPack()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 
 		dl, err := url.Parse(args[1])
 		if err != nil {
-			fmt.Println("Failed to parse URL:", err)
-			os.Exit(1)
+			cmdshared.Exitln("Failed to parse URL:", err)
 		}
 		if dl.Scheme != "https" && dl.Scheme != "http" {
-			fmt.Println("Unsupported URL scheme:", dl.Scheme)
-			os.Exit(1)
+			cmdshared.Exitln("Unsupported URL scheme:", dl.Scheme)
 		}
 
 		// TODO: consider using colors for these warnings but those can have issues on windows
@@ -51,21 +48,18 @@ var installCmd = &cobra.Command{
 				msg = "curseforge add " + args[1]
 			}
 			if msg != "" {
-				fmt.Println("Consider using packwiz", msg, "instead; if you know what you are doing use --force to add this file without update metadata.")
-				os.Exit(1)
+				cmdshared.Exitln("Consider using packwiz", msg, "instead; if you know what you are doing use --force to add this file without update metadata.")
 			}
 		}
 
 		hash, err := getHash(args[1])
 		if err != nil {
-			fmt.Println("Failed to retrieve SHA256 hash for file", err)
-			os.Exit(1)
+			cmdshared.Exitln("Failed to retrieve SHA256 hash for file", err)
 		}
 
 		index, err := pack.LoadIndex()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 
 		filename := path.Base(dl.Path)
@@ -85,8 +79,7 @@ var installCmd = &cobra.Command{
 		}
 		destPathName, err := cmd.Flags().GetString("meta-name")
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		if destPathName == "" {
 			destPathName = core.SlugifyName(args[0])
@@ -96,28 +89,23 @@ var installCmd = &cobra.Command{
 
 		format, hash, err := modMeta.Write()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		err = index.RefreshFileWithHash(destPath, format, hash, true)
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		err = index.Write()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		err = pack.UpdateIndexHash()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		err = pack.Write()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		fmt.Printf("Successfully added %s (%s) from: %s\n", args[0], destPath, args[1])
 	}}

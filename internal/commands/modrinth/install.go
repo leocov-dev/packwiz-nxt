@@ -4,16 +4,14 @@ import (
 	modrinthApi "codeberg.org/jmansfield/go-modrinth/modrinth"
 	"errors"
 	"fmt"
-	"github.com/packwiz/packwiz/cmdshared"
+	"github.com/leocov-dev/fork.packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
+	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
-	"os"
+	"gopkg.in/dixonwille/wmenu.v4"
 	"path/filepath"
 	"strings"
-
-	"github.com/packwiz/packwiz/core"
-	"github.com/spf13/cobra"
-	"gopkg.in/dixonwille/wmenu.v4"
 )
 
 // installCmd represents the install command
@@ -25,14 +23,12 @@ var installCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		pack, err := core.LoadPack()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 
 		index, err := pack.LoadIndex()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 
 		// If project/version IDs/version file name is provided in command line, use those
@@ -40,15 +36,13 @@ var installCmd = &cobra.Command{
 		if projectIDFlag != "" {
 			projectID = projectIDFlag
 			if len(args) != 0 {
-				fmt.Println("--project-id cannot be used with a separately specified URL/slug/search term")
-				os.Exit(1)
+				cmdshared.Exitln("--project-id cannot be used with a separately specified URL/slug/search term")
 			}
 		}
 		if versionIDFlag != "" {
 			versionID = versionIDFlag
 			if len(args) != 0 {
-				fmt.Println("--version-id cannot be used with a separately specified URL/slug/search term")
-				os.Exit(1)
+				cmdshared.Exitln("--version-id cannot be used with a separately specified URL/slug/search term")
 			}
 		}
 		if versionFilenameFlag != "" {
@@ -56,8 +50,7 @@ var installCmd = &cobra.Command{
 		}
 
 		if (len(args) == 0 || len(args[0]) == 0) && projectID == "" {
-			fmt.Println("You must specify a project; with the ID flags, or by passing a URL, slug or search term directly.")
-			os.Exit(1)
+			cmdshared.Exitln("You must specify a project; with the ID flags, or by passing a URL, slug or search term directly.")
 		}
 
 		var version string
@@ -66,8 +59,7 @@ var installCmd = &cobra.Command{
 			// Try interpreting the argument as a slug/project ID, or project/version/CDN URL
 			parsedSlug, err = parseSlugOrUrl(args[0], &projectID, &version, &versionID, &versionFilename)
 			if err != nil {
-				fmt.Printf("Failed to parse URL: %v\n", err)
-				os.Exit(1)
+				cmdshared.Exitf("Failed to parse URL: %v\n", err)
 			}
 		}
 
@@ -75,8 +67,7 @@ var installCmd = &cobra.Command{
 		if versionID != "" {
 			err = installVersionById(versionID, versionFilename, pack, &index)
 			if err != nil {
-				fmt.Printf("Failed to add project: %s\n", err)
-				os.Exit(1)
+				cmdshared.Exitf("Failed to add project: %s\n", err)
 			}
 			return
 		}
@@ -92,13 +83,11 @@ var installCmd = &cobra.Command{
 					// Try to look up version number
 					versionData, err := resolveVersion(project, version)
 					if err != nil {
-						fmt.Printf("Failed to add project: %s\n", err)
-						os.Exit(1)
+						cmdshared.Exitf("Failed to add project: %s\n", err)
 					}
 					err = installVersion(project, versionData, versionFilename, pack, &index)
 					if err != nil {
-						fmt.Printf("Failed to add project: %s\n", err)
-						os.Exit(1)
+						cmdshared.Exitf("Failed to add project: %s\n", err)
 					}
 					return
 				}
@@ -106,8 +95,7 @@ var installCmd = &cobra.Command{
 				// No version specified; find latest
 				err = installProject(project, versionFilename, pack, &index)
 				if err != nil {
-					fmt.Printf("Failed to add project: %s\n", err)
-					os.Exit(1)
+					cmdshared.Exitf("Failed to add project: %s\n", err)
 				}
 				return
 			}
@@ -117,12 +105,10 @@ var installCmd = &cobra.Command{
 		if projectID == "" || parsedSlug {
 			err = installViaSearch(strings.Join(args, " "), versionFilename, !parsedSlug, pack, &index)
 			if err != nil {
-				fmt.Printf("Failed to add project: %s\n", err)
-				os.Exit(1)
+				cmdshared.Exitf("Failed to add project: %s\n", err)
 			}
 		} else {
-			fmt.Printf("Failed to add project: %s\n", err)
-			os.Exit(1)
+			cmdshared.Exitf("Failed to add project: %s\n", err)
 		}
 	},
 }

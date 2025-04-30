@@ -4,6 +4,7 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
+	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 	"html/template"
 	"io"
 	"net/http"
@@ -14,7 +15,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/packwiz/packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/core"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -40,21 +41,18 @@ var serveCmd = &cobra.Command{
 			fmt.Println("Loading modpack...")
 			pack, err := core.LoadPack()
 			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
+				cmdshared.Exitln(err)
 			}
 			index, err := pack.LoadIndex()
 			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
+				cmdshared.Exitln(err)
 			}
 			packServeDir := filepath.Dir(viper.GetString("pack-file"))
 			packFileName := filepath.Base(viper.GetString("pack-file"))
 
 			t, err := template.New("index-page").Parse(indexPage)
 			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
+				cmdshared.Exitln(err)
 			}
 
 			indexPageBuf := new(bytes.Buffer)
@@ -143,8 +141,7 @@ var serveCmd = &cobra.Command{
 		fmt.Println("Running on port " + port)
 		err := http.ListenAndServe(":"+port, nil)
 		if err != nil {
-			fmt.Printf("Error running server: %s\n", err)
-			os.Exit(1)
+			cmdshared.Exitf("Error running server: %s\n", err)
 		}
 	},
 }

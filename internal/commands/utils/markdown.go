@@ -7,6 +7,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
 	"github.com/spf13/viper"
+
+	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 )
 
 // markdownCmd represents the markdown command
@@ -19,14 +21,12 @@ var markdownCmd = &cobra.Command{
 		outDir := viper.GetString("utils.markdown.dir")
 		err := os.MkdirAll(outDir, os.ModePerm)
 		if err != nil {
-			fmt.Printf("Error creating directory: %s\n", err)
-			os.Exit(1)
+			cmdshared.Exitf("Error creating directory: %s\n", err)
 		}
 		disableTag(cmd.Root())
 		err = doc.GenMarkdownTree(cmd.Root(), outDir)
 		if err != nil {
-			fmt.Printf("Error generating markdown: %s\n", err)
-			os.Exit(1)
+			cmdshared.Exitf("Error generating markdown: %s\n", err)
 		}
 		fmt.Println("Generated markdown successfully!")
 	},

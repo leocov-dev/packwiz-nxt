@@ -2,9 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-
-	"github.com/packwiz/packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 	"github.com/spf13/cobra"
 )
 
@@ -12,49 +11,40 @@ func pinMod(args []string, pinned bool) {
 	fmt.Println("Loading modpack...")
 	pack, err := core.LoadPack()
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		cmdshared.Exitln(err)
 	}
 	index, err := pack.LoadIndex()
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		cmdshared.Exitln(err)
 	}
 	modPath, ok := index.FindMod(args[0])
 	if !ok {
-		fmt.Println("Can't find this file; please ensure you have run packwiz refresh and use the name of the .pw.toml file (defaults to the project slug)")
-		os.Exit(1)
+		cmdshared.Exitln("Can't find this file; please ensure you have run packwiz refresh and use the name of the .pw.toml file (defaults to the project slug)")
 	}
 	modData, err := core.LoadMod(modPath)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		cmdshared.Exitln(err)
 	}
 	modData.Pin = pinned
 	format, hash, err := modData.Write()
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		cmdshared.Exitln(err)
 	}
 	err = index.RefreshFileWithHash(modPath, format, hash, true)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		cmdshared.Exitln(err)
 	}
 	err = index.Write()
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		cmdshared.Exitln(err)
 	}
 	err = pack.UpdateIndexHash()
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		cmdshared.Exitln(err)
 	}
 	err = pack.Write()
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		cmdshared.Exitln(err)
 	}
 
 	message := "pinned"

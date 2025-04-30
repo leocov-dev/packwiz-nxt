@@ -2,9 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 	"os"
 
-	"github.com/packwiz/packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/core"
 	"github.com/spf13/cobra"
 )
 
@@ -18,44 +19,36 @@ var removeCmd = &cobra.Command{
 		fmt.Println("Loading modpack...")
 		pack, err := core.LoadPack()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		index, err := pack.LoadIndex()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		resolvedMod, ok := index.FindMod(args[0])
 		if !ok {
-			fmt.Println("Can't find this file; please ensure you have run packwiz refresh and use the name of the .pw.toml file (defaults to the project slug)")
-			os.Exit(1)
+			cmdshared.Exitln("Can't find this file; please ensure you have run packwiz refresh and use the name of the .pw.toml file (defaults to the project slug)")
 		}
 		err = os.Remove(resolvedMod)
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		fmt.Println("Removing file from index...")
 		err = index.RemoveFile(resolvedMod)
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		err = index.Write()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		err = pack.UpdateIndexHash()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		err = pack.Write()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 
 		fmt.Printf("%s removed successfully!\n", args[0])

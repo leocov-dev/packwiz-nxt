@@ -2,9 +2,9 @@ package migrate
 
 import (
 	"fmt"
-	packCmd "github.com/packwiz/packwiz/cmd"
-	"github.com/packwiz/packwiz/cmdshared"
-	"github.com/packwiz/packwiz/core"
+	packCmd "github.com/leocov-dev/fork.packwiz/cmd"
+	"github.com/leocov-dev/fork.packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"os"
@@ -20,16 +20,13 @@ var minecraftCommand = &cobra.Command{
 		if err != nil {
 			// Check if it's a no such file or directory error
 			if os.IsNotExist(err) {
-				fmt.Println("No pack.toml file found, run 'packwiz init' to create one!")
-				os.Exit(1)
+				cmdshared.Exitln("No pack.toml file found, run 'packwiz init' to create one!")
 			}
-			fmt.Printf("Error loading pack: %s\n", err)
-			os.Exit(1)
+			cmdshared.Exitf("Error loading pack: %s\n", err)
 		}
 		currentVersion, err := modpack.GetMCVersion()
 		if err != nil {
-			fmt.Printf("Error getting Minecraft version from pack: %s\n", err)
-			os.Exit(1)
+			cmdshared.Exitf("Error getting Minecraft version from pack: %s\n", err)
 		}
 		wantedMCVersion := args[0]
 		if wantedMCVersion == currentVersion {
@@ -38,8 +35,7 @@ var minecraftCommand = &cobra.Command{
 		}
 		mcVersions, err := cmdshared.GetValidMCVersions()
 		if err != nil {
-			fmt.Printf("Error getting Minecraft versions: %s\n", err)
-			os.Exit(1)
+			cmdshared.Exitf("Error getting Minecraft versions: %s\n", err)
 		}
 		mcVersions.CheckValid(wantedMCVersion)
 		// Set the version in the pack
@@ -47,8 +43,7 @@ var minecraftCommand = &cobra.Command{
 		// Write the pack to disk
 		err = modpack.Write()
 		if err != nil {
-			fmt.Printf("Error writing pack.toml: %s\n", err)
-			os.Exit(1)
+			cmdshared.Exitf("Error writing pack.toml: %s\n", err)
 		}
 		fmt.Printf("Successfully updated Minecraft version to %s\n", wantedMCVersion)
 		// Prompt the user if they want to update the loader too while they're at it.

@@ -3,7 +3,7 @@ package cmdshared
 import (
 	"archive/zip"
 	"fmt"
-	"github.com/packwiz/packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/core"
 	"io"
 	"os"
 	"path"
@@ -20,8 +20,7 @@ func ListManualDownloads(session core.DownloadSession) {
 		}
 		cacheDir, err := core.GetPackwizCache()
 		if err != nil {
-			fmt.Printf("Error locating cache folder: %v", err)
-			os.Exit(1)
+			Exitf("Error locating cache folder: %v", err)
 		}
 
 		fmt.Printf("Once you have done so, place these files in %s and re-run this command.\n",

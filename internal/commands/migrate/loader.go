@@ -2,8 +2,8 @@ package migrate
 
 import (
 	"fmt"
-	"github.com/packwiz/packwiz/cmdshared"
-	"github.com/packwiz/packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
 	"os"
@@ -18,26 +18,21 @@ var loaderCommand = &cobra.Command{
 		if err != nil {
 			// Check if it's a no such file or directory error
 			if os.IsNotExist(err) {
-				fmt.Println("No pack.toml file found, run 'packwiz init' to create one!")
-				os.Exit(1)
+				cmdshared.Exitln("No pack.toml file found, run 'packwiz init' to create one!")
 			}
-			fmt.Printf("Error loading pack: %s\n", err)
-			os.Exit(1)
+			cmdshared.Exitf("Error loading pack: %s\n", err)
 		}
 		var currentLoaders = modpack.GetLoaders()
 		// Do some sanity checks on the current loader slice
 		if len(currentLoaders) == 0 {
-			fmt.Println("No loader is currently set in your pack.toml!")
-			os.Exit(1)
+			cmdshared.Exitln("No loader is currently set in your pack.toml!")
 		} else if len(currentLoaders) > 1 {
-			fmt.Println("You have multiple loaders set in your pack.toml, this is not supported!")
-			os.Exit(1)
+			cmdshared.Exitln("You have multiple loaders set in your pack.toml, this is not supported!")
 		}
 		// Get the Minecraft version for the pack
 		mcVersion, err := modpack.GetMCVersion()
 		if err != nil {
-			fmt.Printf("Error getting Minecraft version: %s\n", err)
-			os.Exit(1)
+			cmdshared.Exitf("Error getting Minecraft version: %s\n", err)
 		}
 		if args[0] == "latest" {
 			fmt.Println("Updating to latest loader version")
@@ -58,14 +53,12 @@ var loaderCommand = &cobra.Command{
 			// TODO: Figure out a way to get the recommended version, this is Forge only
 			// Ensure we're on Forge
 			if !slices.Contains(currentLoaders, "forge") {
-				fmt.Println("The recommended loader version is only available on Forge!")
-				os.Exit(1)
+				cmdshared.Exitln("The recommended loader version is only available on Forge!")
 			}
 			// We'll be updating to the recommended loader version
 			recommendedVer := core.GetForgeRecommended(mcVersion)
 			if recommendedVer == "" {
-				fmt.Println("Error getting recommended Forge version!")
-				os.Exit(1)
+				cmdshared.Exitln("Error getting recommended Forge version!")
 			}
 			if ok := updatePackToVersion(recommendedVer, modpack, core.ModLoaders["forge"]); !ok {
 				os.Exit(1)
@@ -73,8 +66,7 @@ var loaderCommand = &cobra.Command{
 			// Write the pack to disk
 			err = modpack.Write()
 			if err != nil {
-				fmt.Printf("Error writing pack.toml: %s", err)
-				os.Exit(1)
+				cmdshared.Exitf("Error writing pack.toml: %s", err)
 			}
 		} else {
 			fmt.Println("Updating to explicit loader version")
@@ -99,8 +91,7 @@ var loaderCommand = &cobra.Command{
 			// Write the pack to disk
 			err = modpack.Write()
 			if err != nil {
-				fmt.Printf("Error writing pack.toml: %s\n", err)
-				os.Exit(1)
+				cmdshared.Exitf("Error writing pack.toml: %s\n", err)
 			}
 		}
 	},
@@ -113,21 +104,18 @@ func init() {
 func getVersionsForLoader(loader, mcVersion string) ([]string, string, core.ModLoaderComponent) {
 	gottenLoader, ok := core.ModLoaders[loader]
 	if !ok {
-		fmt.Printf("Unknown loader %s\n", loader)
-		os.Exit(1)
+		cmdshared.Exitf("Unknown loader %s\n", loader)
 	}
 	versions, latestVersion, err := gottenLoader.VersionListGetter(mcVersion)
 	if err != nil {
-		fmt.Printf("Error getting version list for %s: %s\n", gottenLoader.FriendlyName, err)
-		os.Exit(1)
+		cmdshared.Exitf("Error getting version list for %s: %s\n", gottenLoader.FriendlyName, err)
 	}
 	return versions, latestVersion, gottenLoader
 }
 
 func validateVersion(versions []string, version string, gottenLoader core.ModLoaderComponent) {
 	if !slices.Contains(versions, version) {
-		fmt.Printf("Version %s is not a valid version for %s\n", version, gottenLoader.FriendlyName)
-		os.Exit(1)
+		cmdshared.Exitf("Version %s is not a valid version for %s\n", version, gottenLoader.FriendlyName)
 	}
 }
 

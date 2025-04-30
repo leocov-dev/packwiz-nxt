@@ -2,11 +2,10 @@ package cmdshared
 
 import (
 	"encoding/json"
-	"fmt"
-	"github.com/packwiz/packwiz/core"
-	"os"
 	"sort"
 	"time"
+
+	"github.com/leocov-dev/fork.packwiz/core"
 )
 
 type McVersionManifest struct {
@@ -29,8 +28,7 @@ func (m McVersionManifest) CheckValid(version string) {
 			return
 		}
 	}
-	fmt.Println("Given version is not a valid Minecraft version!")
-	os.Exit(1)
+	Exitln("Given version is not a valid Minecraft version!")
 }
 
 func GetValidMCVersions() (McVersionManifest, error) {

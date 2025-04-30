@@ -2,11 +2,10 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/spf13/viper"
-	"os"
-
-	"github.com/packwiz/packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // refreshCmd represents the refresh command
@@ -18,8 +17,7 @@ var refreshCmd = &cobra.Command{
 		fmt.Println("Loading modpack...")
 		pack, err := core.LoadPack()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		build, err := cmd.Flags().GetBool("build")
 		if err == nil && build {
@@ -29,28 +27,23 @@ var refreshCmd = &cobra.Command{
 		}
 		index, err := pack.LoadIndex()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		err = index.Refresh()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		err = index.Write()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		err = pack.UpdateIndexHash()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		err = pack.Write()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		fmt.Println("Index refreshed!")
 	},

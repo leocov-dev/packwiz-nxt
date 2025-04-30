@@ -6,14 +6,15 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/packwiz/packwiz/curseforge/packinterop"
+	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
+	"github.com/leocov-dev/fork.packwiz/internal/commands/curseforge/packinterop"
 	"io"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 
-	"github.com/packwiz/packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/core"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -30,8 +31,7 @@ var importCmd = &cobra.Command{
 		// TODO: refactor/extract file checking?
 		if strings.HasPrefix(inputFile, "http") {
 			// TODO: implement
-			fmt.Println("HTTP not supported (yet)")
-			os.Exit(1)
+			cmdshared.Exitln("HTTP not supported (yet)")
 		} else {
 			// Attempt to read from file
 			var f *os.File
@@ -71,8 +71,7 @@ var importCmd = &cobra.Command{
 				if found {
 					f, err = os.Open(inputFile)
 					if err != nil {
-						fmt.Printf("Error opening file: %s\n", err)
-						os.Exit(1)
+						cmdshared.Exitf("Error opening file: %s\n", err)
 					}
 				} else {
 					fmt.Printf("Error opening file: %s\n", err)
@@ -89,8 +88,7 @@ var importCmd = &cobra.Command{
 			buf := bufio.NewReader(f)
 			header, err := buf.Peek(2)
 			if err != nil {
-				fmt.Printf("Error reading file: %s\n", err)
-				os.Exit(1)
+				cmdshared.Exitf("Error reading file: %s\n", err)
 			}
 
 			// Check if file is a zip
@@ -98,19 +96,16 @@ var importCmd = &cobra.Command{
 				// Read the whole file (as bufio doesn't work for zips)
 				zipData, err := io.ReadAll(buf)
 				if err != nil {
-					fmt.Printf("Error reading file: %s\n", err)
-					os.Exit(1)
+					cmdshared.Exitf("Error reading file: %s\n", err)
 				}
 				// Get zip size
 				stat, err := f.Stat()
 				if err != nil {
-					fmt.Printf("Error reading file: %s\n", err)
-					os.Exit(1)
+					cmdshared.Exitf("Error reading file: %s\n", err)
 				}
 				zr, err := zip.NewReader(bytes.NewReader(zipData), stat.Size())
 				if err != nil {
-					fmt.Printf("Error parsing zip: %s\n", err)
-					os.Exit(1)
+					cmdshared.Exitf("Error parsing zip: %s\n", err)
 				}
 
 				// Search the zip for minecraftinstance.json or manifest.json
@@ -122,8 +117,7 @@ var importCmd = &cobra.Command{
 				}
 
 				if metaFile == nil {
-					fmt.Println("Can't find manifest.json or minecraftinstance.json, is this a valid pack?")
-					os.Exit(1)
+					cmdshared.Exitln("Can't find manifest.json or minecraftinstance.json, is this a valid pack?")
 				}
 
 				packImport = packinterop.ReadMetadata(packinterop.GetZipPackSource(metaFile, zr))
@@ -143,13 +137,11 @@ var importCmd = &cobra.Command{
 				// Create file
 				err = os.WriteFile(indexFilePath, []byte{}, 0644)
 				if err != nil {
-					fmt.Printf("Error creating index file: %s\n", err)
-					os.Exit(1)
+					cmdshared.Exitf("Error creating index file: %s\n", err)
 				}
 				fmt.Println(indexFilePath + " created!")
 			} else if err != nil {
-				fmt.Printf("Error checking index file: %s\n", err)
-				os.Exit(1)
+				cmdshared.Exitf("Error checking index file: %s\n", err)
 			}
 
 			pack = core.Pack{
@@ -179,8 +171,7 @@ var importCmd = &cobra.Command{
 		}
 		index, err := pack.LoadIndex()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 
 		modsList := packImport.Mods()
@@ -193,8 +184,7 @@ var importCmd = &cobra.Command{
 
 		modInfos, err := cfDefaultClient.getModInfoMultiple(modIDs)
 		if err != nil {
-			fmt.Printf("Failed to obtain project information: %s\n", err)
-			os.Exit(1)
+			cmdshared.Exitf("Failed to obtain project information: %s\n", err)
 		}
 
 		modInfosMap := make(map[uint32]modInfo)
@@ -237,8 +227,7 @@ var importCmd = &cobra.Command{
 
 		modFileInfos, err := cfDefaultClient.getFileInfoMultiple(remainingFileIDs)
 		if err != nil {
-			fmt.Printf("Failed to obtain project file information: %s\n", err)
-			os.Exit(1)
+			cmdshared.Exitf("Failed to obtain project file information: %s\n", err)
 		}
 
 		for _, v := range modFileInfos {
@@ -261,8 +250,7 @@ var importCmd = &cobra.Command{
 
 			err = createModFile(modInfoValue, modFileInfoValue, &index, v.OptionalDisabled)
 			if err != nil {
-				fmt.Printf("Failed to save project \"%s\": %s\n", modInfoValue.Name, err)
-				os.Exit(1)
+				cmdshared.Exitf("Failed to save project \"%s\": %s\n", modInfoValue.Name, err)
 			}
 
 			modFilePath := getPathForFile(modInfoValue.GameID, modInfoValue.ClassID, modInfoValue.PrimaryCategoryID, modInfoValue.Slug)
@@ -280,8 +268,7 @@ var importCmd = &cobra.Command{
 		fmt.Println("Reading override files...")
 		filesList, err := packImport.GetFiles()
 		if err != nil {
-			fmt.Printf("Failed to read override files: %s\n", err)
-			os.Exit(1)
+			cmdshared.Exitf("Failed to read override files: %s\n", err)
 		}
 
 		successes = 0
@@ -346,8 +333,7 @@ var importCmd = &cobra.Command{
 			fmt.Printf("Successfully copied %d/%d files!\n", successes, len(filesList))
 			err = index.Refresh()
 			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
+				cmdshared.Exitln(err)
 			}
 		} else {
 			fmt.Println("No files copied!")
@@ -355,18 +341,15 @@ var importCmd = &cobra.Command{
 
 		err = index.Write()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		err = pack.UpdateIndexHash()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		err = pack.Write()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 	},
 }

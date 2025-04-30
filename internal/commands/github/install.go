@@ -4,15 +4,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"os"
-	"path/filepath"
-	"regexp"
-
 	"github.com/dlclark/regexp2"
-	"github.com/packwiz/packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"io"
+	"path/filepath"
+	"regexp"
 )
 
 var GithubRegex = regexp.MustCompile(`^https?://(?:www\.)?github\.com/([^/]+/[^/]+)`)
@@ -26,13 +25,11 @@ var installCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		pack, err := core.LoadPack()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 
 		if len(args) == 0 || len(args[0]) == 0 {
-			fmt.Println("You must specify a GitHub repository URL.")
-			os.Exit(1)
+			cmdshared.Exitln("You must specify a GitHub repository URL.")
 		}
 
 		// Try interpreting the argument as a slug, or GitHub repository URL.
@@ -61,8 +58,7 @@ var installCmd = &cobra.Command{
 		repo, err := fetchRepo(slug)
 
 		if err != nil {
-			fmt.Printf("Failed to add project: %s\n", err)
-			os.Exit(1)
+			cmdshared.Exitf("Failed to add project: %s\n", err)
 		}
 
 		if branchFlag != "" {
@@ -74,8 +70,7 @@ var installCmd = &cobra.Command{
 
 		err = installMod(repo, branch, regex, pack)
 		if err != nil {
-			fmt.Printf("Failed to add project: %s\n", err)
-			os.Exit(1)
+			cmdshared.Exitf("Failed to add project: %s\n", err)
 		}
 	},
 }

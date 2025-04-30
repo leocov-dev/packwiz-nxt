@@ -3,16 +3,14 @@ package curseforge
 import (
 	"errors"
 	"fmt"
-	"github.com/packwiz/packwiz/cmdshared"
+	"github.com/leocov-dev/fork.packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 	"github.com/sahilm/fuzzy"
+	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
-	"os"
-	"strings"
-
-	"github.com/packwiz/packwiz/core"
-	"github.com/spf13/cobra"
 	"gopkg.in/dixonwille/wmenu.v4"
+	"strings"
 )
 
 const maxCycles = 20
@@ -31,23 +29,19 @@ var installCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		pack, err := core.LoadPack()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		index, err := pack.LoadIndex()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		mcVersions, err := pack.GetSupportedMCVersions()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		primaryMCVersion, err := pack.GetMCVersion()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 
 		game := gameFlag
@@ -64,14 +58,12 @@ var installCmd = &cobra.Command{
 		}
 
 		if (len(args) == 0 || len(args[0]) == 0) && modID == 0 {
-			fmt.Println("You must specify a project; with the ID flags, or by passing a URL, slug or search term directly.")
-			os.Exit(1)
+			cmdshared.Exitln("You must specify a project; with the ID flags, or by passing a URL, slug or search term directly.")
 		}
 		if modID == 0 && len(args) == 1 {
 			parsedGame, parsedCategory, parsedSlug, parsedFileID, err := parseSlugOrUrl(args[0])
 			if err != nil {
-				fmt.Printf("Failed to parse URL: %v\n", err)
-				os.Exit(1)
+				cmdshared.Exitf("Failed to parse URL: %v\n", err)
 			}
 
 			if parsedGame != "" {
@@ -107,23 +99,20 @@ var installCmd = &cobra.Command{
 		}
 
 		if modID == 0 {
-			fmt.Println("No projects found!")
-			os.Exit(1)
+			cmdshared.Exitln("No projects found!")
 		}
 
 		if !modInfoObtained {
 			modInfoData, err = cfDefaultClient.getModInfo(modID)
 			if err != nil {
-				fmt.Printf("Failed to get project info: %v\n", err)
-				os.Exit(1)
+				cmdshared.Exitf("Failed to get project info: %v\n", err)
 			}
 		}
 
 		var fileInfoData modFileInfo
 		fileInfoData, err = getLatestFile(modInfoData, mcVersions, fileID, pack.GetCompatibleLoaders())
 		if err != nil {
-			fmt.Printf("Failed to get file for project: %v\n", err)
-			os.Exit(1)
+			cmdshared.Exitf("Failed to get file for project: %v\n", err)
 		}
 
 		if len(fileInfoData.Dependencies) > 0 {
@@ -211,8 +200,7 @@ var installCmd = &cobra.Command{
 					cycles++
 				}
 				if cycles >= maxCycles {
-					fmt.Println("Dependencies recurse too deeply! Try increasing maxCycles.")
-					os.Exit(1)
+					cmdshared.Exitln("Dependencies recurse too deeply! Try increasing maxCycles.")
 				}
 
 				if len(depsInstallable) > 0 {
@@ -225,8 +213,7 @@ var installCmd = &cobra.Command{
 						for _, v := range depsInstallable {
 							err = createModFile(v.modInfo, v.fileInfo, &index, false)
 							if err != nil {
-								fmt.Println(err)
-								os.Exit(1)
+								cmdshared.Exitln(err)
 							}
 							fmt.Printf("Dependency \"%s\" successfully added! (%s)\n", v.modInfo.Name, v.fileInfo.FileName)
 						}
@@ -239,24 +226,20 @@ var installCmd = &cobra.Command{
 
 		err = createModFile(modInfoData, fileInfoData, &index, false)
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 
 		err = index.Write()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		err = pack.UpdateIndexHash()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		err = pack.Write()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 
 		fmt.Printf("Project \"%s\" successfully added! (%s)\n", modInfoData.Name, fileInfoData.FileName)
@@ -291,33 +274,28 @@ func searchCurseforgeInternal(searchTerm string, isSlug bool, game string, categ
 	if gameID == 0 {
 		games, err := cfDefaultClient.getGames()
 		if err != nil {
-			fmt.Printf("Failed to lookup game %s: %v\n", game, err)
-			os.Exit(1)
+			cmdshared.Exitf("Failed to lookup game %s: %v\n", game, err)
 		}
 		for _, v := range games {
 			if v.Slug == game {
 				if v.Status != gameStatusLive {
-					fmt.Printf("Failed to lookup game %s: selected game is not live!\n", game)
-					os.Exit(1)
+					cmdshared.Exitf("Failed to lookup game %s: selected game is not live!\n", game)
 				}
 				if v.APIStatus != gameApiStatusPublic {
-					fmt.Printf("Failed to lookup game %s: selected game does not have a public API!\n", game)
-					os.Exit(1)
+					cmdshared.Exitf("Failed to lookup game %s: selected game does not have a public API!\n", game)
 				}
 				gameID = v.ID
 				break
 			}
 		}
 		if gameID == 0 {
-			fmt.Printf("Failed to lookup: game %s could not be found!\n", game)
-			os.Exit(1)
+			cmdshared.Exitf("Failed to lookup: game %s could not be found!\n", game)
 		}
 	}
 	if categoryID == 0 && classID == 0 && category != "" {
 		categories, err := cfDefaultClient.getCategories(gameID)
 		if err != nil {
-			fmt.Printf("Failed to lookup categories: %v\n", err)
-			os.Exit(1)
+			cmdshared.Exitf("Failed to lookup categories: %v\n", err)
 		}
 		for _, v := range categories {
 			if v.Slug == category {
@@ -331,8 +309,7 @@ func searchCurseforgeInternal(searchTerm string, isSlug bool, game string, categ
 			}
 		}
 		if categoryID == 0 && classID == 0 {
-			fmt.Printf("Failed to lookup: category %s could not be found!\n", category)
-			os.Exit(1)
+			cmdshared.Exitf("Failed to lookup: category %s could not be found!\n", category)
 		}
 	}
 
@@ -349,12 +326,10 @@ func searchCurseforgeInternal(searchTerm string, isSlug bool, game string, categ
 	}
 	results, err := cfDefaultClient.getSearch(search, slug, gameID, classID, categoryID, filterGameVersion, searchLoaderType)
 	if err != nil {
-		fmt.Printf("Failed to search for project: %v\n", err)
-		os.Exit(1)
+		cmdshared.Exitf("Failed to search for project: %v\n", err)
 	}
 	if len(results) == 0 {
-		fmt.Println("No projects found!")
-		os.Exit(1)
+		cmdshared.Exitln("No projects found!")
 		return false, modInfo{}
 	} else if len(results) == 1 {
 		return false, results[0]
@@ -401,8 +376,7 @@ func searchCurseforgeInternal(searchTerm string, isSlug bool, game string, categ
 		})
 		err = menu.Run()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 
 		if cancelled {

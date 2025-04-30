@@ -1,6 +1,10 @@
 package cmdshared
 
-import "strings"
+import (
+	"fmt"
+	"os"
+	"strings"
+)
 
 func GetRawForgeVersion(version string) string {
 	var wantedVersion string
@@ -13,4 +17,14 @@ func GetRawForgeVersion(version string) string {
 		wantedVersion = version
 	}
 	return wantedVersion
+}
+
+func Exitf(format string, a ...interface{}) {
+	fmt.Printf(format, a...)
+	os.Exit(1)
+}
+
+func Exitln(a ...interface{}) {
+	fmt.Println(a...)
+	os.Exit(1)
 }

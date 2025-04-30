@@ -2,8 +2,8 @@ package settings
 
 import (
 	"fmt"
-	"github.com/packwiz/packwiz/cmdshared"
-	"github.com/packwiz/packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 	"github.com/spf13/cobra"
 	"github.com/unascribed/FlexVer/go/flexver"
 	"golang.org/x/exp/slices"
@@ -21,11 +21,9 @@ var acceptableVersionsCommand = &cobra.Command{
 		if err != nil {
 			// Check if it's a no such file or directory error
 			if os.IsNotExist(err) {
-				fmt.Println("No pack.toml file found, run 'packwiz init' to create one!")
-				os.Exit(1)
+				cmdshared.Exitln("No pack.toml file found, run 'packwiz init' to create one!")
 			}
-			fmt.Printf("Error loading pack: %s\n", err)
-			os.Exit(1)
+			cmdshared.Exitf("Error loading pack: %s\n", err)
 		}
 		var currentVersions []string
 		// Check if they have no options whatsoever
@@ -45,8 +43,7 @@ var acceptableVersionsCommand = &cobra.Command{
 			acceptableVersion := args[0]
 			// Check if the version is already in the list
 			if slices.Contains(currentVersions, acceptableVersion) {
-				fmt.Printf("Version %s is already in your acceptable versions list!\n", acceptableVersion)
-				os.Exit(1)
+				cmdshared.Exitf("Version %s is already in your acceptable versions list!\n", acceptableVersion)
 			}
 			// Add the version to the list and re-sort it
 			currentVersions = append(currentVersions, acceptableVersion)
@@ -56,8 +53,7 @@ var acceptableVersionsCommand = &cobra.Command{
 			// Save the pack
 			err = modpack.Write()
 			if err != nil {
-				fmt.Printf("Error writing pack: %s\n", err)
-				os.Exit(1)
+				cmdshared.Exitf("Error writing pack: %s\n", err)
 			}
 			// Print success message
 			prettyList := strings.Join(currentVersions, ", ")
@@ -67,8 +63,7 @@ var acceptableVersionsCommand = &cobra.Command{
 			acceptableVersion := args[0]
 			// Check if the version is in the list
 			if !slices.Contains(currentVersions, acceptableVersion) {
-				fmt.Printf("Version %s is not in your acceptable versions list!\n", acceptableVersion)
-				os.Exit(1)
+				cmdshared.Exitf("Version %s is not in your acceptable versions list!\n", acceptableVersion)
 			}
 			// Remove the version from the list
 			i := slices.Index(currentVersions, acceptableVersion)
@@ -80,8 +75,7 @@ var acceptableVersionsCommand = &cobra.Command{
 			// Save the pack
 			err = modpack.Write()
 			if err != nil {
-				fmt.Printf("Error writing pack: %s\n", err)
-				os.Exit(1)
+				cmdshared.Exitf("Error writing pack: %s\n", err)
 			}
 			// Print success message
 			prettyList := strings.Join(currentVersions, ", ")
@@ -125,8 +119,7 @@ var acceptableVersionsCommand = &cobra.Command{
 			modpack.Options["acceptable-game-versions"] = acceptableVersionsDeduped
 			err = modpack.Write()
 			if err != nil {
-				fmt.Printf("Error writing pack: %s\n", err)
-				os.Exit(1)
+				cmdshared.Exitf("Error writing pack: %s\n", err)
 			}
 			// Print success message
 			prettyList := strings.Join(acceptableVersionsDeduped, ", ")

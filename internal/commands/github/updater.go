@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/dlclark/regexp2"
+	"github.com/leocov-dev/fork.packwiz/core"
 	"github.com/mitchellh/mapstructure"
-	"github.com/packwiz/packwiz/core"
 )
 
 type ghUpdateData struct {

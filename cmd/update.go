@@ -2,12 +2,12 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
-	"github.com/packwiz/packwiz/cmdshared"
-	"github.com/packwiz/packwiz/core"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/leocov-dev/fork.packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 )
 
 // UpdateCmd represents the update command
@@ -23,13 +23,11 @@ var UpdateCmd = &cobra.Command{
 		fmt.Println("Loading modpack...")
 		pack, err := core.LoadPack()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		index, err := pack.LoadIndex()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 
 		var singleUpdatedName string
@@ -38,8 +36,7 @@ var UpdateCmd = &cobra.Command{
 			fmt.Println("Reading metadata files...")
 			mods, err := index.LoadAllMods()
 			if err != nil {
-				fmt.Printf("Failed to update all files: %v\n", err)
-				os.Exit(1)
+				cmdshared.Exitf("Failed to update all files: %v\n", err)
 			}
 			for _, modData := range mods {
 				updaterFound := false
@@ -126,22 +123,18 @@ var UpdateCmd = &cobra.Command{
 			}
 		} else {
 			if len(args) < 1 || len(args[0]) == 0 {
-				fmt.Println("Must specify a valid file, or use the --all flag!")
-				os.Exit(1)
+				cmdshared.Exitln("Must specify a valid file, or use the --all flag!")
 			}
 			modPath, ok := index.FindMod(args[0])
 			if !ok {
-				fmt.Println("Can't find this file; please ensure you have run packwiz refresh and use the name of the .pw.toml file (defaults to the project slug)")
-				os.Exit(1)
+				cmdshared.Exitln("Can't find this file; please ensure you have run packwiz refresh and use the name of the .pw.toml file (defaults to the project slug)")
 			}
 			modData, err := core.LoadMod(modPath)
 			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
+				cmdshared.Exitln(err)
 			}
 			if modData.Pin {
-				fmt.Println("Version is pinned; run the unpin command to allow updating")
-				os.Exit(1)
+				cmdshared.Exitln("Version is pinned; run the unpin command to allow updating")
 			}
 			singleUpdatedName = modData.Name
 			updaterFound := false
@@ -154,12 +147,10 @@ var UpdateCmd = &cobra.Command{
 
 				check, err := updater.CheckUpdate([]*core.Mod{&modData}, pack)
 				if err != nil {
-					fmt.Println(err)
-					os.Exit(1)
+					cmdshared.Exitln(err)
 				}
 				if len(check) != 1 {
-					fmt.Println("Invalid update check response")
-					os.Exit(1)
+					cmdshared.Exitln("Invalid update check response")
 				}
 
 				if check[0].UpdateAvailable {
@@ -167,19 +158,16 @@ var UpdateCmd = &cobra.Command{
 
 					err = updater.DoUpdate([]*core.Mod{&modData}, []interface{}{check[0].CachedState})
 					if err != nil {
-						fmt.Println(err)
-						os.Exit(1)
+						cmdshared.Exitln(err)
 					}
 
 					format, hash, err := modData.Write()
 					if err != nil {
-						fmt.Println(err)
-						os.Exit(1)
+						cmdshared.Exitln(err)
 					}
 					err = index.RefreshFileWithHash(modPath, format, hash, true)
 					if err != nil {
-						fmt.Println(err)
-						os.Exit(1)
+						cmdshared.Exitln(err)
 					}
 				} else {
 					fmt.Printf("\"%s\" is already up to date!\n", modData.Name)
@@ -190,25 +178,21 @@ var UpdateCmd = &cobra.Command{
 			}
 			if !updaterFound {
 				// TODO: use file name instead of Name when len(Name) == 0 in all places?
-				fmt.Println("A supported update system for \"" + modData.Name + "\" cannot be found.")
-				os.Exit(1)
+				cmdshared.Exitln("A supported update system for \"" + modData.Name + "\" cannot be found.")
 			}
 		}
 
 		err = index.Write()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		err = pack.UpdateIndexHash()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		err = pack.Write()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			cmdshared.Exitln(err)
 		}
 		if viper.GetBool("update.all") {
 			fmt.Println("Files updated!")
