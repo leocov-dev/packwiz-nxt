@@ -40,14 +40,16 @@ var exportCmd = &cobra.Command{
 		if err != nil {
 			cmdshared.Exitln(err)
 		}
-		err = index.Write()
+
+		repr := index.ToWritable()
+		writer := fileio.NewIndexWriter()
+		format, hash, err := writer.Write(&repr)
 		if err != nil {
 			cmdshared.Exitln(err)
 		}
-		err = pack.UpdateIndexHash()
-		if err != nil {
-			cmdshared.Exitln(err)
-		}
+
+		pack.RefreshIndexHash(format, hash)
+
 		packWriter := fileio.NewPackWriter()
 		err = packWriter.Write(&pack)
 		if err != nil {

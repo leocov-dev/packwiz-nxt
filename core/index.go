@@ -19,22 +19,18 @@ import (
 
 // Index is a representation of the index.toml file for referencing all the files in a pack.
 type Index struct {
-	HashFormat string
-	Files      IndexFiles
-	indexFile  string
-	packRoot   string
-}
+	DefaultModHashFormat string
+	Files                IndexFiles
+	packRoot             string
 
-// indexTomlRepresentation is the TOML representation of Index (Files must be converted)
-type indexTomlRepresentation struct {
-	HashFormat string                       `toml:"hash-format"`
-	Files      indexFilesTomlRepresentation `toml:"files"`
+	hashFormat string
+	hash       string
 }
 
 // LoadIndex attempts to load the index file from a path
 func LoadIndex(indexFile string) (Index, error) {
 	// Decode as indexTomlRepresentation then convert to Index
-	var rep indexTomlRepresentation
+	var rep IndexTomlRepresentation
 	raw, err := os.ReadFile(indexFile)
 	if err != nil {
 		return Index{}, err
@@ -42,16 +38,19 @@ func LoadIndex(indexFile string) (Index, error) {
 	if err := toml.Unmarshal(raw, &rep); err != nil {
 		return Index{}, err
 	}
-	if len(rep.HashFormat) == 0 {
-		rep.HashFormat = "sha256"
+	if len(rep.DefaultModHashFormat) == 0 {
+		rep.DefaultModHashFormat = "sha256"
 	}
 	index := Index{
-		HashFormat: rep.HashFormat,
-		Files:      rep.Files.toMemoryRep(),
-		indexFile:  indexFile,
-		packRoot:   filepath.Dir(indexFile),
+		DefaultModHashFormat: rep.DefaultModHashFormat,
+		Files:                rep.Files.toMemoryRep(),
+		packRoot:             filepath.Dir(indexFile),
 	}
 	return index, nil
+}
+
+func (in *Index) GetFilePath() string {
+	return filepath.Join(in.packRoot, "index.toml")
 }
 
 // RemoveFile removes a file from the index, given a file path
@@ -66,7 +65,7 @@ func (in *Index) RemoveFile(path string) error {
 
 func (in *Index) updateFileHashGiven(path, format, hash string, markAsMetaFile bool) error {
 	// Remove format if equal to index hash format
-	if in.HashFormat == format {
+	if in.DefaultModHashFormat == format {
 		format = ""
 	}
 
@@ -119,12 +118,12 @@ func (in *Index) updateFile(path string) error {
 }
 
 // ResolveIndexPath turns a path from the index into a file path on disk
-func (in Index) ResolveIndexPath(p string) string {
+func (in *Index) ResolveIndexPath(p string) string {
 	return filepath.Join(in.packRoot, filepath.FromSlash(p))
 }
 
 // RelIndexPath turns a file path on disk into a path from the index
-func (in Index) RelIndexPath(p string) (string, error) {
+func (in *Index) RelIndexPath(p string) (string, error) {
 	rel, err := filepath.Rel(in.packRoot, p)
 	if err != nil {
 		return "", err
@@ -175,7 +174,7 @@ func (in *Index) Refresh() error {
 
 	// Is case-sensitivity a problem?
 	pathPF, _ := filepath.Abs(viper.GetString("pack-file"))
-	pathIndex, _ := filepath.Abs(in.indexFile)
+	pathIndex, _ := filepath.Abs(in.GetFilePath())
 
 	pathIgnore, _ := filepath.Abs(filepath.Join(in.packRoot, ".packwizignore"))
 	ignore, ignoreExists := readGitignore(pathIgnore)
@@ -262,29 +261,12 @@ func (in *Index) Refresh() error {
 	return nil
 }
 
-// Write saves the index file
-func (in Index) Write() error {
-	// Convert to indexTomlRepresentation
-	rep := indexTomlRepresentation{
-		HashFormat: in.HashFormat,
-		Files:      in.Files.toTomlRep(),
+func (in *Index) ToWritable() IndexTomlRepresentation {
+	return IndexTomlRepresentation{
+		DefaultModHashFormat: in.DefaultModHashFormat,
+		Files:                in.Files.toTomlRep(),
+		index:                in,
 	}
-
-	// TODO: calculate and provide hash while writing?
-	f, err := os.Create(in.indexFile)
-	if err != nil {
-		return err
-	}
-
-	enc := toml.NewEncoder(f)
-	// Disable indentation
-	enc.SetIndentSymbol("")
-	err = enc.Encode(rep)
-	if err != nil {
-		_ = f.Close()
-		return err
-	}
-	return f.Close()
 }
 
 // RefreshFileWithHash updates a file in the index, given a file hash and whether it should be marked as metafile or not
@@ -296,7 +278,7 @@ func (in *Index) RefreshFileWithHash(path, format, hash string, markAsMetaFile b
 }
 
 // FindMod finds a mod in the index and returns its path and whether it has been found
-func (in Index) FindMod(modName string) (string, bool) {
+func (in *Index) FindMod(modName string) (string, bool) {
 	for p, v := range in.Files {
 		if v.IsMetaFile() {
 			_, fileName := path.Split(p)
@@ -310,7 +292,7 @@ func (in Index) FindMod(modName string) (string, bool) {
 }
 
 // getAllMods finds paths to every metadata file (Mod) in the index
-func (in Index) getAllMods() []string {
+func (in *Index) getAllMods() []string {
 	var list []string
 	for p, v := range in.Files {
 		if v.IsMetaFile() {
@@ -321,7 +303,7 @@ func (in Index) getAllMods() []string {
 }
 
 // LoadAllMods reads all metadata files into Mod structs
-func (in Index) LoadAllMods() ([]*Mod, error) {
+func (in *Index) LoadAllMods() ([]*Mod, error) {
 	modPaths := in.getAllMods()
 	mods := make([]*Mod, len(modPaths))
 	for i, v := range modPaths {
@@ -332,4 +314,21 @@ func (in Index) LoadAllMods() ([]*Mod, error) {
 		mods[i] = &modData
 	}
 	return mods, nil
+}
+
+// IndexTomlRepresentation is the TOML representation of Index (Files must be converted)
+type IndexTomlRepresentation struct {
+	DefaultModHashFormat string                       `toml:"hash-format"`
+	Files                IndexFilesTomlRepresentation `toml:"files"`
+
+	index *Index
+}
+
+func (it *IndexTomlRepresentation) GetFilePath() string {
+	return it.index.GetFilePath()
+}
+
+func (it *IndexTomlRepresentation) UpdateHash(format, hash string) {
+	it.index.hashFormat = format
+	it.index.hash = hash
 }

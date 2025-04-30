@@ -201,14 +201,16 @@ func installRelease(repo Repo, release Release, regex string, pack core.Pack) er
 	if err != nil {
 		return err
 	}
-	err = index.Write()
+
+	repr := index.ToWritable()
+	writer := fileio.NewIndexWriter()
+	format, hash, err = writer.Write(&repr)
 	if err != nil {
 		return err
 	}
-	err = pack.UpdateIndexHash()
-	if err != nil {
-		return err
-	}
+
+	pack.RefreshIndexHash(format, hash)
+
 	packWriter := fileio.NewPackWriter()
 	err = packWriter.Write(&pack)
 	if err != nil {

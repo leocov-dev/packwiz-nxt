@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/pelletier/go-toml/v2"
 	"golang.org/x/exp/slices"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -113,39 +112,9 @@ func (pack Pack) LoadIndex() (Index, error) {
 	return LoadIndex(filepath.Join(filepath.Dir(viper.GetString("pack-file")), fileNative))
 }
 
-// UpdateIndexHash recalculates the hash of the index file of this modpack
-func (pack *Pack) UpdateIndexHash() error {
-	if viper.GetBool("no-internal-hashes") {
-		pack.Index.HashFormat = "sha256"
-		pack.Index.Hash = ""
-		return nil
-	}
-
-	fileNative := filepath.FromSlash(pack.Index.File)
-	indexFile := filepath.Join(filepath.Dir(viper.GetString("pack-file")), fileNative)
-
-	f, err := os.Open(indexFile)
-	if err != nil {
-		return err
-	}
-
-	// Hash usage strategy (may change):
-	// Just use SHA256, overwrite existing hash regardless of what it is
-	// May update later to continue using the same hash that was already being used
-	h, err := GetHashImpl("sha256")
-	if err != nil {
-		_ = f.Close()
-		return err
-	}
-	if _, err := io.Copy(h, f); err != nil {
-		_ = f.Close()
-		return err
-	}
-	hashString := h.String()
-
-	pack.Index.HashFormat = "sha256"
-	pack.Index.Hash = hashString
-	return f.Close()
+func (pack *Pack) RefreshIndexHash(format, hash string) {
+	pack.Index.HashFormat = format
+	pack.Index.Hash = hash
 }
 
 // GetMCVersion gets the version of Minecraft this pack uses, if it has been correctly specified

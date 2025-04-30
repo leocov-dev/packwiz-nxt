@@ -73,15 +73,14 @@ var rehashCmd = &cobra.Command{
 			cmdshared.Exitf("Error refreshing index: %v\n", err)
 		}
 
-		err = index.Write()
+		repr := index.ToWritable()
+		writer := fileio.NewIndexWriter()
+		format, hash, err := writer.Write(&repr)
 		if err != nil {
 			cmdshared.Exitf("Error writing index: %v\n", err)
 		}
 
-		err = pack.UpdateIndexHash()
-		if err != nil {
-			cmdshared.Exitf("Error updating index hash: %v\n", err)
-		}
+		pack.RefreshIndexHash(format, hash)
 
 		packWriter := fileio.NewPackWriter()
 		err = packWriter.Write(&pack)

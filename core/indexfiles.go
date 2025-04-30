@@ -17,8 +17,8 @@ type IndexPathHolder interface {
 	IsMetaFile() bool
 }
 
-// indexFile is a file in the index
-type indexFile struct {
+// IndexFile is a file in the index
+type IndexFile struct {
 	// Files are stored in forward-slash format relative to the index file
 	File       string `toml:"file"`
 	Hash       string `toml:"hash,omitempty"`
@@ -29,28 +29,28 @@ type indexFile struct {
 	fileFound  bool
 }
 
-func (i *indexFile) updateHash(hash string, format string) {
+func (i *IndexFile) updateHash(hash string, format string) {
 	i.Hash = hash
 	i.HashFormat = format
 }
 
-func (i *indexFile) markFound() {
+func (i *IndexFile) markFound() {
 	i.fileFound = true
 }
 
-func (i *indexFile) markMetaFile() {
+func (i *IndexFile) markMetaFile() {
 	i.MetaFile = true
 }
 
-func (i *indexFile) markedFound() bool {
+func (i *IndexFile) markedFound() bool {
 	return i.fileFound
 }
 
-func (i *indexFile) IsMetaFile() bool {
+func (i *IndexFile) IsMetaFile() bool {
 	return i.MetaFile
 }
 
-type indexFileMultipleAlias map[string]indexFile
+type indexFileMultipleAlias map[string]IndexFile
 
 func (i *indexFileMultipleAlias) updateHash(hash string, format string) {
 	for k, v := range *i {
@@ -108,7 +108,7 @@ func (f *IndexFiles) updateFileEntry(path string, format string, hash string, ma
 		// (don't do anything if markAsMetaFile is false - don't reset metafile status of existing metafiles)
 	} else {
 		// Doesn't exist: create new file data
-		newFile := indexFile{
+		newFile := IndexFile{
 			File:       path,
 			Hash:       hash,
 			HashFormat: format,
@@ -119,11 +119,11 @@ func (f *IndexFiles) updateFileEntry(path string, format string, hash string, ma
 	}
 }
 
-type indexFilesTomlRepresentation []indexFile
+type IndexFilesTomlRepresentation []IndexFile
 
 // toMemoryRep converts the TOML representation of IndexFiles to that used in memory
 // These silly converter functions are necessary because the TOML libraries don't support custom non-primitive serializers
-func (rep indexFilesTomlRepresentation) toMemoryRep() IndexFiles {
+func (rep IndexFilesTomlRepresentation) toMemoryRep() IndexFiles {
 	out := make(IndexFiles)
 
 	// Add entries to map
@@ -136,7 +136,7 @@ func (rep indexFilesTomlRepresentation) toMemoryRep() IndexFiles {
 			v.Alias = ""
 		}
 		if existing, ok := out[v.File]; ok {
-			if existingFile, ok := existing.(*indexFile); ok {
+			if existingFile, ok := existing.(*IndexFile); ok {
 				// Is this the same as the existing file?
 				if v.Alias == existingFile.Alias {
 					// Yes: overwrite
@@ -164,11 +164,11 @@ func (rep indexFilesTomlRepresentation) toMemoryRep() IndexFiles {
 
 // toTomlRep converts the in-memory representation of IndexFiles to that used in TOML
 // These silly converter functions are necessary because the TOML libraries don't support custom non-primitive serializers
-func (f *IndexFiles) toTomlRep() indexFilesTomlRepresentation {
+func (f *IndexFiles) toTomlRep() IndexFilesTomlRepresentation {
 	// Turn internal representation into TOML representation
-	rep := make(indexFilesTomlRepresentation, 0, len(*f))
+	rep := make(IndexFilesTomlRepresentation, 0, len(*f))
 	for _, v := range *f {
-		if file, ok := v.(*indexFile); ok {
+		if file, ok := v.(*IndexFile); ok {
 			rep = append(rep, *file)
 		} else if file, ok := v.(*indexFileMultipleAlias); ok {
 			for _, alias := range *file {
@@ -179,7 +179,7 @@ func (f *IndexFiles) toTomlRep() indexFilesTomlRepresentation {
 		}
 	}
 
-	slices.SortFunc(rep, func(a indexFile, b indexFile) bool {
+	slices.SortFunc(rep, func(a IndexFile, b IndexFile) bool {
 		if a.File == b.File {
 			return a.Alias < b.Alias
 		} else {
