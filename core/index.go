@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pelletier/go-toml/v2"
 	gitignore "github.com/sabhiram/go-gitignore"
 	"github.com/spf13/viper"
 	"github.com/vbauerster/mpb/v4"
@@ -27,26 +26,12 @@ type Index struct {
 	hash       string
 }
 
-// LoadIndex attempts to load the index file from a path
-func LoadIndex(indexFile string) (Index, error) {
-	// Decode as indexTomlRepresentation then convert to Index
-	var rep IndexTomlRepresentation
-	raw, err := os.ReadFile(indexFile)
-	if err != nil {
-		return Index{}, err
-	}
-	if err := toml.Unmarshal(raw, &rep); err != nil {
-		return Index{}, err
-	}
-	if len(rep.DefaultModHashFormat) == 0 {
-		rep.DefaultModHashFormat = "sha256"
-	}
-	index := Index{
+func NewIndexFromTomlRepr(rep IndexTomlRepresentation) Index {
+	return Index{
 		DefaultModHashFormat: rep.DefaultModHashFormat,
 		Files:                rep.Files.toMemoryRep(),
-		packRoot:             filepath.Dir(indexFile),
+		packRoot:             filepath.Dir(rep.GetFilePath()),
 	}
-	return index, nil
 }
 
 func (in *Index) GetFilePath() string {
@@ -315,11 +300,16 @@ type IndexTomlRepresentation struct {
 	DefaultModHashFormat string                       `toml:"hash-format"`
 	Files                IndexFilesTomlRepresentation `toml:"files"`
 
-	index *Index
+	filePath string
+	index    *Index
 }
 
 func (it *IndexTomlRepresentation) GetFilePath() string {
-	return it.index.GetFilePath()
+	return it.filePath
+}
+
+func (it *IndexTomlRepresentation) SetFilePath(path string) {
+	it.filePath = path
 }
 
 func (it *IndexTomlRepresentation) UpdateHash(format, hash string) {

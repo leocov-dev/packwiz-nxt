@@ -66,8 +66,8 @@ func LoadPackFile(packPath string) (core.Pack, error) {
 
 func LoadPackIndexFile(pack *core.Pack) (core.Index, error) {
 	if filepath.IsAbs(pack.Index.File) {
-		return core.LoadIndex(pack.Index.File)
+		return LoadIndex(pack.Index.File)
 	}
 	fileNative := filepath.FromSlash(pack.Index.File)
-	return core.LoadIndex(filepath.Join(pack.GetPackDir(), fileNative))
+	return LoadIndex(filepath.Join(pack.GetPackDir(), fileNative))
 }

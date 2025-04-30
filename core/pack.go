@@ -40,15 +40,6 @@ func mustParseConstraint(s string) *semver.Constraints {
 	return c
 }
 
-// LoadIndexFile attempts to load the index file of this modpack
-func (pack *Pack) LoadIndexFile() (Index, error) {
-	if filepath.IsAbs(pack.Index.File) {
-		return LoadIndex(pack.Index.File)
-	}
-	fileNative := filepath.FromSlash(pack.Index.File)
-	return LoadIndex(filepath.Join(pack.GetPackDir(), fileNative))
-}
-
 func (pack *Pack) RefreshIndexHash(format, hash string) {
 	pack.Index.HashFormat = format
 	pack.Index.Hash = hash
