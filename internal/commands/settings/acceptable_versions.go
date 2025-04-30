@@ -3,6 +3,7 @@ package settings
 import (
 	"fmt"
 	"github.com/leocov-dev/fork.packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/fileio"
 	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 	"github.com/spf13/cobra"
 	"github.com/unascribed/FlexVer/go/flexver"
@@ -51,7 +52,8 @@ var acceptableVersionsCommand = &cobra.Command{
 			// Set the new list
 			modpack.Options["acceptable-game-versions"] = currentVersions
 			// Save the pack
-			err = modpack.Write()
+			packWriter := fileio.NewPackWriter()
+			err = packWriter.Write(&modpack)
 			if err != nil {
 				cmdshared.Exitf("Error writing pack: %s\n", err)
 			}
@@ -73,7 +75,8 @@ var acceptableVersionsCommand = &cobra.Command{
 			// Set the new list
 			modpack.Options["acceptable-game-versions"] = currentVersions
 			// Save the pack
-			err = modpack.Write()
+			packWriter := fileio.NewPackWriter()
+			err = packWriter.Write(&modpack)
 			if err != nil {
 				cmdshared.Exitf("Error writing pack: %s\n", err)
 			}
@@ -117,7 +120,8 @@ var acceptableVersionsCommand = &cobra.Command{
 				}
 			}
 			modpack.Options["acceptable-game-versions"] = acceptableVersionsDeduped
-			err = modpack.Write()
+			packWriter := fileio.NewPackWriter()
+			err = packWriter.Write(&modpack)
 			if err != nil {
 				cmdshared.Exitf("Error writing pack: %s\n", err)
 			}

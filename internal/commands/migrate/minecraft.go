@@ -4,6 +4,7 @@ import (
 	"fmt"
 	packCmd "github.com/leocov-dev/fork.packwiz/cmd"
 	"github.com/leocov-dev/fork.packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/fileio"
 	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -41,7 +42,8 @@ var minecraftCommand = &cobra.Command{
 		// Set the version in the pack
 		modpack.Versions["minecraft"] = wantedMCVersion
 		// Write the pack to disk
-		err = modpack.Write()
+		packWriter := fileio.NewPackWriter()
+		err = packWriter.Write(&modpack)
 		if err != nil {
 			cmdshared.Exitf("Error writing pack.toml: %s\n", err)
 		}

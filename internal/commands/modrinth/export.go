@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"encoding/json"
 	"fmt"
+	"github.com/leocov-dev/fork.packwiz/fileio"
 	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
@@ -47,7 +48,8 @@ var exportCmd = &cobra.Command{
 			fmt.Println(err)
 			return
 		}
-		err = pack.Write()
+		packWriter := fileio.NewPackWriter()
+		err = packWriter.Write(&pack)
 		if err != nil {
 			fmt.Println(err)
 			return

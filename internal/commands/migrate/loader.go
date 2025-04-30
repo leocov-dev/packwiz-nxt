@@ -3,6 +3,7 @@ package migrate
 import (
 	"fmt"
 	"github.com/leocov-dev/fork.packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/fileio"
 	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
@@ -34,6 +35,8 @@ var loaderCommand = &cobra.Command{
 		if err != nil {
 			cmdshared.Exitf("Error getting Minecraft version: %s\n", err)
 		}
+
+		packWriter := fileio.NewPackWriter()
 		if args[0] == "latest" {
 			fmt.Println("Updating to latest loader version")
 			// We'll be updating to the latest loader version
@@ -43,7 +46,7 @@ var loaderCommand = &cobra.Command{
 					continue
 				}
 				// Write the pack to disk
-				err = modpack.Write()
+				err = packWriter.Write(&modpack)
 				if err != nil {
 					fmt.Printf("Error writing pack.toml: %s\n", err)
 					continue
@@ -64,7 +67,8 @@ var loaderCommand = &cobra.Command{
 				os.Exit(1)
 			}
 			// Write the pack to disk
-			err = modpack.Write()
+			packWriter := fileio.NewPackWriter()
+			err = packWriter.Write(&modpack)
 			if err != nil {
 				cmdshared.Exitf("Error writing pack.toml: %s", err)
 			}
@@ -89,7 +93,8 @@ var loaderCommand = &cobra.Command{
 				}
 			}
 			// Write the pack to disk
-			err = modpack.Write()
+			packWriter := fileio.NewPackWriter()
+			err = packWriter.Write(&modpack)
 			if err != nil {
 				cmdshared.Exitf("Error writing pack.toml: %s\n", err)
 			}

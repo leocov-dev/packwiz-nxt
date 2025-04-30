@@ -6,6 +6,7 @@ import (
 	"github.com/fatih/camelcase"
 	"github.com/igorsobreira/titlecase"
 	"github.com/leocov-dev/fork.packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/fileio"
 	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -153,6 +154,7 @@ var initCmd = &cobra.Command{
 				pack.Versions[k] = v
 			}
 		}
+		pack.SetMetafile(viper.GetString("pack-file"))
 
 		// Refresh the index and pack
 		index, err := pack.LoadIndex()
@@ -171,10 +173,13 @@ var initCmd = &cobra.Command{
 		if err != nil {
 			cmdshared.Exitln(err)
 		}
-		err = pack.Write()
+
+		packWriter := fileio.NewPackWriter()
+		err = packWriter.Write(&pack)
 		if err != nil {
 			cmdshared.Exitln(err)
 		}
+
 		fmt.Println(viper.GetString("pack-file") + " created!")
 	},
 }

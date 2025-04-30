@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"github.com/leocov-dev/fork.packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/fileio"
 	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -41,7 +42,8 @@ var refreshCmd = &cobra.Command{
 		if err != nil {
 			cmdshared.Exitln(err)
 		}
-		err = pack.Write()
+		packWriter := fileio.NewPackWriter()
+		err = packWriter.Write(&pack)
 		if err != nil {
 			cmdshared.Exitln(err)
 		}

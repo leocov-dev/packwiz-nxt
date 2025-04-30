@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bufio"
 	"fmt"
+	"github.com/leocov-dev/fork.packwiz/fileio"
 	"os"
 	"strconv"
 
@@ -47,7 +48,8 @@ var exportCmd = &cobra.Command{
 		if err != nil {
 			cmdshared.Exitln(err)
 		}
-		err = pack.Write()
+		packWriter := fileio.NewPackWriter()
+		err = packWriter.Write(&pack)
 		if err != nil {
 			cmdshared.Exitln(err)
 		}

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/leocov-dev/fork.packwiz/fileio"
 	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 	"os"
 
@@ -46,7 +47,8 @@ var removeCmd = &cobra.Command{
 		if err != nil {
 			cmdshared.Exitln(err)
 		}
-		err = pack.Write()
+		packWriter := fileio.NewPackWriter()
+		err = packWriter.Write(&pack)
 		if err != nil {
 			cmdshared.Exitln(err)
 		}

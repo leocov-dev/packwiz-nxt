@@ -4,6 +4,7 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
+	"github.com/leocov-dev/fork.packwiz/fileio"
 	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 	"html/template"
 	"io"
@@ -168,7 +169,8 @@ func doServeRefresh(pack *core.Pack, index *core.Index) error {
 	if err != nil {
 		return err
 	}
-	err = pack.Write()
+	packWriter := fileio.NewPackWriter()
+	err = packWriter.Write(pack)
 	if err != nil {
 		return err
 	}

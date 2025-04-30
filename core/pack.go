@@ -30,6 +30,8 @@ type Pack struct {
 	Versions map[string]string                 `toml:"versions"`
 	Export   map[string]map[string]interface{} `toml:"export"`
 	Options  map[string]interface{}            `toml:"options"`
+
+	metaFile string
 }
 
 const CurrentPackFormat = "packwiz:1.1.0"
@@ -48,13 +50,16 @@ func mustParseConstraint(s string) *semver.Constraints {
 // LoadPack loads the modpack metadata to a Pack struct
 func LoadPack() (Pack, error) {
 	var modpack Pack
-	raw, err := os.ReadFile(viper.GetString("pack-file"))
+	packPath := viper.GetString("pack-file")
+	raw, err := os.ReadFile(packPath)
 	if err != nil {
 		return Pack{}, err
 	}
 	if err := toml.Unmarshal(raw, &modpack); err != nil {
 		return Pack{}, err
 	}
+
+	modpack.SetMetafile(packPath)
 
 	// Check pack-format
 	if len(modpack.PackFormat) == 0 {
@@ -93,6 +98,10 @@ func LoadPack() (Pack, error) {
 		modpack.Index.File = "index.toml"
 	}
 	return modpack, nil
+}
+
+func (pack *Pack) SetMetafile(metaFile string) {
+	pack.metaFile = metaFile
 }
 
 // LoadIndex attempts to load the index file of this modpack
@@ -136,24 +145,6 @@ func (pack *Pack) UpdateIndexHash() error {
 
 	pack.Index.HashFormat = "sha256"
 	pack.Index.Hash = hashString
-	return f.Close()
-}
-
-// Write saves the pack file
-func (pack Pack) Write() error {
-	f, err := os.Create(viper.GetString("pack-file"))
-	if err != nil {
-		return err
-	}
-
-	enc := toml.NewEncoder(f)
-	// Disable indentation
-	enc.SetIndentSymbol("")
-	err = enc.Encode(pack)
-	if err != nil {
-		_ = f.Close()
-		return err
-	}
 	return f.Close()
 }
 
@@ -225,4 +216,12 @@ func (pack Pack) GetLoaders() (loaders []string) {
 		loaders = append(loaders, "forge")
 	}
 	return
+}
+
+func (pack *Pack) UpdateHash(_, _ string) {
+	// noop for packs
+}
+
+func (pack *Pack) GetFilePath() string {
+	return pack.metaFile
 }

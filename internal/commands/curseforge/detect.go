@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/aviddiviner/go-murmur"
 	"github.com/leocov-dev/fork.packwiz/core"
+	"github.com/leocov-dev/fork.packwiz/fileio"
 	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 	"github.com/spf13/cobra"
 	"os"
@@ -124,7 +125,8 @@ var detectCmd = &cobra.Command{
 			fmt.Println(err)
 			return
 		}
-		err = pack.Write()
+		packWriter := fileio.NewPackWriter()
+		err = packWriter.Write(&pack)
 		if err != nil {
 			fmt.Println(err)
 			return

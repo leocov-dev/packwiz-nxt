@@ -41,7 +41,7 @@ func (m ModWriter) Write(writable Writable) (string, string, error) {
 	enc := toml.NewEncoder(w)
 	// Disable indentation
 	enc.SetIndentSymbol("")
-	err = enc.Encode(m)
+	err = enc.Encode(writable)
 	hashString := h.String()
 
 	writable.UpdateHash(hashFormat, hashString)

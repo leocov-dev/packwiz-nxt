@@ -83,7 +83,8 @@ var rehashCmd = &cobra.Command{
 			cmdshared.Exitf("Error updating index hash: %v\n", err)
 		}
 
-		err = pack.Write()
+		packWriter := fileio.NewPackWriter()
+		err = packWriter.Write(&pack)
 		if err != nil {
 			cmdshared.Exitf("Error writing pack: %v\n", err)
 		}

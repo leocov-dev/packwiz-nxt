@@ -209,7 +209,8 @@ func installRelease(repo Repo, release Release, regex string, pack core.Pack) er
 	if err != nil {
 		return err
 	}
-	err = pack.Write()
+	packWriter := fileio.NewPackWriter()
+	err = packWriter.Write(&pack)
 	if err != nil {
 		return err
 	}
