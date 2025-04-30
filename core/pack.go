@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/pelletier/go-toml/v2"
-	"golang.org/x/exp/slices"
+	"github.com/unascribed/FlexVer/go/flexver"
 	"os"
 	"path/filepath"
 	"strings"
@@ -104,7 +104,7 @@ func (pack *Pack) SetMetafile(metaFile string) {
 }
 
 // LoadIndex attempts to load the index file of this modpack
-func (pack Pack) LoadIndex() (Index, error) {
+func (pack *Pack) LoadIndex() (Index, error) {
 	if filepath.IsAbs(pack.Index.File) {
 		return LoadIndex(pack.Index.File)
 	}
@@ -118,7 +118,7 @@ func (pack *Pack) RefreshIndexHash(format, hash string) {
 }
 
 // GetMCVersion gets the version of Minecraft this pack uses, if it has been correctly specified
-func (pack Pack) GetMCVersion() (string, error) {
+func (pack *Pack) GetMCVersion() (string, error) {
 	mcVersion, ok := pack.Versions["minecraft"]
 	if !ok {
 		return "", errors.New("no minecraft version specified in modpack")
@@ -127,25 +127,26 @@ func (pack Pack) GetMCVersion() (string, error) {
 }
 
 // GetSupportedMCVersions gets the versions of Minecraft this pack allows in downloaded mods, ordered by preference (highest = most desirable)
-func (pack Pack) GetSupportedMCVersions() ([]string, error) {
-	mcVersion, ok := pack.Versions["minecraft"]
-	if !ok {
-		return nil, errors.New("no minecraft version specified in modpack")
+func (pack *Pack) GetSupportedMCVersions() ([]string, error) {
+	mcVersion, err := pack.GetMCVersion()
+	if err != nil {
+		return nil, err
 	}
-	allVersions := append(append([]string(nil), viper.GetStringSlice("acceptable-game-versions")...), mcVersion)
-	// Deduplicate values
-	allVersionsDeduped := []string(nil)
-	for i, v := range allVersions {
-		// If another copy of this value exists past this point in the array, don't insert
-		// (i.e. prefer a later copy over an earlier copy, so the main version is last)
-		if !slices.Contains(allVersions[i+1:], v) {
-			allVersionsDeduped = append(allVersionsDeduped, v)
-		}
-	}
-	return allVersionsDeduped, nil
+	allVersions := append(append([]string(nil), pack.GetAcceptableGameVersions()...), mcVersion)
+	sortAndDedupeVersions(allVersions)
+	return allVersions, nil
 }
 
-func (pack Pack) GetPackName() string {
+func (pack *Pack) GetAcceptableGameVersions() []string {
+	return pack.Options["acceptable-game-versions"].([]string)
+}
+
+func (pack *Pack) SetAcceptableGameVersions(versions []string) {
+	sortAndDedupeVersions(versions)
+	pack.Options["acceptable-game-versions"] = versions
+}
+
+func (pack *Pack) GetPackName() string {
 	if pack.Name == "" {
 		return "export"
 	} else if pack.Version == "" {
@@ -155,7 +156,7 @@ func (pack Pack) GetPackName() string {
 	}
 }
 
-func (pack Pack) GetCompatibleLoaders() (loaders []string) {
+func (pack *Pack) GetCompatibleLoaders() (loaders []string) {
 	if _, hasQuilt := pack.Versions["quilt"]; hasQuilt {
 		loaders = append(loaders, "quilt")
 		loaders = append(loaders, "fabric") // Backwards-compatible; for now (could be configurable later)
@@ -171,7 +172,7 @@ func (pack Pack) GetCompatibleLoaders() (loaders []string) {
 	return
 }
 
-func (pack Pack) GetLoaders() (loaders []string) {
+func (pack *Pack) GetLoaders() (loaders []string) {
 	if _, hasQuilt := pack.Versions["quilt"]; hasQuilt {
 		loaders = append(loaders, "quilt")
 	}
@@ -193,4 +194,19 @@ func (pack *Pack) UpdateHash(_, _ string) {
 
 func (pack *Pack) GetFilePath() string {
 	return pack.metaFile
+}
+
+func sortAndDedupeVersions(versions []string) {
+	flexver.VersionSlice(versions).Sort()
+	// Deduplicate the sorted array
+	if len(versions) > 0 {
+		j := 0
+		for i := 1; i < len(versions); i++ {
+			if versions[i] != versions[j] {
+				j++
+				versions[j] = versions[i]
+			}
+		}
+		versions = versions[:j+1]
+	}
 }

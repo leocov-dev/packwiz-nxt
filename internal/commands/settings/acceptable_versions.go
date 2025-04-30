@@ -6,7 +6,6 @@ import (
 	"github.com/leocov-dev/fork.packwiz/fileio"
 	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
 	"github.com/spf13/cobra"
-	"github.com/unascribed/FlexVer/go/flexver"
 	"golang.org/x/exp/slices"
 	"os"
 	"strings"
@@ -33,10 +32,11 @@ var acceptableVersionsCommand = &cobra.Command{
 			modpack.Options = make(map[string]interface{})
 		}
 		// Check if the acceptable-game-versions is nil, which would mean their pack.toml doesn't have it set yet
-		if modpack.Options["acceptable-game-versions"] != nil {
+		acceptableGameVersions := modpack.GetAcceptableGameVersions()
+		if acceptableGameVersions != nil {
 			// Convert the interface{} to a string slice
-			for _, v := range modpack.Options["acceptable-game-versions"].([]interface{}) {
-				currentVersions = append(currentVersions, v.(string))
+			for _, v := range acceptableGameVersions {
+				currentVersions = append(currentVersions, v)
 			}
 		}
 		// Check our flags to see if we're adding or removing
@@ -48,9 +48,8 @@ var acceptableVersionsCommand = &cobra.Command{
 			}
 			// Add the version to the list and re-sort it
 			currentVersions = append(currentVersions, acceptableVersion)
-			flexver.VersionSlice(currentVersions).Sort()
 			// Set the new list
-			modpack.Options["acceptable-game-versions"] = currentVersions
+			modpack.SetAcceptableGameVersions(currentVersions)
 			// Save the pack
 			packWriter := fileio.NewPackWriter()
 			err = packWriter.Write(&modpack)
@@ -70,10 +69,8 @@ var acceptableVersionsCommand = &cobra.Command{
 			// Remove the version from the list
 			i := slices.Index(currentVersions, acceptableVersion)
 			currentVersions = slices.Delete(currentVersions, i, i+1)
-			// Sort it just in case it's out of order
-			flexver.VersionSlice(currentVersions).Sort()
 			// Set the new list
-			modpack.Options["acceptable-game-versions"] = currentVersions
+			modpack.SetAcceptableGameVersions(currentVersions)
 			// Save the pack
 			packWriter := fileio.NewPackWriter()
 			err = packWriter.Write(&modpack)
@@ -88,45 +85,14 @@ var acceptableVersionsCommand = &cobra.Command{
 			// Overwriting
 			acceptableVersions := args[0]
 			acceptableVersionsList := strings.Split(acceptableVersions, ",")
-			// Dedupe the list
-			acceptableVersionsDeduped := []string(nil)
-			for i, v := range acceptableVersionsList {
-				if !slices.Contains(acceptableVersionsList[i+1:], v) {
-					acceptableVersionsDeduped = append(acceptableVersionsDeduped, v)
-				}
-			}
-			// Check if the list of versions is out of order, lowest to highest, and inform the user if it is
-			// Compare the versions one by one to the next one, if the next one is lower, then it's out of order
-			// If it's only 1 element long, then it's already sorted
-			if len(acceptableVersionsDeduped) > 1 {
-				for i, v := range acceptableVersionsDeduped {
-					if i+1 < len(acceptableVersionsDeduped) && flexver.Less(acceptableVersionsDeduped[i+1], v) {
-						fmt.Printf("Warning: Your acceptable versions list is out of order. ")
-						// Give a do you mean example
-						// Clone the list
-						acceptableVersionsDedupedClone := make([]string, len(acceptableVersionsDeduped))
-						copy(acceptableVersionsDedupedClone, acceptableVersionsDeduped)
-						flexver.VersionSlice(acceptableVersionsDedupedClone).Sort()
-						fmt.Printf("Did you mean %s?\n", strings.Join(acceptableVersionsDedupedClone, ", "))
-						if cmdshared.PromptYesNo("Would you like to fix this automatically? [Y/n] ") {
-							// If yes we'll just set the list to the sorted one
-							acceptableVersionsDeduped = acceptableVersionsDedupedClone
-							break
-						} else {
-							// If no we'll just continue
-							break
-						}
-					}
-				}
-			}
-			modpack.Options["acceptable-game-versions"] = acceptableVersionsDeduped
+			modpack.SetAcceptableGameVersions(acceptableVersionsList)
 			packWriter := fileio.NewPackWriter()
 			err = packWriter.Write(&modpack)
 			if err != nil {
 				cmdshared.Exitf("Error writing pack: %s\n", err)
 			}
 			// Print success message
-			prettyList := strings.Join(acceptableVersionsDeduped, ", ")
+			prettyList := strings.Join(acceptableVersionsList, ", ")
 			prettyList += ", " + modpack.Versions["minecraft"]
 			fmt.Printf("Set acceptable versions to %s\n", prettyList)
 		}
