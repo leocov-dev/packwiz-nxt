@@ -10,7 +10,7 @@ require (
 	github.com/igorsobreira/titlecase v0.0.0-20140109233139-4156b5b858ac
 	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/pelletier/go-toml/v2 v2.0.6 // indirect
+	github.com/pelletier/go-toml/v2 v2.0.6
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
 	github.com/sahilm/fuzzy v0.1.0
@@ -28,7 +28,6 @@ require (
 
 require (
 	codeberg.org/jmansfield/go-modrinth v0.6.0
-	github.com/BurntSushi/toml v1.2.1
 	github.com/spf13/pflag v1.0.6
 	github.com/unascribed/FlexVer/go/flexver v1.0.0
 	golang.org/x/exp v0.0.0-20230118134722-a68e582fa157

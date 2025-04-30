@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/BurntSushi/toml"
+	"github.com/pelletier/go-toml/v2"
 )
 
 // Mod stores metadata about a mod. This is written to a TOML file for each mod.
@@ -58,8 +58,12 @@ const (
 // LoadMod attempts to load a mod file from a path
 func LoadMod(modFile string) (Mod, error) {
 	var mod Mod
-	if _, err := toml.DecodeFile(modFile, &mod); err != nil {
-		return Mod{}, err
+	raw, err := os.ReadFile(modFile)
+	if err != nil {
+		return mod, err
+	}
+	if err := toml.Unmarshal(raw, &mod); err != nil {
+		return mod, err
 	}
 	mod.updateData = make(map[string]interface{})
 	// Horrible reflection library to convert map[string]interface to proper struct
@@ -108,7 +112,7 @@ func (m Mod) Write() (string, string, error) {
 
 	enc := toml.NewEncoder(w)
 	// Disable indentation
-	enc.Indent = ""
+	enc.SetIndentSymbol("")
 	err = enc.Encode(m)
 	hashString := h.HashToString(h.Sum(nil))
 	if err != nil {

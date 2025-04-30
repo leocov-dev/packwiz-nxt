@@ -3,13 +3,13 @@ package core
 import (
 	"errors"
 	"fmt"
+	"github.com/pelletier/go-toml/v2"
 	"golang.org/x/exp/slices"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/BurntSushi/toml"
 	"github.com/Masterminds/semver/v3"
 	"github.com/spf13/viper"
 )
@@ -48,7 +48,11 @@ func mustParseConstraint(s string) *semver.Constraints {
 // LoadPack loads the modpack metadata to a Pack struct
 func LoadPack() (Pack, error) {
 	var modpack Pack
-	if _, err := toml.DecodeFile(viper.GetString("pack-file"), &modpack); err != nil {
+	raw, err := os.ReadFile(viper.GetString("pack-file"))
+	if err != nil {
+		return Pack{}, err
+	}
+	if err := toml.Unmarshal(raw, &modpack); err != nil {
 		return Pack{}, err
 	}
 
@@ -144,7 +148,7 @@ func (pack Pack) Write() error {
 
 	enc := toml.NewEncoder(f)
 	// Disable indentation
-	enc.Indent = ""
+	enc.SetIndentSymbol("")
 	err = enc.Encode(pack)
 	if err != nil {
 		_ = f.Close()

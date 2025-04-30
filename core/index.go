@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/BurntSushi/toml"
+	"github.com/pelletier/go-toml/v2"
 	gitignore "github.com/sabhiram/go-gitignore"
 	"github.com/spf13/viper"
 	"github.com/vbauerster/mpb/v4"
@@ -35,7 +35,11 @@ type indexTomlRepresentation struct {
 func LoadIndex(indexFile string) (Index, error) {
 	// Decode as indexTomlRepresentation then convert to Index
 	var rep indexTomlRepresentation
-	if _, err := toml.DecodeFile(indexFile, &rep); err != nil {
+	raw, err := os.ReadFile(indexFile)
+	if err != nil {
+		return Index{}, err
+	}
+	if err := toml.Unmarshal(raw, &rep); err != nil {
 		return Index{}, err
 	}
 	if len(rep.HashFormat) == 0 {
@@ -274,7 +278,7 @@ func (in Index) Write() error {
 
 	enc := toml.NewEncoder(f)
 	// Disable indentation
-	enc.Indent = ""
+	enc.SetIndentSymbol("")
 	err = enc.Encode(rep)
 	if err != nil {
 		_ = f.Close()
