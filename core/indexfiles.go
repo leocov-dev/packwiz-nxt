@@ -179,11 +179,21 @@ func (f *IndexFiles) toTomlRep() IndexFilesTomlRepresentation {
 		}
 	}
 
-	slices.SortFunc(rep, func(a IndexFile, b IndexFile) bool {
+	slices.SortFunc(rep, func(a IndexFile, b IndexFile) int {
 		if a.File == b.File {
-			return a.Alias < b.Alias
+			if a.Alias == b.Alias {
+				return 0
+			} else if a.Alias < b.Alias {
+				return -1
+			} else {
+				return 1
+			}
 		} else {
-			return a.File < b.File
+			if a.File < b.File {
+				return -1
+			} else {
+				return 1
+			}
 		}
 	})
 
