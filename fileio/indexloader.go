@@ -1,6 +1,7 @@
 package fileio
 
 import (
+	"fmt"
 	"github.com/leocov-dev/packwiz-nxt/core"
 	"github.com/pelletier/go-toml/v2"
 	"os"
@@ -24,4 +25,17 @@ func LoadIndex(indexFile string) (core.Index, error) {
 
 	index := core.NewIndexFromTomlRepr(rep)
 	return index, nil
+}
+
+func LoadAllMods(index *core.Index) ([]*core.Mod, error) {
+	modPaths := index.GetAllMods()
+	mods := make([]*core.Mod, len(modPaths))
+	for i, v := range modPaths {
+		modData, err := LoadMod(v)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read metadata file %s: %w", v, err)
+		}
+		mods[i] = &modData
+	}
+	return mods, nil
 }

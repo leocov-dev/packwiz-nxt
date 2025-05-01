@@ -131,34 +131,18 @@ var importCmd = &cobra.Command{
 		if err != nil {
 			fmt.Println("Failed to load existing pack, creating a new one...")
 
-			// Create a new modpack
-			indexFilePath := viper.GetString("init.index-file")
-			_, err = os.Stat(indexFilePath)
-			if os.IsNotExist(err) {
-				// Create file
-				err = os.WriteFile(indexFilePath, []byte{}, 0644)
-				if err != nil {
-					cmdshared.Exitf("Error creating index file: %s\n", err)
-				}
-				fmt.Println(indexFilePath + " created!")
-			} else if err != nil {
-				cmdshared.Exitf("Error checking index file: %s\n", err)
+			pack := core.NewPack(
+				packImport.Name(),
+				packImport.PackAuthor(),
+				packImport.PackVersion(),
+				packImport.Versions(),
+			)
+
+			err = fileio.InitIndexFile(*pack)
+			if err != nil {
+				cmdshared.Exitf("Error creating index file: %s\n", err)
 			}
 
-			pack = core.Pack{
-				Name:       packImport.Name(),
-				Author:     packImport.PackAuthor(),
-				Version:    packImport.PackVersion(),
-				PackFormat: core.CurrentPackFormat,
-				Index: struct {
-					File       string `toml:"file"`
-					HashFormat string `toml:"hash-format"`
-					Hash       string `toml:"hash,omitempty"`
-				}{
-					File: indexFilePath,
-				},
-				Versions: packImport.Versions(),
-			}
 		} else {
 			for component, version := range packImport.Versions() {
 				packVersion, ok := pack.Versions[component]

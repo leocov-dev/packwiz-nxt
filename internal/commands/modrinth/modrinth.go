@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/leocov-dev/packwiz-nxt/cmd"
 	"github.com/leocov-dev/packwiz-nxt/core"
+	"github.com/leocov-dev/packwiz-nxt/fileio"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/unascribed/FlexVer/go/flexver"
@@ -392,7 +393,7 @@ func getBestHash(v *modrinthApi.File) (string, string) {
 func getInstalledProjectIDs(index *core.Index) []string {
 	var installedProjects []string
 	// Get modids of all mods
-	mods, err := index.LoadAllMods()
+	mods, err := fileio.LoadAllMods(index)
 	if err != nil {
 		fmt.Printf("Failed to determine existing projects: %v\n", err)
 	} else {

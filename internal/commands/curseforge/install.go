@@ -134,7 +134,7 @@ var installCmd = &cobra.Command{
 				for len(depIDPendingQueue) > 0 && cycles < maxCycles {
 					if installedIDList == nil {
 						// Get modids of all mods
-						mods, err := index.LoadAllMods()
+						mods, err := fileio.LoadAllMods(&index)
 						if err != nil {
 							fmt.Printf("Failed to determine existing projects: %v\n", err)
 						} else {

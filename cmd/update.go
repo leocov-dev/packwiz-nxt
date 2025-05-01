@@ -35,7 +35,7 @@ var UpdateCmd = &cobra.Command{
 		if viper.GetBool("update.all") {
 			filesWithUpdater := make(map[string][]*core.Mod)
 			fmt.Println("Reading metadata files...")
-			mods, err := index.LoadAllMods()
+			mods, err := fileio.LoadAllMods(&index)
 			if err != nil {
 				cmdshared.Exitf("Failed to update all files: %v\n", err)
 			}
@@ -132,7 +132,7 @@ var UpdateCmd = &cobra.Command{
 			if !ok {
 				cmdshared.Exitln("Can't find this file; please ensure you have run packwiz refresh and use the name of the .pw.toml file (defaults to the project slug)")
 			}
-			modData, err := core.LoadMod(modPath)
+			modData, err := fileio.LoadMod(modPath)
 			if err != nil {
 				cmdshared.Exitln(err)
 			}

@@ -1,7 +1,6 @@
 package core
 
 import (
-	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -270,8 +269,8 @@ func (in *Index) FindMod(modName string) (string, bool) {
 	return "", false
 }
 
-// getAllMods finds paths to every metadata file (Mod) in the index
-func (in *Index) getAllMods() []string {
+// GetAllMods finds paths to every metadata file (Mod) in the index
+func (in *Index) GetAllMods() []string {
 	var list []string
 	for p, v := range in.Files {
 		if v.IsMetaFile() {
@@ -279,20 +278,6 @@ func (in *Index) getAllMods() []string {
 		}
 	}
 	return list
-}
-
-// LoadAllMods reads all metadata files into Mod structs
-func (in *Index) LoadAllMods() ([]*Mod, error) {
-	modPaths := in.getAllMods()
-	mods := make([]*Mod, len(modPaths))
-	for i, v := range modPaths {
-		modData, err := LoadMod(v)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read metadata file %s: %w", v, err)
-		}
-		mods[i] = &modData
-	}
-	return mods, nil
 }
 
 // IndexTomlRepresentation is the TOML representation of Index (Files must be converted)

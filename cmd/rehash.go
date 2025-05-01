@@ -32,7 +32,7 @@ var rehashCmd = &cobra.Command{
 		}
 
 		// Load mods
-		mods, err := index.LoadAllMods()
+		mods, err := fileio.LoadAllMods(&index)
 		if err != nil {
 			cmdshared.Exitln(err)
 		}

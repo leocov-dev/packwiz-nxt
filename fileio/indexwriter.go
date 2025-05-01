@@ -1,6 +1,7 @@
 package fileio
 
 import (
+	"fmt"
 	"github.com/leocov-dev/packwiz-nxt/core"
 	"github.com/pelletier/go-toml/v2"
 	"io"
@@ -50,4 +51,17 @@ func (m IndexWriter) Write(writable Writable) (string, string, error) {
 		return hashFormat, hashString, err
 	}
 	return hashFormat, hashString, f.Close()
+}
+
+func InitIndexFile(pack core.Pack) error {
+	indexFilePath := pack.Index.File
+	_, err := os.Stat(indexFilePath)
+	if os.IsNotExist(err) {
+		err = os.WriteFile(indexFilePath, []byte{}, 0644)
+		if err != nil {
+			return err
+		}
+		fmt.Println(indexFilePath + " created!")
+	}
+	return err
 }

@@ -2,9 +2,12 @@ package core
 
 import (
 	"errors"
+	"fmt"
 	"github.com/Masterminds/semver/v3"
+	"github.com/spf13/viper"
 	"github.com/unascribed/FlexVer/go/flexver"
 	"path/filepath"
+	"strings"
 )
 
 // Pack stores the modpack metadata, usually in pack.toml
@@ -31,6 +34,66 @@ const CurrentPackFormat = "packwiz:1.1.0"
 
 var PackFormatConstraintAccepted = mustParseConstraint("~1")
 var PackFormatConstraintSuggestUpgrade = mustParseConstraint("~1.1")
+
+func NewPack(name, author, version string, versions map[string]string) *Pack {
+	return &Pack{
+		Name:       name,
+		Author:     author,
+		Version:    version,
+		PackFormat: CurrentPackFormat,
+		Index: struct {
+			File       string `toml:"file"`
+			HashFormat string `toml:"hash-format"`
+			Hash       string `toml:"hash,omitempty"`
+		}{
+			File: "index.toml",
+		},
+		Versions: versions,
+	}
+}
+
+// ValidatePack run some basic validation and migrate the pack if possible.
+func ValidatePack(pack *Pack) error {
+	// Check pack-format
+	if len(pack.PackFormat) == 0 {
+		fmt.Println("Modpack manifest has no pack-format field; assuming packwiz:1.1.0")
+		pack.PackFormat = "packwiz:1.1.0"
+	}
+	// Auto-migrate versions
+	if pack.PackFormat == "packwiz:1.0.0" {
+		fmt.Println("Automatically migrating pack to packwiz:1.1.0 format...")
+		pack.PackFormat = "packwiz:1.1.0"
+	}
+	if !strings.HasPrefix(pack.PackFormat, "packwiz:") {
+		return errors.New("pack-format field does not indicate a valid packwiz pack")
+	}
+	ver, err := semver.StrictNewVersion(strings.TrimPrefix(pack.PackFormat, "packwiz:"))
+	if err != nil {
+		return fmt.Errorf("pack-format field is not valid semver: %w", err)
+	}
+	if !PackFormatConstraintAccepted.Check(ver) {
+		return errors.New("the pack is incompatible with this version of packwiz; please update")
+	}
+	if !PackFormatConstraintSuggestUpgrade.Check(ver) {
+		fmt.Println("Modpack has a newer feature number than is supported by this version of packwiz. Update to the latest version of packwiz for new features and bugfixes!")
+	}
+
+	// TODO: suggest migration if necessary (primarily for 2.0.0)
+
+	// Read options into viper
+	if pack.Options != nil {
+		err := viper.MergeConfigMap(pack.Options)
+		if err != nil {
+			return err
+		}
+	}
+
+	if len(pack.Index.File) == 0 {
+		pack.Index.File = "index.toml"
+	}
+
+	return nil
+}
 
 func mustParseConstraint(s string) *semver.Constraints {
 	c, err := semver.NewConstraint(s)

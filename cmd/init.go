@@ -119,36 +119,20 @@ var initCmd = &cobra.Command{
 			}
 		}
 
-		indexFilePath := viper.GetString("init.index-file")
-		_, err = os.Stat(indexFilePath)
-		if os.IsNotExist(err) {
-			// Create file
-			err = os.WriteFile(indexFilePath, []byte{}, 0644)
-			if err != nil {
-				cmdshared.Exitf("Error creating index file: %s\n", err)
-			}
-			fmt.Println(indexFilePath + " created!")
-		} else if err != nil {
-			cmdshared.Exitf("Error checking index file: %s\n", err)
-		}
-
-		// Create the pack
-		pack := core.Pack{
-			Name:       name,
-			Author:     author,
-			Version:    version,
-			PackFormat: core.CurrentPackFormat,
-			Index: struct {
-				File       string `toml:"file"`
-				HashFormat string `toml:"hash-format"`
-				Hash       string `toml:"hash,omitempty"`
-			}{
-				File: indexFilePath,
-			},
-			Versions: map[string]string{
+		pack := core.NewPack(
+			name,
+			author,
+			version,
+			map[string]string{
 				"minecraft": mcVersion,
 			},
+		)
+
+		err = fileio.InitIndexFile(*pack)
+		if err != nil {
+			cmdshared.Exitf("Error creating index file: %s\n", err)
 		}
+
 		if modLoaderName != "none" {
 			for k, v := range modLoaderVersions {
 				pack.Versions[k] = v
@@ -157,7 +141,7 @@ var initCmd = &cobra.Command{
 		pack.SetFilePath(viper.GetString("pack-file"))
 
 		// Refresh the index and pack
-		index, err := fileio.LoadPackIndexFile(&pack)
+		index, err := fileio.LoadPackIndexFile(pack)
 		if err != nil {
 			cmdshared.Exitln(err)
 		}
@@ -176,7 +160,7 @@ var initCmd = &cobra.Command{
 		pack.RefreshIndexHash(format, hash)
 
 		packWriter := fileio.NewPackWriter()
-		err = packWriter.Write(&pack)
+		err = packWriter.Write(pack)
 		if err != nil {
 			cmdshared.Exitln(err)
 		}
@@ -191,8 +175,6 @@ func init() {
 	initCmd.Flags().String("name", "", "The name of the modpack (omit to define interactively)")
 	initCmd.Flags().String("author", "", "The author of the modpack (omit to define interactively)")
 	initCmd.Flags().String("version", "", "The version of the modpack (omit to define interactively)")
-	initCmd.Flags().String("index-file", "index.toml", "The index file to use")
-	_ = viper.BindPFlag("init.index-file", initCmd.Flags().Lookup("index-file"))
 	initCmd.Flags().String("mc-version", "", "The Minecraft version to use (omit to define interactively)")
 	_ = viper.BindPFlag("init.mc-version", initCmd.Flags().Lookup("mc-version"))
 	initCmd.Flags().BoolP("latest", "l", false, "Automatically select the latest version of Minecraft")

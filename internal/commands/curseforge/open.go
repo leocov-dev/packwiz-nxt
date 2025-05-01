@@ -2,7 +2,6 @@ package curseforge
 
 import (
 	"fmt"
-	"github.com/leocov-dev/packwiz-nxt/core"
 	"github.com/leocov-dev/packwiz-nxt/fileio"
 	"github.com/leocov-dev/packwiz-nxt/internal/cmdshared"
 	"github.com/skratchdot/open-golang/open"
@@ -32,7 +31,7 @@ var openCmd = &cobra.Command{
 			// TODO: should this auto-refresh?
 			cmdshared.Exitln("Can't find this file; please ensure you have run packwiz refresh and use the name of the .pw.toml file (defaults to the project slug)")
 		}
-		modData, err := core.LoadMod(resolvedMod)
+		modData, err := fileio.LoadMod(resolvedMod)
 		if err != nil {
 			cmdshared.Exitln(err)
 		}

@@ -2,12 +2,9 @@ package core
 
 import (
 	"errors"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
-
-	"github.com/pelletier/go-toml/v2"
 )
 
 // Mod stores metadata about a mod. This is written to a TOML file for each mod.
@@ -57,32 +54,24 @@ const (
 	EmptySide     = ""
 )
 
-// LoadMod attempts to load a mod file from a path
-func LoadMod(modFile string) (Mod, error) {
-	var mod Mod
-	raw, err := os.ReadFile(modFile)
-	if err != nil {
-		return mod, err
-	}
-	if err := toml.Unmarshal(raw, &mod); err != nil {
-		return mod, err
-	}
-	mod.updateData = make(map[string]interface{})
+func (m *Mod) ReflectUpdateData() error {
+	m.updateData = make(map[string]interface{})
+
 	// Horrible reflection library to convert map[string]interface to proper struct
-	for k, v := range mod.Update {
+	for k, v := range m.Update {
 		updater, ok := Updaters[k]
 		if ok {
 			updateData, err := updater.ParseUpdate(v)
 			if err != nil {
-				return mod, err
+				return err
 			}
-			mod.updateData[k] = updateData
+			m.updateData[k] = updateData
 		} else {
-			return mod, errors.New("Update plugin " + k + " not found!")
+			return errors.New("Update plugin " + k + " not found!")
 		}
 	}
-	mod.metaFile = modFile
-	return mod, nil
+
+	return nil
 }
 
 // SetMetaPath sets the file path of a metadata file

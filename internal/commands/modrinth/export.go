@@ -57,7 +57,7 @@ var exportCmd = &cobra.Command{
 		}
 
 		fmt.Println("Reading external files...")
-		mods, err := index.LoadAllMods()
+		mods, err := fileio.LoadAllMods(&index)
 		if err != nil {
 			cmdshared.Exitf("Error reading file: %v\n", err)
 		}
