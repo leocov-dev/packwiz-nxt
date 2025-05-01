@@ -117,7 +117,7 @@ var UpdateCmd = &cobra.Command{
 						continue
 					}
 
-					err = index.RefreshFileWithHash(modData.GetFilePath(), format, hash, true)
+					err = index.UpdateFileHashGiven(modData.GetFilePath(), format, hash, true)
 					if err != nil {
 						fmt.Println(err.Error())
 						continue
@@ -170,7 +170,7 @@ var UpdateCmd = &cobra.Command{
 						cmdshared.Exitln(err)
 					}
 
-					err = index.RefreshFileWithHash(modPath, format, hash, true)
+					err = index.UpdateFileHashGiven(modPath, format, hash, true)
 					if err != nil {
 						cmdshared.Exitln(err)
 					}

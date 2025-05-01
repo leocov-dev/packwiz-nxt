@@ -197,7 +197,7 @@ func installRelease(repo Repo, release Release, regex string, pack core.Pack) er
 		return err
 	}
 
-	err = index.RefreshFileWithHash(path, format, hash, true)
+	err = index.UpdateFileHashGiven(path, format, hash, true)
 	if err != nil {
 		return err
 	}

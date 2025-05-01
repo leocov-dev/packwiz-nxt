@@ -34,7 +34,7 @@ func pinMod(args []string, pinned bool) {
 		cmdshared.Exitln(err)
 	}
 
-	err = index.RefreshFileWithHash(modPath, format, hash, true)
+	err = index.UpdateFileHashGiven(modPath, format, hash, true)
 	if err != nil {
 		cmdshared.Exitln(err)
 	}

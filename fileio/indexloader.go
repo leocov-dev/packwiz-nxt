@@ -7,9 +7,11 @@ import (
 	"github.com/spf13/viper"
 	"github.com/vbauerster/mpb/v4"
 	"github.com/vbauerster/mpb/v4/decor"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -120,7 +122,7 @@ func RefreshIndexFiles(index *core.Index) error {
 	for _, v := range fileList {
 		start := time.Now()
 
-		err := index.UpdateFile(v)
+		err := UpdateIndexFile(index, v)
 		if err != nil {
 			return err
 		}
@@ -139,4 +141,39 @@ func RefreshIndexFiles(index *core.Index) error {
 	}
 
 	return nil
+}
+
+func UpdateIndexFile(in *core.Index, path string) error {
+	var hashString string
+
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+
+	// Hash usage strategy (may change):
+	// Just use SHA256, overwrite existing hash regardless of what it is
+	// May update later to continue using the same hash that was already being used
+	h, err := core.GetHashImpl("sha256")
+	if err != nil {
+		_ = f.Close()
+		return err
+	}
+	if _, err := io.Copy(h, f); err != nil {
+		_ = f.Close()
+		return err
+	}
+	err = f.Close()
+	if err != nil {
+		return err
+	}
+	hashString = h.String()
+
+	markAsMetaFile := false
+	// If the file has an extension of pw.toml, set markAsMetaFile to true
+	if strings.HasSuffix(filepath.Base(path), core.MetaExtension) {
+		markAsMetaFile = true
+	}
+
+	return in.UpdateFileHashGiven(path, "sha256", hashString, markAsMetaFile)
 }

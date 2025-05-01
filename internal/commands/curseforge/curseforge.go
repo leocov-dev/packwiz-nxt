@@ -223,7 +223,7 @@ func createModFile(modInfo modInfo, fileInfo modFileInfo, index *core.Index, opt
 		return err
 	}
 
-	return index.RefreshFileWithHash(path, format, hash, true)
+	return index.UpdateFileHashGiven(path, format, hash, true)
 }
 
 func getSearchLoaderType(pack core.Pack) modloaderType {

@@ -443,7 +443,7 @@ func createFileMeta(project *modrinthApi.Project, version *modrinthApi.Version, 
 		return err
 	}
 
-	return index.RefreshFileWithHash(path, format, hash, true)
+	return index.UpdateFileHashGiven(path, format, hash, true)
 }
 
 var projectIDFlag string

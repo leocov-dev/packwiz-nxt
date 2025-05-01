@@ -94,7 +94,7 @@ var installCmd = &cobra.Command{
 			cmdshared.Exitln(err)
 		}
 
-		err = index.RefreshFileWithHash(destPath, format, hash, true)
+		err = index.UpdateFileHashGiven(destPath, format, hash, true)
 		if err != nil {
 			cmdshared.Exitln(err)
 		}
