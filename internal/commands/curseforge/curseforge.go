@@ -3,7 +3,7 @@ package curseforge
 import (
 	"errors"
 	"fmt"
-	"github.com/leocov-dev/fork.packwiz/fileio"
+	"github.com/leocov-dev/packwiz-nxt/fileio"
 	"github.com/spf13/viper"
 	"github.com/unascribed/FlexVer/go/flexver"
 	"golang.org/x/exp/slices"
@@ -13,8 +13,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/leocov-dev/fork.packwiz/cmd"
-	"github.com/leocov-dev/fork.packwiz/core"
+	"github.com/leocov-dev/packwiz-nxt/cmd"
+	"github.com/leocov-dev/packwiz-nxt/core"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/cobra"
 )

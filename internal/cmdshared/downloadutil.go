@@ -3,7 +3,7 @@ package cmdshared
 import (
 	"archive/zip"
 	"fmt"
-	"github.com/leocov-dev/fork.packwiz/core"
+	"github.com/leocov-dev/packwiz-nxt/core"
 	"io"
 	"os"
 	"path"

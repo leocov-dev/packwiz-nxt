@@ -1,4 +1,4 @@
-module github.com/leocov-dev/fork.packwiz
+module github.com/leocov-dev/packwiz-nxt
 
 require (
 	github.com/Masterminds/semver/v3 v3.3.1

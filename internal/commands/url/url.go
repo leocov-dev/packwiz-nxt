@@ -1,7 +1,7 @@
 package url
 
 import (
-	"github.com/leocov-dev/fork.packwiz/cmd"
+	"github.com/leocov-dev/packwiz-nxt/cmd"
 	"github.com/spf13/cobra"
 )
 

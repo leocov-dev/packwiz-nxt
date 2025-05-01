@@ -5,7 +5,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/leocov-dev/fork.packwiz/core"
+	"github.com/leocov-dev/packwiz-nxt/core"
 )
 
 type McVersionManifest struct {

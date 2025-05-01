@@ -3,8 +3,8 @@ package packinterop
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/leocov-dev/fork.packwiz/core"
-	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
+	"github.com/leocov-dev/packwiz-nxt/core"
+	"github.com/leocov-dev/packwiz-nxt/internal/cmdshared"
 	"io"
 )
 

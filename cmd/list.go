@@ -2,15 +2,15 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/leocov-dev/fork.packwiz/fileio"
+	"github.com/leocov-dev/packwiz-nxt/fileio"
 	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/leocov-dev/fork.packwiz/core"
-	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
+	"github.com/leocov-dev/packwiz-nxt/core"
+	"github.com/leocov-dev/packwiz-nxt/internal/cmdshared"
 )
 
 // listCmd represents the list command

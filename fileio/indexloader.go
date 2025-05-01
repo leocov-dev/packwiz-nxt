@@ -1,7 +1,7 @@
 package fileio
 
 import (
-	"github.com/leocov-dev/fork.packwiz/core"
+	"github.com/leocov-dev/packwiz-nxt/core"
 	"github.com/pelletier/go-toml/v2"
 	"os"
 )

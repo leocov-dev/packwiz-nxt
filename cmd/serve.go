@@ -4,8 +4,8 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
-	"github.com/leocov-dev/fork.packwiz/fileio"
-	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
+	"github.com/leocov-dev/packwiz-nxt/fileio"
+	"github.com/leocov-dev/packwiz-nxt/internal/cmdshared"
 	"html/template"
 	"io"
 	"net/http"
@@ -16,7 +16,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/leocov-dev/fork.packwiz/core"
+	"github.com/leocov-dev/packwiz-nxt/core"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

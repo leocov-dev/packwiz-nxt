@@ -2,9 +2,9 @@ package migrate
 
 import (
 	"fmt"
-	"github.com/leocov-dev/fork.packwiz/core"
-	"github.com/leocov-dev/fork.packwiz/fileio"
-	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
+	"github.com/leocov-dev/packwiz-nxt/core"
+	"github.com/leocov-dev/packwiz-nxt/fileio"
+	"github.com/leocov-dev/packwiz-nxt/internal/cmdshared"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"

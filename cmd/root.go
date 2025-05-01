@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/leocov-dev/fork.packwiz/core"
-	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
+	"github.com/leocov-dev/packwiz-nxt/core"
+	"github.com/leocov-dev/packwiz-nxt/internal/cmdshared"
 	"github.com/spf13/pflag"
 	"os"
 	"path/filepath"

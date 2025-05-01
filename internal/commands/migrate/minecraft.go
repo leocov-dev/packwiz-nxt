@@ -2,9 +2,9 @@ package migrate
 
 import (
 	"fmt"
-	packCmd "github.com/leocov-dev/fork.packwiz/cmd"
-	"github.com/leocov-dev/fork.packwiz/fileio"
-	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
+	packCmd "github.com/leocov-dev/packwiz-nxt/cmd"
+	"github.com/leocov-dev/packwiz-nxt/fileio"
+	"github.com/leocov-dev/packwiz-nxt/internal/cmdshared"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"os"

@@ -18,3 +18,4 @@ ldflags:
   - "-w"  # strip dwarf
   - "-extldflags=-static"
   - "-X main.Version={{ .Env.VERSION }}"
+  - "-X main.CfApiKey={{ .Env.CF_API_KEY }}"

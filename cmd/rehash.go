@@ -2,14 +2,14 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/leocov-dev/fork.packwiz/fileio"
+	"github.com/leocov-dev/packwiz-nxt/fileio"
 	"github.com/spf13/viper"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
 
-	"github.com/leocov-dev/fork.packwiz/core"
-	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
+	"github.com/leocov-dev/packwiz-nxt/core"
+	"github.com/leocov-dev/packwiz-nxt/internal/cmdshared"
 )
 
 // rehashCmd represents the rehash command

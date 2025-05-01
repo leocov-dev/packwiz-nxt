@@ -8,7 +8,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"github.com/leocov-dev/fork.packwiz/core/murmur2"
+	"github.com/leocov-dev/packwiz-nxt/core/murmur2"
 	"hash"
 	"strconv"
 	"strings"

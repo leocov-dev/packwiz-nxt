@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra/doc"
 	"github.com/spf13/viper"
 
-	"github.com/leocov-dev/fork.packwiz/internal/cmdshared"
+	"github.com/leocov-dev/packwiz-nxt/internal/cmdshared"
 )
 
 // markdownCmd represents the markdown command
