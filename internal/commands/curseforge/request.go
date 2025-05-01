@@ -2,9 +2,9 @@ package curseforge
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/leocov-dev/fork.packwiz/config"
 	"github.com/leocov-dev/fork.packwiz/core"
 	"io"
 	"net/http"
@@ -14,20 +14,6 @@ import (
 )
 
 const cfApiServer = "api.curseforge.com"
-
-// If you fork/derive from packwiz, I request that you obtain your own API key.
-const cfApiKeyDefault = "JDJhJDEwJHNBWVhqblU1N0EzSmpzcmJYM3JVdk92UWk2NHBLS3BnQ2VpbGc1TUM1UGNKL0RYTmlGWWxh"
-
-// Exists so you can provide it as a build parameter: -ldflags="-X 'github.com/leocov-dev/fork.packwiz/curseforge.cfApiKey=key'"
-var cfApiKey = ""
-
-func decodeDefaultKey() string {
-	k, err := base64.StdEncoding.DecodeString(cfApiKeyDefault)
-	if err != nil {
-		panic("failed to read API key!")
-	}
-	return string(k)
-}
 
 type cfApiClient struct {
 	httpClient *http.Client
@@ -43,10 +29,10 @@ func (c *cfApiClient) makeGet(endpoint string) (*http.Response, error) {
 
 	req.Header.Set("User-Agent", core.UserAgent)
 	req.Header.Set("Accept", "application/json")
-	if cfApiKey == "" {
-		cfApiKey = decodeDefaultKey()
+	if config.CfApiKey == "" {
+		panic("no CurseForge API key set")
 	}
-	req.Header.Set("X-API-Key", cfApiKey)
+	req.Header.Set("X-API-Key", config.CfApiKey)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -68,10 +54,10 @@ func (c *cfApiClient) makePost(endpoint string, body io.Reader) (*http.Response,
 	req.Header.Set("User-Agent", core.UserAgent)
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
-	if cfApiKey == "" {
-		cfApiKey = decodeDefaultKey()
+	if config.CfApiKey == "" {
+		panic("no CurseForge API key set")
 	}
-	req.Header.Set("X-API-Key", cfApiKey)
+	req.Header.Set("X-API-Key", config.CfApiKey)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
