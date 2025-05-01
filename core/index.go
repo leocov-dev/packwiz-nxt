@@ -2,17 +2,10 @@ package core
 
 import (
 	"io"
-	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
-	"time"
-
-	gitignore "github.com/sabhiram/go-gitignore"
-	"github.com/spf13/viper"
-	"github.com/vbauerster/mpb/v4"
-	"github.com/vbauerster/mpb/v4/decor"
 )
 
 // Index is a representation of the index.toml file for referencing all the files in a pack.
@@ -35,6 +28,10 @@ func NewIndexFromTomlRepr(rep IndexTomlRepresentation) Index {
 
 func (in *Index) GetFilePath() string {
 	return filepath.Join(in.packRoot, "index.toml")
+}
+
+func (in *Index) GetPackRoot() string {
+	return in.packRoot
 }
 
 // RemoveFile removes a file from the index, given a file path
@@ -62,8 +59,8 @@ func (in *Index) updateFileHashGiven(path, format, hash string, markAsMetaFile b
 	return nil
 }
 
-// updateFile calculates the hash for a given path and updates it in the index
-func (in *Index) updateFile(path string) error {
+// UpdateFile calculates the hash for a given path and updates it in the index
+func (in *Index) UpdateFile(path string) error {
 	var hashString string
 
 	f, err := os.Open(path)
@@ -110,136 +107,6 @@ func (in *Index) RelIndexPath(p string) (string, error) {
 		return "", err
 	}
 	return filepath.ToSlash(rel), nil
-}
-
-var ignoreDefaults = []string{
-	// Defaults (can be overridden with a negating pattern preceded with !)
-
-	// Exclude Git metadata
-	".git/**",
-	".gitattributes",
-	".gitignore",
-
-	// Exclude macOS metadata
-	".DS_Store",
-
-	// Exclude exported CurseForge zip files
-	"/*.zip",
-
-	// Exclude exported Modrinth packs
-	"*.mrpack",
-
-	// Exclude packwiz binaries, if the user puts them in their pack folder
-	"packwiz.exe",
-	"packwiz", // Note: also excludes packwiz/ as a directory - you can negate this pattern if you want a directory called packwiz
-}
-
-func readGitignore(path string) (*gitignore.GitIgnore, bool) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		// TODO: check for read errors (and present them)
-		return gitignore.CompileIgnoreLines(ignoreDefaults...), false
-	}
-
-	s := strings.Split(string(data), "\n")
-	var lines []string
-	lines = append(lines, ignoreDefaults...)
-	lines = append(lines, s...)
-	return gitignore.CompileIgnoreLines(lines...), true
-}
-
-// Refresh updates the hashes of all the files in the index, and adds new files to the index
-func (in *Index) Refresh() error {
-	// TODO: If needed, multithreaded hashing
-	// for i := 0; i < runtime.NumCPU(); i++ {}
-
-	// Is case-sensitivity a problem?
-	pathPF, _ := filepath.Abs(viper.GetString("pack-file"))
-	pathIndex, _ := filepath.Abs(in.GetFilePath())
-
-	pathIgnore, _ := filepath.Abs(filepath.Join(in.packRoot, ".packwizignore"))
-	ignore, ignoreExists := readGitignore(pathIgnore)
-
-	var fileList []string
-	err := filepath.WalkDir(in.packRoot, func(path string, info os.DirEntry, err error) error {
-		if err != nil {
-			// TODO: Handle errors on individual files properly
-			return err
-		}
-
-		// Never ignore pack root itself (gitignore doesn't allow ignoring the root)
-		if path == in.packRoot {
-			return nil
-		}
-
-		if info.IsDir() {
-			// Don't traverse ignored directories (consistent with Git handling of ignored dirs)
-			if ignore.MatchesPath(path) {
-				return fs.SkipDir
-			}
-			// Don't add directories to the file list
-			return nil
-		}
-		// Exit if the files are the same as the pack/index files
-		absPath, _ := filepath.Abs(path)
-		if absPath == pathPF || absPath == pathIndex {
-			return nil
-		}
-		if ignoreExists {
-			if absPath == pathIgnore {
-				return nil
-			}
-		}
-		if ignore.MatchesPath(path) {
-			return nil
-		}
-
-		fileList = append(fileList, path)
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-
-	progressContainer := mpb.New()
-	progress := progressContainer.AddBar(int64(len(fileList)),
-		mpb.PrependDecorators(
-			// simple name decorator
-			decor.Name("Refreshing index..."),
-			// decor.DSyncWidth bit enables column width synchronization
-			decor.Percentage(decor.WCSyncSpace),
-		),
-		mpb.AppendDecorators(
-			// replace ETA decorator with "done" message, OnComplete event
-			decor.OnComplete(
-				// ETA decorator with ewma age of 60
-				decor.EwmaETA(decor.ET_STYLE_GO, 60), "done",
-			),
-		),
-	)
-
-	for _, v := range fileList {
-		start := time.Now()
-
-		err := in.updateFile(v)
-		if err != nil {
-			return err
-		}
-
-		progress.Increment(time.Since(start))
-	}
-	// Close bar
-	progress.SetTotal(int64(len(fileList)), true) // If len = 0, we have to manually set complete to true
-	progressContainer.Wait()
-
-	// Check all the files exist, remove them if they don't
-	for p, file := range in.Files {
-		if !file.markedFound() {
-			delete(in.Files, p)
-		}
-	}
-
-	return nil
 }
 
 func (in *Index) ToWritable() IndexTomlRepresentation {

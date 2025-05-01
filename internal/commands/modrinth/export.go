@@ -33,7 +33,7 @@ var exportCmd = &cobra.Command{
 			cmdshared.Exitln(err)
 		}
 		// Do a refresh to ensure files are up to date
-		err = index.Refresh()
+		err = fileio.RefreshIndexFiles(&index)
 		if err != nil {
 			fmt.Println(err)
 			return

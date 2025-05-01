@@ -316,7 +316,7 @@ var importCmd = &cobra.Command{
 		}
 		if len(filesList) > 0 {
 			fmt.Printf("Successfully copied %d/%d files!\n", successes, len(filesList))
-			err = index.Refresh()
+			err = fileio.RefreshIndexFiles(&index)
 			if err != nil {
 				cmdshared.Exitln(err)
 			}

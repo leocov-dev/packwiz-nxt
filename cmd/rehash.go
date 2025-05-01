@@ -69,7 +69,7 @@ var rehashCmd = &cobra.Command{
 			cmdshared.Exitf("Error saving cache index: %v\n", err)
 		}
 
-		err = index.Refresh()
+		err = fileio.RefreshIndexFiles(&index)
 		if err != nil {
 			cmdshared.Exitf("Error refreshing index: %v\n", err)
 		}

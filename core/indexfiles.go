@@ -13,7 +13,7 @@ type IndexPathHolder interface {
 	updateHash(hash string, format string)
 	markFound()
 	markMetaFile()
-	markedFound() bool
+	MarkedFound() bool
 	IsMetaFile() bool
 }
 
@@ -42,7 +42,7 @@ func (i *IndexFile) markMetaFile() {
 	i.MetaFile = true
 }
 
-func (i *IndexFile) markedFound() bool {
+func (i *IndexFile) MarkedFound() bool {
 	return i.fileFound
 }
 
@@ -74,9 +74,9 @@ func (i *indexFileMultipleAlias) markMetaFile() {
 	}
 }
 
-func (i *indexFileMultipleAlias) markedFound() bool {
+func (i *indexFileMultipleAlias) MarkedFound() bool {
 	for _, v := range *i {
-		return v.markedFound()
+		return v.MarkedFound()
 	}
 	panic("No entries in indexFileMultipleAlias")
 }

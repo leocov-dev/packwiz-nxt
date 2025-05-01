@@ -110,7 +110,7 @@ var detectCmd = &cobra.Command{
 		}
 		fmt.Println("Detection complete!")
 
-		err = index.Refresh()
+		err = fileio.RefreshIndexFiles(&index)
 		if err != nil {
 			fmt.Println(err)
 			return

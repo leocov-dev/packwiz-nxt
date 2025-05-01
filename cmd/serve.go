@@ -151,7 +151,7 @@ func doServeRefresh(pack *core.Pack, index *core.Index) error {
 	if err != nil {
 		return err
 	}
-	err = index.Refresh()
+	err = fileio.RefreshIndexFiles(index)
 	if err != nil {
 		return err
 	}

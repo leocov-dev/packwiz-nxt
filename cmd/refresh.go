@@ -24,7 +24,7 @@ var refreshCmd = &cobra.Command{
 		if err != nil {
 			cmdshared.Exitln(err)
 		}
-		err = index.Refresh()
+		err = fileio.RefreshIndexFiles(&index)
 		if err != nil {
 			cmdshared.Exitln(err)
 		}
