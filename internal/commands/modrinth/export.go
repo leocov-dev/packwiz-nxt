@@ -142,7 +142,7 @@ var exportCmd = &cobra.Command{
 				}
 
 				// Modrinth URLs must be RFC3986
-				u, err := core.ReencodeURL(dl.Mod.Download.URL)
+				u, err := core.ReEncodeURL(dl.Mod.Download.URL)
 				if err != nil {
 					fmt.Printf("Error re-encoding download URL: %s\n", err.Error())
 					u = dl.Mod.Download.URL
