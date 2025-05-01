@@ -4,13 +4,14 @@ import (
 	"archive/zip"
 	"fmt"
 	"github.com/leocov-dev/packwiz-nxt/core"
+	"github.com/leocov-dev/packwiz-nxt/fileio"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
 )
 
-func ListManualDownloads(session core.DownloadSession) {
+func ListManualDownloads(session fileio.DownloadSession) {
 	manualDownloads := session.GetManualDownloads()
 	if len(manualDownloads) > 0 {
 		fmt.Printf("Found %v manual downloads; these mods are unable to be downloaded by packwiz (due to API limitations) and must be manually downloaded:\n",
@@ -18,18 +19,18 @@ func ListManualDownloads(session core.DownloadSession) {
 		for _, dl := range manualDownloads {
 			fmt.Printf("%s (%s) from %s\n", dl.Name, dl.FileName, dl.URL)
 		}
-		cacheDir, err := core.GetPackwizCache()
+		cacheDir, err := fileio.GetPackwizCache()
 		if err != nil {
 			Exitf("Error locating cache folder: %v", err)
 		}
 
 		fmt.Printf("Once you have done so, place these files in %s and re-run this command.\n",
-			filepath.Join(cacheDir, core.DownloadCacheImportFolder))
+			filepath.Join(cacheDir, fileio.DownloadCacheImportFolder))
 		os.Exit(1)
 	}
 }
 
-func AddToZip(dl core.CompletedDownload, exp *zip.Writer, dir string, index *core.Index) bool {
+func AddToZip(dl fileio.CompletedDownload, exp *zip.Writer, dir string, index *core.Index) bool {
 	if dl.Error != nil {
 		fmt.Printf("Download of %s (%s) failed: %v\n", dl.Mod.Name, dl.Mod.FileName, dl.Error)
 		return false

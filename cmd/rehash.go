@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
 
-	"github.com/leocov-dev/packwiz-nxt/core"
 	"github.com/leocov-dev/packwiz-nxt/internal/cmdshared"
 )
 
@@ -41,7 +40,7 @@ var rehashCmd = &cobra.Command{
 			cmdshared.Exitf("Hash format '%s' is not supported\n", args[0])
 		}
 
-		session, err := core.CreateDownloadSession(mods, []string{args[0]})
+		session, err := fileio.CreateDownloadSession(mods, []string{args[0]})
 		if err != nil {
 			cmdshared.Exitf("Error retrieving external files: %v\n", err)
 		}

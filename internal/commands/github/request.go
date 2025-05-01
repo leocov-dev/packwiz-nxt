@@ -2,10 +2,10 @@ package github
 
 import (
 	"fmt"
+	"github.com/leocov-dev/packwiz-nxt/core"
 	"net/http"
 	"strconv"
 
-	"github.com/leocov-dev/packwiz-nxt/core"
 	"github.com/spf13/viper"
 )
 

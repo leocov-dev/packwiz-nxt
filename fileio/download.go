@@ -1,11 +1,11 @@
-package core
+package fileio
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/leocov-dev/packwiz-nxt/core"
 	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,22 +13,10 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-const UserAgent = "packwiz/packwiz"
-
-func GetWithUA(url string, contentType string) (resp *http.Response, err error) {
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", UserAgent)
-	req.Header.Set("Accept", contentType)
-	return http.DefaultClient.Do(req)
-}
-
 const DownloadCacheImportFolder = "import"
 
 type DownloadSession interface {
-	GetManualDownloads() []ManualDownload
+	GetManualDownloads() []core.ManualDownload
 	StartDownloads() chan CompletedDownload
 	SaveIndex() error
 }
@@ -36,7 +24,7 @@ type DownloadSession interface {
 type CompletedDownload struct {
 	// File is only populated when the download is successful; points to the opened cache file
 	File *os.File
-	Mod  *Mod
+	Mod  *core.Mod
 	// Hashes is only populated when the download is successful; contains all stored hashes of the file
 	Hashes map[string]string
 	// Error indicates if/why downloading this file failed
@@ -49,20 +37,20 @@ type downloadSessionInternal struct {
 	cacheIndex           CacheIndex
 	cacheFolder          string
 	hashesToObtain       []string
-	manualDownloads      []ManualDownload
+	manualDownloads      []core.ManualDownload
 	downloadTasks        []downloadTask
 	foundManualDownloads []CompletedDownload
 }
 
 type downloadTask struct {
-	metaDownloaderData MetaDownloaderData
-	mod                *Mod
+	metaDownloaderData core.MetaDownloaderData
+	mod                *core.Mod
 	url                string
 	hashFormat         string
 	hash               string
 }
 
-func (d *downloadSessionInternal) GetManualDownloads() []ManualDownload {
+func (d *downloadSessionInternal) GetManualDownloads() []core.ManualDownload {
 	return d.manualDownloads
 }
 
@@ -118,7 +106,7 @@ func (d *downloadSessionInternal) SaveIndex() error {
 	return nil
 }
 
-func reuseExistingFile(cacheHandle *CacheIndexHandle, hashesToObtain []string, mod *Mod) (CompletedDownload, error) {
+func reuseExistingFile(cacheHandle *CacheIndexHandle, hashesToObtain []string, mod *core.Mod) (CompletedDownload, error) {
 	// Already stored; try using it!
 	file, err := cacheHandle.Open()
 	if err == nil {
@@ -160,7 +148,7 @@ func downloadNewFile(task *downloadTask, cacheFolder string, hashesToObtain []st
 	if len(hashesToObtain) > 0 {
 		var data io.ReadCloser
 		if task.url != "" {
-			resp, err := GetWithUA(task.url, "application/octet-stream")
+			resp, err := core.GetWithUA(task.url, "application/octet-stream")
 			if err != nil {
 				return CompletedDownload{}, fmt.Errorf("failed to download %s: %w", task.url, err)
 			}
@@ -216,7 +204,7 @@ func downloadNewFile(task *downloadTask, cacheFolder string, hashesToObtain []st
 }
 
 func selectPreferredHash(hashes map[string]string) (currHashFormat string, currHash string) {
-	for _, hashFormat := range PreferredHashList {
+	for _, hashFormat := range core.PreferredHashList {
 		if hash, ok := hashes[hashFormat]; ok {
 			currHashFormat = hashFormat
 			currHash = hash
@@ -252,14 +240,14 @@ func teeHashes(hashesToObtain []string, hashes map[string]string,
 	}
 
 	// Create writers for all the hashers
-	mainHasher, err := GetHashImpl(validateHashFormat)
+	mainHasher, err := core.GetHashImpl(validateHashFormat)
 	if err != nil {
 		return fmt.Errorf("failed to get hash format %s", validateHashFormat)
 	}
-	hashers := make(map[string]HashStringer, len(hashesToObtain))
+	hashers := make(map[string]core.HashStringer, len(hashesToObtain))
 	allWriters := make([]io.Writer, len(hashesToObtain))
 	for i, v := range hashesToObtain {
-		hashers[v], err = GetHashImpl(v)
+		hashers[v], err = core.GetHashImpl(v)
 		if err != nil {
 			return fmt.Errorf("failed to get hash format %s", v)
 		}
@@ -389,11 +377,11 @@ func (c *CacheIndex) rehashFile(cacheHash string, hashFormat string) (string, er
 	if err != nil {
 		return "", err
 	}
-	validateHasher, err := GetHashImpl(cacheHashFormat)
+	validateHasher, err := core.GetHashImpl(cacheHashFormat)
 	if err != nil {
 		return "", fmt.Errorf("failed to get hasher for rehash: %w", err)
 	}
-	rehashHasher, err := GetHashImpl(hashFormat)
+	rehashHasher, err := core.GetHashImpl(hashFormat)
 	if err != nil {
 		return "", fmt.Errorf("failed to get hasher for rehash: %w", err)
 	}
@@ -448,7 +436,7 @@ func (c *CacheIndex) MoveImportFiles() error {
 			_ = file.Close()
 			return fmt.Errorf("failed to open imported file %s: %w", path, err)
 		}
-		hasher, err := GetHashImpl(cacheHashFormat)
+		hasher, err := core.GetHashImpl(cacheHashFormat)
 		if err != nil {
 			_ = file.Close()
 			return fmt.Errorf("failed to validate imported file %s: %w", path, err)
@@ -584,7 +572,7 @@ func removeEmpty(hashList []string) ([]string, []int) {
 	return hashList[:i], indices
 }
 
-func CreateDownloadSession(mods []*Mod, hashesToObtain []string) (DownloadSession, error) {
+func CreateDownloadSession(mods []*core.Mod, hashesToObtain []string) (DownloadSession, error) {
 	// Load cache index
 	cacheIndex := CacheIndex{Version: 1, Hashes: make(map[string][]string)}
 	cachePath, err := GetPackwizCache()
@@ -652,11 +640,11 @@ func CreateDownloadSession(mods []*Mod, hashesToObtain []string) (DownloadSessio
 		hashesToObtain: hashesToObtain,
 	}
 
-	pendingMetadata := make(map[string][]*Mod)
+	pendingMetadata := make(map[string][]*core.Mod)
 
 	// Get necessary metadata for all files
 	for _, mod := range mods {
-		if mod.Download.Mode == ModeURL || mod.Download.Mode == "" {
+		if mod.Download.Mode == core.ModeURL || mod.Download.Mode == "" {
 			downloadSession.downloadTasks = append(downloadSession.downloadTasks, downloadTask{
 				mod:        mod,
 				url:        mod.Download.URL,
@@ -672,7 +660,7 @@ func CreateDownloadSession(mods []*Mod, hashesToObtain []string) (DownloadSessio
 	}
 
 	for dlID, mods := range pendingMetadata {
-		downloader, ok := MetaDownloaders[dlID]
+		downloader, ok := core.MetaDownloaders[dlID]
 		if !ok {
 			return nil, fmt.Errorf("unknown download mode %s for %s", mods[0].Download.Mode, mods[0].Name)
 		}

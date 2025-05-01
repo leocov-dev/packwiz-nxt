@@ -2,10 +2,9 @@ package cmdshared
 
 import (
 	"encoding/json"
+	"github.com/leocov-dev/packwiz-nxt/core"
 	"sort"
 	"time"
-
-	"github.com/leocov-dev/packwiz-nxt/core"
 )
 
 type McVersionManifest struct {

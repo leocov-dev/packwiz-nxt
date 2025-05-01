@@ -120,7 +120,7 @@ var exportCmd = &cobra.Command{
 			fmt.Printf("Retrieving %v external files to store in the modpack zip...\n", len(nonCfMods))
 			cmdshared.PrintDisclaimer(true)
 
-			session, err := core.CreateDownloadSession(nonCfMods, []string{})
+			session, err := fileio.CreateDownloadSession(nonCfMods, []string{})
 			if err != nil {
 				cmdshared.Exitf("Error retrieving external files: %v\n", err)
 			}
