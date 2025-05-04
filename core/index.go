@@ -1,6 +1,7 @@
 package core
 
 import (
+	"github.com/pelletier/go-toml/v2"
 	"path"
 	"path/filepath"
 	"strings"
@@ -125,4 +126,36 @@ func (it *IndexTomlRepresentation) SetFilePath(path string) {
 func (it *IndexTomlRepresentation) UpdateHash(format, hash string) {
 	it.index.hashFormat = format
 	it.index.hash = hash
+}
+
+func (it *IndexTomlRepresentation) GetHashFormat() string {
+	return "sha256"
+}
+
+func (it *IndexTomlRepresentation) Marshal() (MarshalResult, error) {
+	result := MarshalResult{
+		HashFormat: it.GetHashFormat(),
+	}
+
+	var err error
+
+	result.Value, err = toml.Marshal(it)
+	if err != nil {
+		return result, err
+	}
+
+	stringer, err := GetHashImpl(result.HashFormat)
+	if err != nil {
+		return result, err
+	}
+
+	if _, err := stringer.Write(result.Value); err != nil {
+		return result, err
+	}
+
+	result.Hash = stringer.String()
+
+	it.UpdateHash(result.HashFormat, result.Hash)
+
+	return result, nil
 }

@@ -2,6 +2,7 @@ package core
 
 import (
 	"errors"
+	"github.com/pelletier/go-toml/v2"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -21,8 +22,7 @@ type Mod struct {
 
 	Option *ModOption `toml:"option,omitempty"`
 
-	hashFormat string
-	hash       string
+	hash string
 }
 
 const (
@@ -98,12 +98,11 @@ func (m *Mod) GetDestFilePath() string {
 
 // UpdateHash updates the hash of a mod file, used with ModWriter
 func (m *Mod) UpdateHash(hashFormat string, hash string) {
-	m.hashFormat = hashFormat
 	m.hash = hash
 }
 
 func (m *Mod) GetHashInfo() (string, string) {
-	return m.hashFormat, m.hash
+	return m.GetHashFormat(), m.hash
 }
 
 func (m *Mod) IsMetaFile() bool {
@@ -115,6 +114,38 @@ func (m *Mod) AppendUpdateData(key string, value interface{}) {
 		m.updateData = make(map[string]interface{})
 	}
 	m.updateData[key] = value
+}
+
+func (m *Mod) GetHashFormat() string {
+	return "sha256"
+}
+
+func (m *Mod) Marshal() (MarshalResult, error) {
+	result := MarshalResult{
+		HashFormat: m.GetHashFormat(),
+	}
+
+	var err error
+
+	result.Value, err = toml.Marshal(m)
+	if err != nil {
+		return result, err
+	}
+
+	stringer, err := GetHashImpl(result.HashFormat)
+	if err != nil {
+		return result, err
+	}
+
+	if _, err := stringer.Write(result.Value); err != nil {
+		return result, err
+	}
+
+	result.Hash = stringer.String()
+
+	m.UpdateHash(result.HashFormat, result.Hash)
+
+	return result, nil
 }
 
 var slugifyRegex1 = regexp.MustCompile(`\(.*\)`)

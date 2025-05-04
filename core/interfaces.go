@@ -53,3 +53,17 @@ type ManualDownload struct {
 	FileName string
 	URL      string
 }
+
+type MarshalResult struct {
+	Value      []byte
+	HashFormat string
+	Hash       string
+}
+
+func (m MarshalResult) String() string {
+	return string(m.Value)
+}
+
+type HashableObject interface {
+	Marshal() (MarshalResult, error)
+}

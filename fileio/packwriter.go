@@ -1,10 +1,5 @@
 package fileio
 
-import (
-	"github.com/pelletier/go-toml/v2"
-	"os"
-)
-
 type PackWriter struct {
 }
 
@@ -15,19 +10,20 @@ func NewPackWriter() PackWriter {
 func (p PackWriter) Write(writable Writable) error {
 	metaFile := writable.GetFilePath()
 
-	f, err := os.Create(metaFile)
+	f, err := CreateFile(metaFile)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	result, err := writable.Marshal()
 	if err != nil {
 		return err
 	}
 
-	enc := toml.NewEncoder(f)
-	// Disable indentation
-	enc.SetIndentSymbol("")
-	err = enc.Encode(writable)
-	if err != nil {
-		_ = f.Close()
+	if _, err := f.Write(result.Value); err != nil {
 		return err
 	}
 
-	return f.Close()
+	return nil
 }

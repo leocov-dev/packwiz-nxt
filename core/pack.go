@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Masterminds/semver/v3"
+	"github.com/pelletier/go-toml/v2"
 	"github.com/spf13/viper"
 	"github.com/unascribed/FlexVer/go/flexver"
 	"path/filepath"
@@ -197,6 +198,24 @@ func (pack *Pack) SetFilePath(path string) {
 
 func (pack *Pack) GetPackDir() string {
 	return filepath.Dir(pack.filePath)
+}
+
+func (pack *Pack) GetHashFormat() string {
+	return ""
+}
+
+func (pack *Pack) Marshal() (MarshalResult, error) {
+	result := MarshalResult{
+		HashFormat: pack.GetHashFormat(),
+	}
+
+	var err error
+	result.Value, err = toml.Marshal(pack)
+	if err != nil {
+		return result, err
+	}
+
+	return result, nil
 }
 
 func sortAndDedupeVersions(versions []string) {
