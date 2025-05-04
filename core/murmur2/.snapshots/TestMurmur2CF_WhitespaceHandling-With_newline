@@ -1,0 +1,6 @@
+(struct { Buffer []uint8; Hash uint32 }) {
+  Buffer: ([]uint8) (len=10) {
+    00000000  48 65 6c 6c 6f 57 6f 72  6c 64                    |HelloWorld|
+  },
+  Hash: (uint32) 1756117720
+}

@@ -76,6 +76,7 @@ func (in *Index) ToWritable() IndexTomlRepresentation {
 		DefaultModHashFormat: in.DefaultModHashFormat,
 		Files:                in.Files.toTomlRep(),
 		index:                in,
+		filePath:             in.GetFilePath(),
 	}
 }
 

@@ -129,7 +129,11 @@ func (pack *Pack) GetSupportedMCVersions() ([]string, error) {
 }
 
 func (pack *Pack) GetAcceptableGameVersions() []string {
-	return pack.Options["acceptable-game-versions"].([]string)
+	acceptableVersions, ok := pack.Options["acceptable-game-versions"]
+	if !ok {
+		return []string{}
+	}
+	return acceptableVersions.([]string)
 }
 
 func (pack *Pack) SetAcceptableGameVersions(versions []string) {
