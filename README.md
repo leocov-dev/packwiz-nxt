@@ -7,13 +7,12 @@ The original CLI functionality is maintained.
 
 Note:
 This fork does not include a Curseforge API key in its source code. 
+You can apply for one [here](https://forms.monday.com/forms/dce5ccb7afda9a1c21dab1a1aa1d84eb?r=use1).
 You must supply it with one of these methods:
 
-- if building the project locally, include the ldflag `-X main.CfApiKey=<key>`
-  - using the make file `CF_API_KEY=<key> make`
-- if using as a library, set `config.CfApiKey` variable at some point
-
-Prebuilt binary releases for this repo will include a Curseforge API key.
+- if building the project locally, include the ldflag `-X main.CfApiKey=<base64-encoded-key>`
+  - using the `make` file: `CF_API_KEY=<base-64-encoded-key> make`
+- if using as a library, call `config.SetCurseforgeApiKey(<base-64-encoded-key>)` at some point in your code
 
 ---
 

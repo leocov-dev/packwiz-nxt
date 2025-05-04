@@ -42,12 +42,12 @@ var removeCmd = &cobra.Command{
 
 		repr := index.ToWritable()
 		writer := fileio.NewIndexWriter()
-		format, hash, err := writer.Write(&repr)
+		err = writer.Write(&repr)
 		if err != nil {
 			cmdshared.Exitln(err)
 		}
 
-		pack.RefreshIndexHash(format, hash)
+		pack.RefreshIndexHash(index)
 
 		packWriter := fileio.NewPackWriter()
 		err = packWriter.Write(&pack)

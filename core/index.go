@@ -33,6 +33,14 @@ func (in *Index) GetPackRoot() string {
 	return in.packRoot
 }
 
+func (in *Index) GetHashFormat() string {
+	return in.hashFormat
+}
+
+func (in *Index) GetHash() string {
+	return in.hash
+}
+
 // RemoveFile removes a file from the index, given a file path
 func (in *Index) RemoveFile(path string) error {
 	relPath, err := in.RelIndexPath(path)

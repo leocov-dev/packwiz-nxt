@@ -16,9 +16,7 @@ var Version string
 var CfApiKey string
 
 func main() {
-	config.SetConfig(
-		Version,
-		CfApiKey,
-	)
+	config.SetVersion(Version)
+	config.SetCurseforgeApiKey(CfApiKey)
 	cmd.Execute()
 }

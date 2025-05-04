@@ -16,7 +16,8 @@ type Mod struct {
 	Side     string      `toml:"side,omitempty"`
 	Pin      bool        `toml:"pin,omitempty"`
 	Download ModDownload `toml:"download"`
-	// Update is a map of map of stuff, so you can store arbitrary values on string keys to define updating
+	// Update is a map of maps, of stuff, so you can store arbitrary values on
+	// string keys to define updating
 	Update     map[string]map[string]interface{} `toml:"update"`
 	updateData map[string]interface{}
 

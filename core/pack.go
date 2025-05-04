@@ -6,7 +6,6 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/spf13/viper"
-	"github.com/unascribed/FlexVer/go/flexver"
 	"path/filepath"
 	"strings"
 )
@@ -104,9 +103,9 @@ func mustParseConstraint(s string) *semver.Constraints {
 	return c
 }
 
-func (pack *Pack) RefreshIndexHash(format, hash string) {
-	pack.Index.HashFormat = format
-	pack.Index.Hash = hash
+func (pack *Pack) RefreshIndexHash(index Index) {
+	pack.Index.HashFormat = index.GetHashFormat()
+	pack.Index.Hash = index.GetHash()
 }
 
 // GetMCVersion gets the version of Minecraft this pack uses, if it has been correctly specified
@@ -125,7 +124,7 @@ func (pack *Pack) GetSupportedMCVersions() ([]string, error) {
 		return nil, err
 	}
 	allVersions := append(append([]string(nil), pack.GetAcceptableGameVersions()...), mcVersion)
-	sortAndDedupeVersions(allVersions)
+	SortAndDedupeVersions(allVersions)
 	return allVersions, nil
 }
 
@@ -138,7 +137,7 @@ func (pack *Pack) GetAcceptableGameVersions() []string {
 }
 
 func (pack *Pack) SetAcceptableGameVersions(versions []string) {
-	sortAndDedupeVersions(versions)
+	SortAndDedupeVersions(versions)
 	pack.Options["acceptable-game-versions"] = versions
 }
 
@@ -200,14 +199,8 @@ func (pack *Pack) GetPackDir() string {
 	return filepath.Dir(pack.filePath)
 }
 
-func (pack *Pack) GetHashFormat() string {
-	return ""
-}
-
 func (pack *Pack) Marshal() (MarshalResult, error) {
-	result := MarshalResult{
-		HashFormat: pack.GetHashFormat(),
-	}
+	result := MarshalResult{}
 
 	var err error
 	result.Value, err = toml.Marshal(pack)
@@ -216,19 +209,4 @@ func (pack *Pack) Marshal() (MarshalResult, error) {
 	}
 
 	return result, nil
-}
-
-func sortAndDedupeVersions(versions []string) {
-	flexver.VersionSlice(versions).Sort()
-	// Deduplicate the sorted array
-	if len(versions) > 0 {
-		j := 0
-		for i := 1; i < len(versions); i++ {
-			if versions[i] != versions[j] {
-				j++
-				versions[j] = versions[i]
-			}
-		}
-		versions = versions[:j+1]
-	}
 }

@@ -118,13 +118,13 @@ var detectCmd = &cobra.Command{
 
 		repr := index.ToWritable()
 		writer := fileio.NewIndexWriter()
-		format, hash, err := writer.Write(&repr)
+		err = writer.Write(&repr)
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
 
-		pack.RefreshIndexHash(format, hash)
+		pack.RefreshIndexHash(index)
 
 		packWriter := fileio.NewPackWriter()
 		err = packWriter.Write(&pack)

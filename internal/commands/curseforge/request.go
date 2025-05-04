@@ -27,12 +27,14 @@ func (c *cfApiClient) makeGet(endpoint string) (*http.Response, error) {
 		return nil, err
 	}
 
+	apiKey, err := config.DecodeCfApiKey()
+	if err != nil {
+		return nil, err
+	}
+
 	req.Header.Set("User-Agent", core.UserAgent)
 	req.Header.Set("Accept", "application/json")
-	if config.CfApiKey == "" {
-		panic("no CurseForge API key set")
-	}
-	req.Header.Set("X-API-Key", config.CfApiKey)
+	req.Header.Set("X-API-Key", apiKey)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -51,13 +53,15 @@ func (c *cfApiClient) makePost(endpoint string, body io.Reader) (*http.Response,
 		return nil, err
 	}
 
+	apiKey, err := config.DecodeCfApiKey()
+	if err != nil {
+		return nil, err
+	}
+
 	req.Header.Set("User-Agent", core.UserAgent)
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
-	if config.CfApiKey == "" {
-		panic("no CurseForge API key set")
-	}
-	req.Header.Set("X-API-Key", config.CfApiKey)
+	req.Header.Set("X-API-Key", apiKey)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

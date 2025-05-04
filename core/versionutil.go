@@ -236,3 +236,18 @@ func GetForgeRecommended(mcVersion string) string {
 	}
 	return ""
 }
+
+func SortAndDedupeVersions(versions []string) {
+	flexver.VersionSlice(versions).Sort()
+	// Deduplicate the sorted array
+	if len(versions) > 0 {
+		j := 0
+		for i := 1; i < len(versions); i++ {
+			if versions[i] != versions[j] {
+				j++
+				versions[j] = versions[i]
+			}
+		}
+		versions = versions[:j+1]
+	}
+}
