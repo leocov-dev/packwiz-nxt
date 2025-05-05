@@ -10,7 +10,7 @@ on:
       - "*"
 
 jobs:
-  format:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
