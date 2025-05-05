@@ -4,12 +4,12 @@ import (
 	"errors"
 	"github.com/pelletier/go-toml/v2"
 	"path/filepath"
-	"regexp"
-	"strings"
 )
 
-// Mod stores metadata about a mod. This is written to a TOML file for each mod.
-type Mod struct {
+type ModUpdate map[string]map[string]interface{}
+
+// ModToml stores metadata about a mod. This is written to a TOML file for each mod.
+type ModToml struct {
 	metaFile string      // The file for the metadata file, used as an ID
 	Name     string      `toml:"name"`
 	FileName string      `toml:"filename"`
@@ -18,7 +18,7 @@ type Mod struct {
 	Download ModDownload `toml:"download"`
 	// Update is a map of maps, of stuff, so you can store arbitrary values on
 	// string keys to define updating
-	Update     map[string]map[string]interface{} `toml:"update"`
+	Update     ModUpdate `toml:"update"`
 	updateData map[string]interface{}
 
 	Option *ModOption `toml:"option,omitempty"`
@@ -55,7 +55,7 @@ const (
 	EmptySide     = ""
 )
 
-func (m *Mod) ReflectUpdateData() error {
+func (m *ModToml) ReflectUpdateData() error {
 	m.updateData = make(map[string]interface{})
 
 	// Horrible reflection library to convert map[string]interface to proper struct
@@ -76,52 +76,52 @@ func (m *Mod) ReflectUpdateData() error {
 }
 
 // SetMetaPath sets the file path of a metadata file
-func (m *Mod) SetMetaPath(metaFile string) string {
+func (m *ModToml) SetMetaPath(metaFile string) string {
 	m.metaFile = metaFile
 	return m.metaFile
 }
 
 // GetParsedUpdateData can be used to retrieve updater-specific information after parsing a mod file
-func (m *Mod) GetParsedUpdateData(updaterName string) (interface{}, bool) {
+func (m *ModToml) GetParsedUpdateData(updaterName string) (interface{}, bool) {
 	upd, ok := m.updateData[updaterName]
 	return upd, ok
 }
 
-// GetFilePath is a clumsy hack that I made because Mod already stores it's path anyway
-func (m *Mod) GetFilePath() string {
+// GetFilePath is a clumsy hack that I made because ModToml already stores it's path anyway
+func (m *ModToml) GetFilePath() string {
 	return m.metaFile
 }
 
 // GetDestFilePath returns the path of the destination file of the mod
-func (m *Mod) GetDestFilePath() string {
+func (m *ModToml) GetDestFilePath() string {
 	return filepath.Join(filepath.Dir(m.metaFile), filepath.FromSlash(m.FileName))
 }
 
 // UpdateHash updates the hash of a mod file, used with ModWriter
-func (m *Mod) UpdateHash(hashFormat string, hash string) {
+func (m *ModToml) UpdateHash(hashFormat string, hash string) {
 	m.hash = hash
 }
 
-func (m *Mod) GetHashInfo() (string, string) {
+func (m *ModToml) GetHashInfo() (string, string) {
 	return m.GetHashFormat(), m.hash
 }
 
-func (m *Mod) IsMetaFile() bool {
+func (m *ModToml) IsMetaFile() bool {
 	return true
 }
 
-func (m *Mod) AppendUpdateData(key string, value interface{}) {
+func (m *ModToml) AppendUpdateData(key string, value interface{}) {
 	if m.updateData == nil {
 		m.updateData = make(map[string]interface{})
 	}
 	m.updateData[key] = value
 }
 
-func (m *Mod) GetHashFormat() string {
+func (m *ModToml) GetHashFormat() string {
 	return "sha256"
 }
 
-func (m *Mod) Marshal() (MarshalResult, error) {
+func (m *ModToml) Marshal() (MarshalResult, error) {
 	result := MarshalResult{
 		HashFormat: m.GetHashFormat(),
 	}
@@ -147,20 +147,4 @@ func (m *Mod) Marshal() (MarshalResult, error) {
 	m.UpdateHash(result.HashFormat, result.Hash)
 
 	return result, nil
-}
-
-var slugifyRegex1 = regexp.MustCompile(`\(.*\)`)
-var slugifyRegex2 = regexp.MustCompile(` - .+`)
-var slugifyRegex3 = regexp.MustCompile(`[^a-z\d]`)
-var slugifyRegex4 = regexp.MustCompile(`-+`)
-var slugifyRegex5 = regexp.MustCompile(`^-|-$`)
-
-func SlugifyName(name string) string {
-	lower := strings.ToLower(name)
-	noBrackets := slugifyRegex1.ReplaceAllString(lower, "")
-	noSuffix := slugifyRegex2.ReplaceAllString(noBrackets, "")
-	limitedChars := slugifyRegex3.ReplaceAllString(noSuffix, "-")
-	noDuplicateDashes := slugifyRegex4.ReplaceAllString(limitedChars, "-")
-	noLeadingTrailingDashes := slugifyRegex5.ReplaceAllString(noDuplicateDashes, "")
-	return noLeadingTrailingDashes
 }

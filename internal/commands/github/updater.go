@@ -30,7 +30,7 @@ type cachedStateStore struct {
 	Release Release
 }
 
-func (u ghUpdater) CheckUpdate(mods []*core.Mod, pack core.Pack) ([]core.UpdateCheck, error) {
+func (u ghUpdater) CheckUpdate(mods []*core.ModToml, pack core.PackToml) ([]core.UpdateCheck, error) {
 	results := make([]core.UpdateCheck, len(mods))
 
 	for i, mod := range mods {
@@ -92,7 +92,7 @@ func (u ghUpdater) CheckUpdate(mods []*core.Mod, pack core.Pack) ([]core.UpdateC
 	return results, nil
 }
 
-func (u ghUpdater) DoUpdate(mods []*core.Mod, cachedState []interface{}) error {
+func (u ghUpdater) DoUpdate(mods []*core.ModToml, cachedState []interface{}) error {
 	for i, mod := range mods {
 		modState := cachedState[i].(cachedStateStore)
 		var release = modState.Release

@@ -131,7 +131,7 @@ var importCmd = &cobra.Command{
 		if err != nil {
 			fmt.Println("Failed to load existing pack, creating a new one...")
 
-			pack := core.NewPack(
+			pack := core.CreatePackToml(
 				packImport.Name(),
 				packImport.PackAuthor(),
 				packImport.PackVersion(),

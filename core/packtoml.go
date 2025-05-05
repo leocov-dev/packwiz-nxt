@@ -10,24 +10,25 @@ import (
 	"strings"
 )
 
-// Pack stores the modpack metadata, usually in pack.toml
-type Pack struct {
-	Name        string `toml:"name"`
-	Author      string `toml:"author,omitempty"`
-	Version     string `toml:"version,omitempty"`
-	Description string `toml:"description,omitempty"`
-	PackFormat  string `toml:"pack-format"`
-	Index       struct {
-		// Path is stored in forward slash format relative to pack.toml
-		File       string `toml:"file"`
-		HashFormat string `toml:"hash-format"`
-		Hash       string `toml:"hash,omitempty"`
-	} `toml:"index"`
-	Versions map[string]string                 `toml:"versions"`
-	Export   map[string]map[string]interface{} `toml:"export"`
-	Options  map[string]interface{}            `toml:"options"`
+// PackToml stores the modpack metadata, usually in pack.toml
+type PackToml struct {
+	Name        string                            `toml:"name"`
+	Author      string                            `toml:"author,omitempty"`
+	Version     string                            `toml:"version,omitempty"`
+	Description string                            `toml:"description,omitempty"`
+	PackFormat  string                            `toml:"pack-format"`
+	Index       PackTomlIndex                     `toml:"index"`
+	Versions    map[string]string                 `toml:"versions"`
+	Export      map[string]map[string]interface{} `toml:"export"`
+	Options     map[string]interface{}            `toml:"options"`
 
 	filePath string
+}
+
+type PackTomlIndex struct {
+	File       string `toml:"file"`
+	HashFormat string `toml:"hash-format"`
+	Hash       string `toml:"hash,omitempty"`
 }
 
 const CurrentPackFormat = "packwiz:1.1.0"
@@ -35,17 +36,13 @@ const CurrentPackFormat = "packwiz:1.1.0"
 var PackFormatConstraintAccepted = mustParseConstraint("~1")
 var PackFormatConstraintSuggestUpgrade = mustParseConstraint("~1.1")
 
-func NewPack(name, author, version string, versions map[string]string) *Pack {
-	return &Pack{
+func CreatePackToml(name, author, version string, versions map[string]string) *PackToml {
+	return &PackToml{
 		Name:       name,
 		Author:     author,
 		Version:    version,
 		PackFormat: CurrentPackFormat,
-		Index: struct {
-			File       string `toml:"file"`
-			HashFormat string `toml:"hash-format"`
-			Hash       string `toml:"hash,omitempty"`
-		}{
+		Index: PackTomlIndex{
 			File: "index.toml",
 		},
 		Versions: versions,
@@ -53,7 +50,7 @@ func NewPack(name, author, version string, versions map[string]string) *Pack {
 }
 
 // ValidatePack run some basic validation and migrate the pack if possible.
-func ValidatePack(pack *Pack) error {
+func ValidatePack(pack *PackToml) error {
 	// Check pack-format
 	if len(pack.PackFormat) == 0 {
 		fmt.Println("Modpack manifest has no pack-format field; assuming packwiz:1.1.0")
@@ -103,13 +100,13 @@ func mustParseConstraint(s string) *semver.Constraints {
 	return c
 }
 
-func (pack *Pack) RefreshIndexHash(index Index) {
+func (pack *PackToml) RefreshIndexHash(index IndexFS) {
 	pack.Index.HashFormat = index.GetHashFormat()
 	pack.Index.Hash = index.GetHash()
 }
 
 // GetMCVersion gets the version of Minecraft this pack uses, if it has been correctly specified
-func (pack *Pack) GetMCVersion() (string, error) {
+func (pack *PackToml) GetMCVersion() (string, error) {
 	mcVersion, ok := pack.Versions["minecraft"]
 	if !ok {
 		return "", errors.New("no minecraft version specified in modpack")
@@ -118,7 +115,7 @@ func (pack *Pack) GetMCVersion() (string, error) {
 }
 
 // GetSupportedMCVersions gets the versions of Minecraft this pack allows in downloaded mods, ordered by preference (highest = most desirable)
-func (pack *Pack) GetSupportedMCVersions() ([]string, error) {
+func (pack *PackToml) GetSupportedMCVersions() ([]string, error) {
 	mcVersion, err := pack.GetMCVersion()
 	if err != nil {
 		return nil, err
@@ -128,7 +125,7 @@ func (pack *Pack) GetSupportedMCVersions() ([]string, error) {
 	return allVersions, nil
 }
 
-func (pack *Pack) GetAcceptableGameVersions() []string {
+func (pack *PackToml) GetAcceptableGameVersions() []string {
 	acceptableVersions, ok := pack.Options["acceptable-game-versions"]
 	if !ok {
 		return []string{}
@@ -136,12 +133,12 @@ func (pack *Pack) GetAcceptableGameVersions() []string {
 	return acceptableVersions.([]string)
 }
 
-func (pack *Pack) SetAcceptableGameVersions(versions []string) {
+func (pack *PackToml) SetAcceptableGameVersions(versions []string) {
 	SortAndDedupeVersions(versions)
 	pack.Options["acceptable-game-versions"] = versions
 }
 
-func (pack *Pack) GetPackName() string {
+func (pack *PackToml) GetPackName() string {
 	if pack.Name == "" {
 		return "export"
 	} else if pack.Version == "" {
@@ -151,7 +148,7 @@ func (pack *Pack) GetPackName() string {
 	}
 }
 
-func (pack *Pack) GetCompatibleLoaders() (loaders []string) {
+func (pack *PackToml) GetCompatibleLoaders() (loaders []string) {
 	if _, hasQuilt := pack.Versions["quilt"]; hasQuilt {
 		loaders = append(loaders, "quilt")
 		loaders = append(loaders, "fabric") // Backwards-compatible; for now (could be configurable later)
@@ -167,7 +164,7 @@ func (pack *Pack) GetCompatibleLoaders() (loaders []string) {
 	return
 }
 
-func (pack *Pack) GetLoaders() (loaders []string) {
+func (pack *PackToml) GetLoaders() (loaders []string) {
 	if _, hasQuilt := pack.Versions["quilt"]; hasQuilt {
 		loaders = append(loaders, "quilt")
 	}
@@ -183,23 +180,23 @@ func (pack *Pack) GetLoaders() (loaders []string) {
 	return
 }
 
-func (pack *Pack) UpdateHash(_, _ string) {
+func (pack *PackToml) UpdateHash(_, _ string) {
 	// noop for packs
 }
 
-func (pack *Pack) GetFilePath() string {
+func (pack *PackToml) GetFilePath() string {
 	return pack.filePath
 }
 
-func (pack *Pack) SetFilePath(path string) {
+func (pack *PackToml) SetFilePath(path string) {
 	pack.filePath = path
 }
 
-func (pack *Pack) GetPackDir() string {
+func (pack *PackToml) GetPackDir() string {
 	return filepath.Dir(pack.filePath)
 }
 
-func (pack *Pack) Marshal() (MarshalResult, error) {
+func (pack *PackToml) Marshal() (MarshalResult, error) {
 	result := MarshalResult{}
 
 	var err error

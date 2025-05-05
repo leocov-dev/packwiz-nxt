@@ -16,15 +16,15 @@ import (
 )
 
 // LoadIndex attempts to load the index file from a path
-func LoadIndex(indexFile string) (core.Index, error) {
-	// Decode as indexTomlRepresentation then convert to Index
+func LoadIndex(indexFile string) (core.IndexFS, error) {
+	// Decode as indexTomlRepresentation then convert to IndexFS
 	var rep core.IndexTomlRepresentation
 	raw, err := os.ReadFile(indexFile)
 	if err != nil {
-		return core.Index{}, err
+		return core.IndexFS{}, err
 	}
 	if err := toml.Unmarshal(raw, &rep); err != nil {
-		return core.Index{}, err
+		return core.IndexFS{}, err
 	}
 	if len(rep.DefaultModHashFormat) == 0 {
 		rep.DefaultModHashFormat = "sha256"
@@ -35,9 +35,9 @@ func LoadIndex(indexFile string) (core.Index, error) {
 	return index, nil
 }
 
-func LoadAllMods(index *core.Index) ([]*core.Mod, error) {
+func LoadAllMods(index *core.IndexFS) ([]*core.ModToml, error) {
 	modPaths := index.GetAllMods()
-	mods := make([]*core.Mod, len(modPaths))
+	mods := make([]*core.ModToml, len(modPaths))
 	for i, v := range modPaths {
 		modData, err := LoadMod(v)
 		if err != nil {
@@ -49,7 +49,7 @@ func LoadAllMods(index *core.Index) ([]*core.Mod, error) {
 }
 
 // RefreshIndexFiles updates the hashes of all the files in the index, and adds new files to the index
-func RefreshIndexFiles(index *core.Index) error {
+func RefreshIndexFiles(index *core.IndexFS) error {
 	// TODO: If needed, multithreaded hashing
 	// for i := 0; i < runtime.NumCPU(); i++ {}
 
@@ -143,7 +143,7 @@ func RefreshIndexFiles(index *core.Index) error {
 	return nil
 }
 
-func UpdateIndexFile(in *core.Index, path string) error {
+func UpdateIndexFile(in *core.IndexFS, path string) error {
 	var hashString string
 
 	f, err := os.Open(path)

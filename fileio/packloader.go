@@ -7,27 +7,27 @@ import (
 	"path/filepath"
 )
 
-// LoadPackFile loads the modpack metadata to a Pack struct
-func LoadPackFile(packPath string) (core.Pack, error) {
-	var modpack core.Pack
+// LoadPackFile loads the modpack metadata to a PackToml struct
+func LoadPackFile(packPath string) (core.PackToml, error) {
+	var modpack core.PackToml
 	raw, err := os.ReadFile(packPath)
 	if err != nil {
-		return core.Pack{}, err
+		return core.PackToml{}, err
 	}
 	if err := toml.Unmarshal(raw, &modpack); err != nil {
-		return core.Pack{}, err
+		return core.PackToml{}, err
 	}
 
 	modpack.SetFilePath(packPath)
 
 	if err = core.ValidatePack(&modpack); err != nil {
-		return core.Pack{}, err
+		return core.PackToml{}, err
 	}
 
 	return modpack, nil
 }
 
-func LoadPackIndexFile(pack *core.Pack) (core.Index, error) {
+func LoadPackIndexFile(pack *core.PackToml) (core.IndexFS, error) {
 	if filepath.IsAbs(pack.Index.File) {
 		return LoadIndex(pack.Index.File)
 	}

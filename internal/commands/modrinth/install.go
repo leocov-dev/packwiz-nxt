@@ -114,7 +114,7 @@ var installCmd = &cobra.Command{
 	},
 }
 
-func installVersionById(versionId string, versionFilename string, pack core.Pack, index *core.Index) error {
+func installVersionById(versionId string, versionFilename string, pack core.PackToml, index *core.IndexFS) error {
 	version, err := mrDefaultClient.Versions.Get(versionId)
 	if err != nil {
 		return fmt.Errorf("failed to fetch version %s: %v", versionId, err)
@@ -128,7 +128,7 @@ func installVersionById(versionId string, versionFilename string, pack core.Pack
 	return installVersion(project, version, versionFilename, pack, index)
 }
 
-func installViaSearch(query string, versionFilename string, autoAcceptFirst bool, pack core.Pack, index *core.Index) error {
+func installViaSearch(query string, versionFilename string, autoAcceptFirst bool, pack core.PackToml, index *core.IndexFS) error {
 	mcVersions, err := pack.GetSupportedMCVersions()
 	if err != nil {
 		return err
@@ -186,7 +186,7 @@ func installViaSearch(query string, versionFilename string, autoAcceptFirst bool
 	return menu.Run()
 }
 
-func installProject(project *modrinthApi.Project, versionFilename string, pack core.Pack, index *core.Index) error {
+func installProject(project *modrinthApi.Project, versionFilename string, pack core.PackToml, index *core.IndexFS) error {
 	latestVersion, err := getLatestVersion(*project.ID, *project.Title, pack)
 	if err != nil {
 		return fmt.Errorf("failed to get latest version: %v", err)
@@ -206,7 +206,7 @@ type depMetadataStore struct {
 	fileInfo    *modrinthApi.File
 }
 
-func installVersion(project *modrinthApi.Project, version *modrinthApi.Version, versionFilename string, pack core.Pack, index *core.Index) error {
+func installVersion(project *modrinthApi.Project, version *modrinthApi.Version, versionFilename string, pack core.PackToml, index *core.IndexFS) error {
 	if len(version.Files) == 0 {
 		return errors.New("version doesn't have any files attached")
 	}
@@ -385,7 +385,7 @@ func installVersion(project *modrinthApi.Project, version *modrinthApi.Version, 
 	return nil
 }
 
-func createFileMeta(project *modrinthApi.Project, version *modrinthApi.Version, file *modrinthApi.File, pack core.Pack, index *core.Index) error {
+func createFileMeta(project *modrinthApi.Project, version *modrinthApi.Version, file *modrinthApi.File, pack core.PackToml, index *core.IndexFS) error {
 	updateMap := make(map[string]map[string]interface{})
 
 	var err error
@@ -407,7 +407,7 @@ func createFileMeta(project *modrinthApi.Project, version *modrinthApi.Version, 
 		return errors.New("file doesn't have a hash")
 	}
 
-	modMeta := core.Mod{
+	modMeta := core.ModToml{
 		Name:     *project.Title,
 		FileName: *file.Filename,
 		Side:     side,

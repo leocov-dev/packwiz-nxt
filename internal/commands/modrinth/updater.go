@@ -35,7 +35,7 @@ type cachedStateStore struct {
 	Version   *modrinthApi.Version
 }
 
-func (u mrUpdater) CheckUpdate(mods []*core.Mod, pack core.Pack) ([]core.UpdateCheck, error) {
+func (u mrUpdater) CheckUpdate(mods []*core.ModToml, pack core.PackToml) ([]core.UpdateCheck, error) {
 	results := make([]core.UpdateCheck, len(mods))
 
 	for i, mod := range mods {
@@ -81,7 +81,7 @@ func (u mrUpdater) CheckUpdate(mods []*core.Mod, pack core.Pack) ([]core.UpdateC
 	return results, nil
 }
 
-func (u mrUpdater) DoUpdate(mods []*core.Mod, cachedState []interface{}) error {
+func (u mrUpdater) DoUpdate(mods []*core.ModToml, cachedState []interface{}) error {
 	for i, mod := range mods {
 		modState := cachedState[i].(cachedStateStore)
 		var version = modState.Version

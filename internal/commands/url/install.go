@@ -64,7 +64,7 @@ var installCmd = &cobra.Command{
 		}
 
 		filename := path.Base(dl.Path)
-		modMeta := core.Mod{
+		modMeta := core.ModToml{
 			Name:     args[0],
 			FileName: filename,
 			Download: core.ModDownload{

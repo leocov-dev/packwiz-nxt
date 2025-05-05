@@ -249,7 +249,7 @@ var whitelistedHosts = []string{
 	"gitlab.com",
 }
 
-func canBeIncludedDirectly(mod *core.Mod, restrictDomains bool) bool {
+func canBeIncludedDirectly(mod *core.ModToml, restrictDomains bool) bool {
 	if mod.Download.Mode == core.ModeURL || mod.Download.Mode == "" {
 		if !restrictDomains {
 			return true

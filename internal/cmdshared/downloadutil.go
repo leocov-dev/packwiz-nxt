@@ -30,7 +30,7 @@ func ListManualDownloads(session fileio.DownloadSession) {
 	}
 }
 
-func AddToZip(dl fileio.CompletedDownload, exp *zip.Writer, dir string, index *core.Index) bool {
+func AddToZip(dl fileio.CompletedDownload, exp *zip.Writer, dir string, index *core.IndexFS) bool {
 	if dl.Error != nil {
 		fmt.Printf("Download of %s (%s) failed: %v\n", dl.Mod.Name, dl.Mod.FileName, dl.Error)
 		return false
@@ -65,7 +65,7 @@ func AddToZip(dl fileio.CompletedDownload, exp *zip.Writer, dir string, index *c
 }
 
 // AddNonMetafileOverrides saves all non-metadata files into an overrides folder in the zip
-func AddNonMetafileOverrides(index *core.Index, exp *zip.Writer) {
+func AddNonMetafileOverrides(index *core.IndexFS, exp *zip.Writer) {
 	for p, v := range index.Files {
 		if !v.IsMetaFile() {
 			file, err := exp.Create(path.Join("overrides", p))

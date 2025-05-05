@@ -125,7 +125,7 @@ func validateVersion(versions []string, version string, gottenLoader core.ModLoa
 	}
 }
 
-func updatePackToVersion(version string, modpack core.Pack, loader core.ModLoaderComponent) bool {
+func updatePackToVersion(version string, modpack core.PackToml, loader core.ModLoaderComponent) bool {
 	// Check if the version is already set
 	if version == modpack.Versions[loader.Name] {
 		fmt.Printf("%s is already on version %s!\n", loader.FriendlyName, version)

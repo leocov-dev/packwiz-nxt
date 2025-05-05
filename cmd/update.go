@@ -33,7 +33,7 @@ var UpdateCmd = &cobra.Command{
 
 		var singleUpdatedName string
 		if viper.GetBool("update.all") {
-			filesWithUpdater := make(map[string][]*core.Mod)
+			filesWithUpdater := make(map[string][]*core.ModToml)
 			fmt.Println("Reading metadata files...")
 			mods, err := fileio.LoadAllMods(&index)
 			if err != nil {
@@ -48,7 +48,7 @@ var UpdateCmd = &cobra.Command{
 						if !ok {
 							continue
 						}
-						slice = []*core.Mod{}
+						slice = []*core.ModToml{}
 					}
 					updaterFound = true
 					filesWithUpdater[k] = append(slice, modData)
@@ -60,7 +60,7 @@ var UpdateCmd = &cobra.Command{
 
 			fmt.Println("Checking for updates...")
 			updatesFound := false
-			updatableFiles := make(map[string][]*core.Mod)
+			updatableFiles := make(map[string][]*core.ModToml)
 			updaterCachedStateMap := make(map[string][]interface{})
 			for k, v := range filesWithUpdater {
 				checks, err := core.Updaters[k].CheckUpdate(v, pack)
@@ -148,7 +148,7 @@ var UpdateCmd = &cobra.Command{
 				}
 				updaterFound = true
 
-				check, err := updater.CheckUpdate([]*core.Mod{&modData}, pack)
+				check, err := updater.CheckUpdate([]*core.ModToml{&modData}, pack)
 				if err != nil {
 					cmdshared.Exitln(err)
 				}
@@ -159,7 +159,7 @@ var UpdateCmd = &cobra.Command{
 				if check[0].UpdateAvailable {
 					fmt.Printf("Update available: %s\n", check[0].UpdateString)
 
-					err = updater.DoUpdate([]*core.Mod{&modData}, []interface{}{check[0].CachedState})
+					err = updater.DoUpdate([]*core.ModToml{&modData}, []interface{}{check[0].CachedState})
 					if err != nil {
 						cmdshared.Exitln(err)
 					}

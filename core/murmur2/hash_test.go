@@ -3,6 +3,7 @@ package murmur2
 import (
 	"encoding/binary"
 	"github.com/bradleyjkemp/cupaloy"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
@@ -36,7 +37,8 @@ func TestMurmur2CF_Write(t *testing.T) {
 	}
 
 	// Check that whitespace was stripped
-	cupaloy.SnapshotMulti("init", t, m.buf)
+	err = cupaloy.SnapshotMulti("init", m.buf)
+	assert.NoError(t, err)
 
 	// Test writing more data
 	n, err = m.Write([]byte(" More data"))
@@ -45,7 +47,8 @@ func TestMurmur2CF_Write(t *testing.T) {
 	}
 
 	// Check accumulated buffer
-	cupaloy.SnapshotMulti("append", t, m.buf)
+	err = cupaloy.SnapshotMulti("append", m.buf)
+	assert.NoError(t, err)
 }
 
 func TestMurmur2CF_Sum(t *testing.T) {
@@ -53,17 +56,20 @@ func TestMurmur2CF_Sum(t *testing.T) {
 
 	// Test with empty input
 	sum := m.Sum(nil)
-	cupaloy.SnapshotMulti("empty", t, sum)
+	err := cupaloy.SnapshotMulti("empty", sum)
+	assert.NoError(t, err)
 
 	// Test with some input
 	m.Write([]byte("Hello, World!"))
 	sum = m.Sum(nil)
-	cupaloy.SnapshotMulti("str", t, sum)
+	err = cupaloy.SnapshotMulti("str", sum)
+	assert.NoError(t, err)
 
 	// Test with pre-allocated buffer
 	b := make([]byte, 4)
 	sum = m.Sum(b)
-	cupaloy.SnapshotMulti("buff", t, sum)
+	err = cupaloy.SnapshotMulti("buff", sum)
+	assert.NoError(t, err)
 }
 
 func TestMurmur2CF_Reset(t *testing.T) {
@@ -73,13 +79,15 @@ func TestMurmur2CF_Reset(t *testing.T) {
 	m.Write([]byte("Hello, World!"))
 
 	// Before reset
-	cupaloy.SnapshotMulti("Before reset", t, m.buf)
+	err := cupaloy.SnapshotMulti("Before reset", m.buf)
+	assert.NoError(t, err)
 
 	// Reset
 	m.Reset()
 
 	// After reset
-	cupaloy.SnapshotMulti("After reset", t, m.buf)
+	err = cupaloy.SnapshotMulti("After reset", m.buf)
+	assert.NoError(t, err)
 }
 
 func TestMurmur2CF_Size(t *testing.T) {
@@ -99,12 +107,14 @@ func TestMurmur2CF_Sum32(t *testing.T) {
 
 	// Test with empty input
 	sum32 := m.Sum32()
-	cupaloy.SnapshotMulti("empty", t, sum32)
+	err := cupaloy.SnapshotMulti("empty", sum32)
+	assert.NoError(t, err)
 
 	// Test with some input
 	m.Write([]byte("Hello, World!"))
 	sum32 = m.Sum32()
-	cupaloy.SnapshotMulti("string", t, sum32)
+	err = cupaloy.SnapshotMulti("string", sum32)
+	assert.NoError(t, err)
 
 	// Verify Sum32 matches binary.BigEndian.Uint32(m.Sum(nil))
 	sumBytes := m.Sum(nil)

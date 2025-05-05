@@ -307,7 +307,7 @@ func findLatestVersion(versions []*modrinthApi.Version, gameVersions []string, u
 	return latestValidVersion
 }
 
-func getLatestVersion(projectID string, name string, pack core.Pack) (*modrinthApi.Version, error) {
+func getLatestVersion(projectID string, name string, pack core.PackToml) (*modrinthApi.Version, error) {
 	gameVersions, err := pack.GetSupportedMCVersions()
 	if err != nil {
 		return nil, err
@@ -390,7 +390,7 @@ func getBestHash(v *modrinthApi.File) (string, string) {
 	return "", ""
 }
 
-func getInstalledProjectIDs(index *core.Index) []string {
+func getInstalledProjectIDs(index *core.IndexFS) []string {
 	var installedProjects []string
 	// Get modids of all mods
 	mods, err := fileio.LoadAllMods(index)

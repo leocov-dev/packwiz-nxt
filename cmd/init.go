@@ -79,7 +79,7 @@ var initCmd = &cobra.Command{
 
 		modLoaderName := strings.ToLower(viper.GetString("init.modloader"))
 		if len(modLoaderName) == 0 {
-			modLoaderName = strings.ToLower(initReadValue("Mod loader [quilt]: ", "quilt"))
+			modLoaderName = strings.ToLower(initReadValue("ModToml loader [quilt]: ", "quilt"))
 		}
 
 		loader, ok := core.ModLoaders[modLoaderName]
@@ -119,7 +119,7 @@ var initCmd = &cobra.Command{
 			}
 		}
 
-		pack := core.NewPack(
+		pack := core.CreatePackToml(
 			name,
 			author,
 			version,

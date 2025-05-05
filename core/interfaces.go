@@ -12,10 +12,10 @@ type Updater interface {
 	ParseUpdate(map[string]interface{}) (interface{}, error)
 	// CheckUpdate checks whether there is an update for each of the mods in the given slice,
 	// called for all of the mods that this updater handles
-	CheckUpdate([]*Mod, Pack) ([]UpdateCheck, error)
-	// DoUpdate carries out the update previously queried in CheckUpdate, on each Mod's metadata,
+	CheckUpdate([]*ModToml, PackToml) ([]UpdateCheck, error)
+	// DoUpdate carries out the update previously queried in CheckUpdate, on each ModToml's metadata,
 	// given pointers to Mods and the value of CachedState for each mod
-	DoUpdate([]*Mod, []interface{}) error
+	DoUpdate([]*ModToml, []interface{}) error
 }
 
 // UpdateCheck represents the data returned from CheckUpdate for each mod
@@ -36,13 +36,13 @@ type UpdateCheck struct {
 // MetaDownloaders stores all the metadata-based installers that packwiz can use. Add your own downloaders to this map, keyed by the source name.
 var MetaDownloaders = make(map[string]MetaDownloader)
 
-// MetaDownloader specifies a downloader for a Mod using a "metadata:source" mode
+// MetaDownloader specifies a downloader for a ModToml using a "metadata:source" mode
 // The calling code should handle caching and hash validation.
 type MetaDownloader interface {
-	GetFilesMetadata([]*Mod) ([]MetaDownloaderData, error)
+	GetFilesMetadata([]*ModToml) ([]MetaDownloaderData, error)
 }
 
-// MetaDownloaderData specifies the per-Mod metadata retrieved for downloading
+// MetaDownloaderData specifies the per-ModToml metadata retrieved for downloading
 type MetaDownloaderData interface {
 	GetManualDownload() (bool, ManualDownload)
 	DownloadFile() (io.ReadCloser, error)

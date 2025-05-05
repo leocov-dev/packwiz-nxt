@@ -176,7 +176,7 @@ func getPathForFile(gameID uint32, classID uint32, categoryID uint32, slug strin
 	return filepath.Join(viper.GetString("meta-folder-base"), metaFolder, slug+core.MetaExtension)
 }
 
-func createModFile(modInfo modInfo, fileInfo modFileInfo, index *core.Index, optionalDisabled bool) error {
+func createModFile(modInfo modInfo, fileInfo modFileInfo, index *core.IndexFS, optionalDisabled bool) error {
 	updateMap := make(map[string]map[string]interface{})
 	var err error
 
@@ -198,7 +198,7 @@ func createModFile(modInfo modInfo, fileInfo modFileInfo, index *core.Index, opt
 		}
 	}
 
-	modMeta := core.Mod{
+	modMeta := core.ModToml{
 		Name:     modInfo.Name,
 		FileName: fileInfo.FileName,
 		Side:     core.UniversalSide,
@@ -226,7 +226,7 @@ func createModFile(modInfo modInfo, fileInfo modFileInfo, index *core.Index, opt
 	return index.UpdateFileHashGiven(path, format, hash, true)
 }
 
-func getSearchLoaderType(pack core.Pack) modloaderType {
+func getSearchLoaderType(pack core.PackToml) modloaderType {
 	dependencies := pack.Versions
 
 	_, hasFabric := dependencies["fabric"]
@@ -252,10 +252,10 @@ func filterLoaderTypeIndex(packLoaders []string, modLoaderType modloaderType) (m
 		return modloaderTypeAny, true
 	} else {
 		if int(modLoaderType) < len(modloaderIds) && slices.Contains(packLoaders, modloaderIds[modLoaderType]) {
-			// Pack contains this loader, pass through
+			// PackToml contains this loader, pass through
 			return modLoaderType, true
 		} else {
-			// Pack does not contain this loader, report unsupported
+			// PackToml does not contain this loader, report unsupported
 			return modloaderTypeAny, false
 		}
 	}
@@ -383,7 +383,7 @@ type cachedStateStore struct {
 	fileInfo *modFileInfo
 }
 
-func (u cfUpdater) CheckUpdate(mods []*core.Mod, pack core.Pack) ([]core.UpdateCheck, error) {
+func (u cfUpdater) CheckUpdate(mods []*core.ModToml, pack core.PackToml) ([]core.UpdateCheck, error) {
 	results := make([]core.UpdateCheck, len(mods))
 	modIDs := make([]uint32, len(mods))
 	modInfos := make([]modInfo, len(mods))
@@ -443,7 +443,7 @@ func (u cfUpdater) CheckUpdate(mods []*core.Mod, pack core.Pack) ([]core.UpdateC
 	return results, nil
 }
 
-func (u cfUpdater) DoUpdate(mods []*core.Mod, cachedState []interface{}) error {
+func (u cfUpdater) DoUpdate(mods []*core.ModToml, cachedState []interface{}) error {
 	// "Do" isn't really that accurate, more like "Apply", because all the work is done in CheckUpdate!
 	for i, v := range mods {
 		modState := cachedState[i].(cachedStateStore)
@@ -493,7 +493,7 @@ func parseExportData(from map[string]interface{}) (cfExportData, error) {
 
 type cfDownloader struct{}
 
-func (c cfDownloader) GetFilesMetadata(mods []*core.Mod) ([]core.MetaDownloaderData, error) {
+func (c cfDownloader) GetFilesMetadata(mods []*core.ModToml) ([]core.MetaDownloaderData, error) {
 	if len(mods) == 0 {
 		return []core.MetaDownloaderData{}, nil
 	}

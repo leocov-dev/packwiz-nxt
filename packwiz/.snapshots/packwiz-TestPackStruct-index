@@ -1,0 +1,8 @@
+hash-format = 'sha256'
+
+[[files]]
+file = 'mods/balm.pw.toml'
+hash = 'a763b71796007bd42fb1eda9da7baac398cacc187b343ab60046b65015c317fd'
+metafile = true
+
+7f0cd03c5cba612b872e151db8374dd9ca17e19c959eb566297d23e1e14ff82e

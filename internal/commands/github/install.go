@@ -76,7 +76,7 @@ var installCmd = &cobra.Command{
 	},
 }
 
-func installMod(repo Repo, branch string, regex string, pack core.Pack) error {
+func installMod(repo Repo, branch string, regex string, pack core.PackToml) error {
 	latestRelease, err := getLatestRelease(repo.FullName, branch)
 	if err != nil {
 		return fmt.Errorf("failed to get latest release: %v", err)
@@ -117,7 +117,7 @@ func getLatestRelease(slug string, branch string) (Release, error) {
 	return releases[0], nil
 }
 
-func installRelease(repo Repo, release Release, regex string, pack core.Pack) error {
+func installRelease(repo Repo, release Release, regex string, pack core.PackToml) error {
 	expr := regexp2.MustCompile(regex, 0)
 
 	if len(release.Assets) == 0 {
@@ -168,7 +168,7 @@ func installRelease(repo Repo, release Release, regex string, pack core.Pack) er
 		return err
 	}
 
-	modMeta := core.Mod{
+	modMeta := core.ModToml{
 		Name:     repo.Name,
 		FileName: file.Name,
 		Side:     core.UniversalSide,

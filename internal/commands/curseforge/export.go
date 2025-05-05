@@ -99,7 +99,7 @@ var exportCmd = &cobra.Command{
 		}
 
 		cfFileRefs := make([]packinterop.AddonFileReference, 0, len(mods))
-		nonCfMods := make([]*core.Mod, 0)
+		nonCfMods := make([]*core.ModToml, 0)
 		for _, mod := range mods {
 			projectRaw, ok := mod.GetParsedUpdateData("curseforge")
 			// If the mod has curseforge metadata, add it to cfFileRefs
@@ -173,7 +173,7 @@ var exportCmd = &cobra.Command{
 	},
 }
 
-func createModlist(zw *zip.Writer, mods []*core.Mod) error {
+func createModlist(zw *zip.Writer, mods []*core.ModToml) error {
 	modlistFile, err := zw.Create("modlist.html")
 	if err != nil {
 		return err

@@ -7,8 +7,8 @@ import (
 )
 
 // LoadMod attempts to load a mod file from a path
-func LoadMod(modFile string) (core.Mod, error) {
-	var mod core.Mod
+func LoadMod(modFile string) (core.ModToml, error) {
+	var mod core.ModToml
 	raw, err := os.ReadFile(modFile)
 	if err != nil {
 		return mod, err

@@ -34,7 +34,7 @@ func (m IndexWriter) Write(writable Writable) error {
 	return nil
 }
 
-func InitIndexFile(pack core.Pack) error {
+func InitIndexFile(pack core.PackToml) error {
 	indexFilePath := pack.Index.File
 	_, err := os.Stat(indexFilePath)
 	if os.IsNotExist(err) {
