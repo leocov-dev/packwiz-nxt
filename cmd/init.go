@@ -7,7 +7,7 @@ import (
 	"github.com/igorsobreira/titlecase"
 	"github.com/leocov-dev/packwiz-nxt/core"
 	"github.com/leocov-dev/packwiz-nxt/fileio"
-	"github.com/leocov-dev/packwiz-nxt/internal/cmdshared"
+	"github.com/leocov-dev/packwiz-nxt/internal/shared"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
@@ -24,9 +24,9 @@ var initCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		_, err := os.Stat(viper.GetString("pack-file"))
 		if err == nil && !viper.GetBool("init.reinit") {
-			cmdshared.Exitf("Modpack metadata file already exists, use -r to override!")
+			shared.Exitf("Modpack metadata file already exists, use -r to override!")
 		} else if err != nil && !os.IsNotExist(err) {
-			cmdshared.Exitf("Error checking pack file: %s\n", err)
+			shared.Exitf("Error checking pack file: %s\n", err)
 		}
 
 		name, err := cmd.Flags().GetString("name")
@@ -56,9 +56,9 @@ var initCmd = &cobra.Command{
 			version = initReadValue("Version [1.0.0]: ", "1.0.0")
 		}
 
-		mcVersions, err := cmdshared.GetValidMCVersions()
+		mcVersions, err := shared.GetValidMCVersions()
 		if err != nil {
-			cmdshared.Exitf("Failed to get latest minecraft versions: %s\n", err)
+			shared.Exitf("Failed to get latest minecraft versions: %s\n", err)
 		}
 
 		mcVersion := viper.GetString("init.mc-version")
@@ -88,7 +88,7 @@ var initCmd = &cobra.Command{
 			if ok {
 				versions, latestVersion, err := loader.VersionListGetter(mcVersion)
 				if err != nil {
-					cmdshared.Exitf("Error loading versions: %s\n", err)
+					shared.Exitf("Error loading versions: %s\n", err)
 				}
 				componentVersion := viper.GetString("init." + loader.Name + "-version")
 				if len(componentVersion) == 0 {
@@ -100,10 +100,10 @@ var initCmd = &cobra.Command{
 				}
 				v := componentVersion
 				if loader.Name == "forge" || loader.Name == "neoforge" {
-					v = cmdshared.GetRawForgeVersion(componentVersion)
+					v = shared.GetRawForgeVersion(componentVersion)
 				}
 				if !slices.Contains(versions, v) {
-					cmdshared.Exitf("Given " + loader.FriendlyName + " version cannot be found!")
+					shared.Exitf("Given " + loader.FriendlyName + " version cannot be found!")
 				}
 				modLoaderVersions[loader.Name] = v
 			} else {
@@ -115,7 +115,7 @@ var initCmd = &cobra.Command{
 					keys[i] = k
 					i++
 				}
-				cmdshared.Exitln(strings.Join(keys, ", "))
+				shared.Exitln(strings.Join(keys, ", "))
 			}
 		}
 
@@ -130,7 +130,7 @@ var initCmd = &cobra.Command{
 
 		err = fileio.InitIndexFile(*pack)
 		if err != nil {
-			cmdshared.Exitf("Error creating index file: %s\n", err)
+			shared.Exitf("Error creating index file: %s\n", err)
 		}
 
 		if modLoaderName != "none" {
@@ -143,18 +143,18 @@ var initCmd = &cobra.Command{
 		// Refresh the index and pack
 		index, err := fileio.LoadPackIndexFile(pack)
 		if err != nil {
-			cmdshared.Exitln(err)
+			shared.Exitln(err)
 		}
 		err = fileio.RefreshIndexFiles(&index)
 		if err != nil {
-			cmdshared.Exitln(err)
+			shared.Exitln(err)
 		}
 
 		repr := index.ToWritable()
 		writer := fileio.NewIndexWriter()
 		err = writer.Write(&repr)
 		if err != nil {
-			cmdshared.Exitln(err)
+			shared.Exitln(err)
 		}
 
 		pack.RefreshIndexHash(index)
@@ -162,7 +162,7 @@ var initCmd = &cobra.Command{
 		packWriter := fileio.NewPackWriter()
 		err = packWriter.Write(pack)
 		if err != nil {
-			cmdshared.Exitln(err)
+			shared.Exitln(err)
 		}
 
 		fmt.Println(viper.GetString("pack-file") + " created!")
@@ -203,7 +203,7 @@ func initReadValue(prompt string, def string) string {
 	}
 	value, err := bufio.NewReader(os.Stdin).ReadString('\n')
 	if err != nil {
-		cmdshared.Exitf("Error reading input: %s\n", err)
+		shared.Exitf("Error reading input: %s\n", err)
 	}
 	// Trims both CR and LF
 	value = strings.TrimSpace(strings.TrimRight(value, "\r\n"))

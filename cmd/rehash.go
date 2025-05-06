@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
 
-	"github.com/leocov-dev/packwiz-nxt/internal/cmdshared"
+	"github.com/leocov-dev/packwiz-nxt/internal/shared"
 )
 
 // rehashCmd represents the rehash command
@@ -21,31 +21,31 @@ var rehashCmd = &cobra.Command{
 		// Load pack
 		pack, err := fileio.LoadPackFile(viper.GetString("pack-file"))
 		if err != nil {
-			cmdshared.Exitln(err)
+			shared.Exitln(err)
 		}
 
 		// Load index
 		index, err := fileio.LoadPackIndexFile(&pack)
 		if err != nil {
-			cmdshared.Exitln(err)
+			shared.Exitln(err)
 		}
 
 		// Load mods
 		mods, err := fileio.LoadAllMods(&index)
 		if err != nil {
-			cmdshared.Exitln(err)
+			shared.Exitln(err)
 		}
 
 		if !slices.Contains([]string{"sha1", "sha512", "sha256"}, args[0]) {
-			cmdshared.Exitf("Hash format '%s' is not supported\n", args[0])
+			shared.Exitf("Hash format '%s' is not supported\n", args[0])
 		}
 
 		session, err := fileio.CreateDownloadSession(mods, []string{args[0]})
 		if err != nil {
-			cmdshared.Exitf("Error retrieving external files: %v\n", err)
+			shared.Exitf("Error retrieving external files: %v\n", err)
 		}
 
-		cmdshared.ListManualDownloads(session)
+		shared.ListManualDownloads(session)
 
 		for dl := range session.StartDownloads() {
 			if dl.Error != nil {
@@ -57,7 +57,7 @@ var rehashCmd = &cobra.Command{
 				modWriter := fileio.NewModWriter()
 				_, _, err := modWriter.Write(dl.Mod)
 				if err != nil {
-					cmdshared.Exitf("Error saving mod %s: %v\n", dl.Mod.Name, err)
+					shared.Exitf("Error saving mod %s: %v\n", dl.Mod.Name, err)
 				}
 			}
 			// TODO pass the hash to index instead of recomputing from scratch
@@ -65,19 +65,19 @@ var rehashCmd = &cobra.Command{
 
 		err = session.SaveIndex()
 		if err != nil {
-			cmdshared.Exitf("Error saving cache index: %v\n", err)
+			shared.Exitf("Error saving cache index: %v\n", err)
 		}
 
 		err = fileio.RefreshIndexFiles(&index)
 		if err != nil {
-			cmdshared.Exitf("Error refreshing index: %v\n", err)
+			shared.Exitf("Error refreshing index: %v\n", err)
 		}
 
 		repr := index.ToWritable()
 		writer := fileio.NewIndexWriter()
 		err = writer.Write(&repr)
 		if err != nil {
-			cmdshared.Exitf("Error writing index: %v\n", err)
+			shared.Exitf("Error writing index: %v\n", err)
 		}
 
 		pack.RefreshIndexHash(index)
@@ -85,7 +85,7 @@ var rehashCmd = &cobra.Command{
 		packWriter := fileio.NewPackWriter()
 		err = packWriter.Write(&pack)
 		if err != nil {
-			cmdshared.Exitf("Error writing pack: %v\n", err)
+			shared.Exitf("Error writing pack: %v\n", err)
 		}
 	},
 }

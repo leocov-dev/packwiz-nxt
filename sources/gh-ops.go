@@ -54,7 +54,7 @@ func AddGitHubMod(slugOrUrl, branch, regex string) (core.ModToml, Repo, Asset, e
 	return modMeta, repo, file, nil
 }
 
-func installMod(repo Repo, branch string, regex string) (core.ModToml, Asset, error) {
+func installMod(repo Repo, branch, regex string) (core.ModToml, Asset, error) {
 	latestRelease, err := getLatestRelease(repo.FullName, branch)
 	if err != nil {
 		return core.ModToml{}, Asset{}, fmt.Errorf("failed to get latest release: %v", err)

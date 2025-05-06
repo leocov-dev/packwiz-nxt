@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 	"github.com/leocov-dev/packwiz-nxt/fileio"
-	"github.com/leocov-dev/packwiz-nxt/internal/cmdshared"
+	"github.com/leocov-dev/packwiz-nxt/internal/shared"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -12,38 +12,38 @@ func pinMod(args []string, pinned bool) {
 	fmt.Println("Loading modpack...")
 	pack, err := fileio.LoadPackFile(viper.GetString("pack-file"))
 	if err != nil {
-		cmdshared.Exitln(err)
+		shared.Exitln(err)
 	}
 	index, err := fileio.LoadPackIndexFile(&pack)
 	if err != nil {
-		cmdshared.Exitln(err)
+		shared.Exitln(err)
 	}
 	modPath, ok := index.FindMod(args[0])
 	if !ok {
-		cmdshared.Exitln("Can't find this file; please ensure you have run packwiz refresh and use the name of the .pw.toml file (defaults to the project slug)")
+		shared.Exitln("Can't find this file; please ensure you have run packwiz refresh and use the name of the .pw.toml file (defaults to the project slug)")
 	}
 	modData, err := fileio.LoadMod(modPath)
 	if err != nil {
-		cmdshared.Exitln(err)
+		shared.Exitln(err)
 	}
 	modData.Pin = pinned
 
 	modWriter := fileio.NewModWriter()
 	format, hash, err := modWriter.Write(&modData)
 	if err != nil {
-		cmdshared.Exitln(err)
+		shared.Exitln(err)
 	}
 
 	err = index.UpdateFileHashGiven(modPath, format, hash, true)
 	if err != nil {
-		cmdshared.Exitln(err)
+		shared.Exitln(err)
 	}
 
 	repr := index.ToWritable()
 	writer := fileio.NewIndexWriter()
 	err = writer.Write(&repr)
 	if err != nil {
-		cmdshared.Exitln(err)
+		shared.Exitln(err)
 	}
 
 	pack.RefreshIndexHash(index)
@@ -51,7 +51,7 @@ func pinMod(args []string, pinned bool) {
 	packWriter := fileio.NewPackWriter()
 	err = packWriter.Write(&pack)
 	if err != nil {
-		cmdshared.Exitln(err)
+		shared.Exitln(err)
 	}
 
 	message := "pinned"

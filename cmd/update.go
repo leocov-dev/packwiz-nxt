@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/leocov-dev/packwiz-nxt/core"
-	"github.com/leocov-dev/packwiz-nxt/internal/cmdshared"
+	"github.com/leocov-dev/packwiz-nxt/internal/shared"
 )
 
 // UpdateCmd represents the update command
@@ -24,11 +24,11 @@ var UpdateCmd = &cobra.Command{
 		fmt.Println("Loading modpack...")
 		pack, err := fileio.LoadPackFile(viper.GetString("pack-file"))
 		if err != nil {
-			cmdshared.Exitln(err)
+			shared.Exitln(err)
 		}
 		index, err := fileio.LoadPackIndexFile(&pack)
 		if err != nil {
-			cmdshared.Exitln(err)
+			shared.Exitln(err)
 		}
 
 		var singleUpdatedName string
@@ -37,7 +37,7 @@ var UpdateCmd = &cobra.Command{
 			fmt.Println("Reading metadata files...")
 			mods, err := fileio.LoadAllMods(&index)
 			if err != nil {
-				cmdshared.Exitf("Failed to update all files: %v\n", err)
+				shared.Exitf("Failed to update all files: %v\n", err)
 			}
 			for _, modData := range mods {
 				updaterFound := false
@@ -97,7 +97,7 @@ var UpdateCmd = &cobra.Command{
 				return
 			}
 
-			if !cmdshared.PromptYesNo("Do you want to update? [Y/n]: ") {
+			if !shared.PromptYesNo("Do you want to update? [Y/n]: ") {
 				fmt.Println("Cancelled!")
 				return
 			}
@@ -126,18 +126,18 @@ var UpdateCmd = &cobra.Command{
 			}
 		} else {
 			if len(args) < 1 || len(args[0]) == 0 {
-				cmdshared.Exitln("Must specify a valid file, or use the --all flag!")
+				shared.Exitln("Must specify a valid file, or use the --all flag!")
 			}
 			modPath, ok := index.FindMod(args[0])
 			if !ok {
-				cmdshared.Exitln("Can't find this file; please ensure you have run packwiz refresh and use the name of the .pw.toml file (defaults to the project slug)")
+				shared.Exitln("Can't find this file; please ensure you have run packwiz refresh and use the name of the .pw.toml file (defaults to the project slug)")
 			}
 			modData, err := fileio.LoadMod(modPath)
 			if err != nil {
-				cmdshared.Exitln(err)
+				shared.Exitln(err)
 			}
 			if modData.Pin {
-				cmdshared.Exitln("Version is pinned; run the unpin command to allow updating")
+				shared.Exitln("Version is pinned; run the unpin command to allow updating")
 			}
 			singleUpdatedName = modData.Name
 			updaterFound := false
@@ -150,10 +150,10 @@ var UpdateCmd = &cobra.Command{
 
 				check, err := updater.CheckUpdate([]*core.ModToml{&modData}, pack)
 				if err != nil {
-					cmdshared.Exitln(err)
+					shared.Exitln(err)
 				}
 				if len(check) != 1 {
-					cmdshared.Exitln("Invalid update check response")
+					shared.Exitln("Invalid update check response")
 				}
 
 				if check[0].UpdateAvailable {
@@ -161,18 +161,18 @@ var UpdateCmd = &cobra.Command{
 
 					err = updater.DoUpdate([]*core.ModToml{&modData}, []interface{}{check[0].CachedState})
 					if err != nil {
-						cmdshared.Exitln(err)
+						shared.Exitln(err)
 					}
 
 					modWriter := fileio.NewModWriter()
 					format, hash, err := modWriter.Write(&modData)
 					if err != nil {
-						cmdshared.Exitln(err)
+						shared.Exitln(err)
 					}
 
 					err = index.UpdateFileHashGiven(modPath, format, hash, true)
 					if err != nil {
-						cmdshared.Exitln(err)
+						shared.Exitln(err)
 					}
 				} else {
 					fmt.Printf("\"%s\" is already up to date!\n", modData.Name)
@@ -183,7 +183,7 @@ var UpdateCmd = &cobra.Command{
 			}
 			if !updaterFound {
 				// TODO: use file name instead of Name when len(Name) == 0 in all places?
-				cmdshared.Exitln("A supported update system for \"" + modData.Name + "\" cannot be found.")
+				shared.Exitln("A supported update system for \"" + modData.Name + "\" cannot be found.")
 			}
 		}
 
@@ -191,7 +191,7 @@ var UpdateCmd = &cobra.Command{
 		writer := fileio.NewIndexWriter()
 		err = writer.Write(&repr)
 		if err != nil {
-			cmdshared.Exitln(err)
+			shared.Exitln(err)
 		}
 
 		pack.RefreshIndexHash(index)
@@ -199,7 +199,7 @@ var UpdateCmd = &cobra.Command{
 		packWriter := fileio.NewPackWriter()
 		err = packWriter.Write(&pack)
 		if err != nil {
-			cmdshared.Exitln(err)
+			shared.Exitln(err)
 		}
 		if viper.GetBool("update.all") {
 			fmt.Println("Files updated!")

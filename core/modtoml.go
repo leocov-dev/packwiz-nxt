@@ -23,7 +23,8 @@ type ModToml struct {
 
 	Option *ModOption `toml:"option,omitempty"`
 
-	hash string
+	hash       string
+	metaFolder string
 }
 
 const (
@@ -75,6 +76,14 @@ func (m *ModToml) ReflectUpdateData() error {
 	}
 
 	return nil
+}
+
+func (m *ModToml) GetMetaFolder() string {
+	return m.metaFolder
+}
+
+func (m *ModToml) SetMetaFolder(value string) {
+	m.metaFolder = value
 }
 
 // SetMetaPath sets the file path of a metadata file

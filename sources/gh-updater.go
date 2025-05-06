@@ -25,7 +25,7 @@ func (u ghUpdater) ParseUpdate(updateUnparsed map[string]interface{}) (interface
 	return updateData, err
 }
 
-type cachedStateStore struct {
+type ghCachedStateStore struct {
 	Slug    string
 	Release Release
 }
@@ -85,7 +85,7 @@ func (u ghUpdater) CheckUpdate(mods []*core.ModToml, pack core.PackToml) ([]core
 		results[i] = core.UpdateCheck{
 			UpdateAvailable: true,
 			UpdateString:    mod.FileName + " -> " + newFile.Name,
-			CachedState:     cachedStateStore{data.Slug, newRelease},
+			CachedState:     ghCachedStateStore{data.Slug, newRelease},
 		}
 	}
 
@@ -94,7 +94,7 @@ func (u ghUpdater) CheckUpdate(mods []*core.ModToml, pack core.PackToml) ([]core
 
 func (u ghUpdater) DoUpdate(mods []*core.ModToml, cachedState []interface{}) error {
 	for i, mod := range mods {
-		modState := cachedState[i].(cachedStateStore)
+		modState := cachedState[i].(ghCachedStateStore)
 		var release = modState.Release
 
 		// yes, this is duplicated - i guess we should just cache asset + tag instead of entire release...?

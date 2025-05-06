@@ -3,13 +3,13 @@ package main
 import (
 	"github.com/leocov-dev/packwiz-nxt/cmd"
 	"github.com/leocov-dev/packwiz-nxt/config"
-	_ "github.com/leocov-dev/packwiz-nxt/internal/commands/curseforge"
-	_ "github.com/leocov-dev/packwiz-nxt/internal/commands/github"
-	_ "github.com/leocov-dev/packwiz-nxt/internal/commands/migrate"
-	_ "github.com/leocov-dev/packwiz-nxt/internal/commands/modrinth"
-	_ "github.com/leocov-dev/packwiz-nxt/internal/commands/settings"
-	_ "github.com/leocov-dev/packwiz-nxt/internal/commands/url"
-	_ "github.com/leocov-dev/packwiz-nxt/internal/commands/utils"
+	_ "github.com/leocov-dev/packwiz-nxt/internal/commands/cmdcurseforge"
+	_ "github.com/leocov-dev/packwiz-nxt/internal/commands/cmdgithub"
+	_ "github.com/leocov-dev/packwiz-nxt/internal/commands/cmdmigrate"
+	_ "github.com/leocov-dev/packwiz-nxt/internal/commands/cmdmodrinth"
+	_ "github.com/leocov-dev/packwiz-nxt/internal/commands/cmdsettings"
+	_ "github.com/leocov-dev/packwiz-nxt/internal/commands/cmdurl"
+	_ "github.com/leocov-dev/packwiz-nxt/internal/commands/cmdutils"
 )
 
 var Version string

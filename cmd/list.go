@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/leocov-dev/packwiz-nxt/core"
-	"github.com/leocov-dev/packwiz-nxt/internal/cmdshared"
+	"github.com/leocov-dev/packwiz-nxt/internal/shared"
 )
 
 // listCmd represents the list command
@@ -23,26 +23,26 @@ var listCmd = &cobra.Command{
 		// Load pack
 		pack, err := fileio.LoadPackFile(viper.GetString("pack-file"))
 		if err != nil {
-			cmdshared.Exitln(err)
+			shared.Exitln(err)
 		}
 
 		// Load index
 		index, err := fileio.LoadPackIndexFile(&pack)
 		if err != nil {
-			cmdshared.Exitln(err)
+			shared.Exitln(err)
 		}
 
 		// Load mods
 		mods, err := fileio.LoadAllMods(&index)
 		if err != nil {
-			cmdshared.Exitln(err)
+			shared.Exitln(err)
 		}
 
 		// Filter mods by side
 		if viper.IsSet("list.side") {
 			side := core.ModSide(viper.GetString("list.side"))
 			if side != core.UniversalSide && side != core.ServerSide && side != core.ClientSide {
-				cmdshared.Exitf("Invalid side %q, must be one of client, server, or both (default)\n", side)
+				shared.Exitf("Invalid side %q, must be one of client, server, or both (default)\n", side)
 			}
 
 			i := 0

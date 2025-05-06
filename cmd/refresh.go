@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 	"github.com/leocov-dev/packwiz-nxt/fileio"
-	"github.com/leocov-dev/packwiz-nxt/internal/cmdshared"
+	"github.com/leocov-dev/packwiz-nxt/internal/shared"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -17,23 +17,23 @@ var refreshCmd = &cobra.Command{
 		fmt.Println("Loading modpack...")
 		pack, err := fileio.LoadPackFile(viper.GetString("pack-file"))
 		if err != nil {
-			cmdshared.Exitln(err)
+			shared.Exitln(err)
 		}
 
 		index, err := fileio.LoadPackIndexFile(&pack)
 		if err != nil {
-			cmdshared.Exitln(err)
+			shared.Exitln(err)
 		}
 		err = fileio.RefreshIndexFiles(&index)
 		if err != nil {
-			cmdshared.Exitln(err)
+			shared.Exitln(err)
 		}
 
 		repr := index.ToWritable()
 		writer := fileio.NewIndexWriter()
 		err = writer.Write(&repr)
 		if err != nil {
-			cmdshared.Exitln(err)
+			shared.Exitln(err)
 		}
 
 		pack.RefreshIndexHash(index)
@@ -41,7 +41,7 @@ var refreshCmd = &cobra.Command{
 		packWriter := fileio.NewPackWriter()
 		err = packWriter.Write(&pack)
 		if err != nil {
-			cmdshared.Exitln(err)
+			shared.Exitln(err)
 		}
 		fmt.Println("Index refreshed!")
 	},

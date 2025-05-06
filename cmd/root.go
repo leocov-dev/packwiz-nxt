@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 	"github.com/leocov-dev/packwiz-nxt/fileio"
-	"github.com/leocov-dev/packwiz-nxt/internal/cmdshared"
+	"github.com/leocov-dev/packwiz-nxt/internal/shared"
 	"github.com/spf13/pflag"
 	"os"
 	"path/filepath"
@@ -59,14 +59,14 @@ func init() {
 
 	defaultCacheDir, err := fileio.GetPackwizCache()
 	if err != nil {
-		cmdshared.Exitln(err)
+		shared.Exitln(err)
 	}
 	rootCmd.PersistentFlags().String("cache", defaultCacheDir, "The directory where packwiz will cache downloaded mods")
 	_ = viper.BindPFlag("cache.directory", rootCmd.PersistentFlags().Lookup("cache"))
 
 	file, err := fileio.GetPackwizLocalStore()
 	if err != nil {
-		cmdshared.Exitln(err)
+		shared.Exitln(err)
 	}
 	file = filepath.Join(file, ".packwiz.toml")
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "The config file to use (default \""+file+"\")")
@@ -84,7 +84,7 @@ func initConfig() {
 	} else {
 		dir, err := fileio.GetPackwizLocalStore()
 		if err != nil {
-			cmdshared.Exitln(err)
+			shared.Exitln(err)
 		}
 
 		viper.AddConfigPath(dir)
