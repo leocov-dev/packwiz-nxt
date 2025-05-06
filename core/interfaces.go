@@ -5,6 +5,10 @@ import "io"
 // Updaters stores all the updaters that packwiz can use. Add your own update systems to this map, keyed by the configuration name.
 var Updaters = make(map[string]Updater)
 
+func AddUpdater(name string, updater Updater) {
+	Updaters[name] = updater
+}
+
 // Updater is used to process updates on mods
 type Updater interface {
 	// ParseUpdate takes an unparsed interface{} (as a map[string]interface{}), and returns an Updater for a mod file.

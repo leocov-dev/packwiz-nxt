@@ -1,9 +1,9 @@
 # packwiz-nxt
 
-This is a rewrite of [packwiz](https://github.com/packwiz/packwiz). 
+This is a refactored [packwiz/packwiz](https://github.com/packwiz/packwiz). 
 This repo focuses on changing the codebase so that packwiz can be used as a 
 library without needing to write to the file system.
-The original CLI functionality is maintained.
+The original CLI functionality is mostly maintained.
 
 Note:
 This fork does not include a Curseforge API key in its source code. 

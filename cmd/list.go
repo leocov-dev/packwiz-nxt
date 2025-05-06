@@ -40,7 +40,7 @@ var listCmd = &cobra.Command{
 
 		// Filter mods by side
 		if viper.IsSet("list.side") {
-			side := viper.GetString("list.side")
+			side := core.ModSide(viper.GetString("list.side"))
 			if side != core.UniversalSide && side != core.ServerSide && side != core.ClientSide {
 				cmdshared.Exitf("Invalid side %q, must be one of client, server, or both (default)\n", side)
 			}

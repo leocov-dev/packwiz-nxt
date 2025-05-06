@@ -342,7 +342,7 @@ func getLatestVersion(projectID string, name string, pack core.PackToml) (*modri
 	return releaseDateLatest, nil
 }
 
-func getSide(mod *modrinthApi.Project) string {
+func getSide(mod *modrinthApi.Project) core.ModSide {
 	server := shouldDownloadOnSide(*mod.ServerSide)
 	client := shouldDownloadOnSide(*mod.ClientSide)
 

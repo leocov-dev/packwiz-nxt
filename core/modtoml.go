@@ -13,7 +13,7 @@ type ModToml struct {
 	metaFile string      // The file for the metadata file, used as an ID
 	Name     string      `toml:"name"`
 	FileName string      `toml:"filename"`
-	Side     string      `toml:"side,omitempty"`
+	Side     ModSide     `toml:"side,omitempty"`
 	Pin      bool        `toml:"pin,omitempty"`
 	Download ModDownload `toml:"download"`
 	// Update is a map of maps, of stuff, so you can store arbitrary values on
@@ -47,12 +47,14 @@ type ModOption struct {
 	Default     bool   `toml:"default,omitempty"`
 }
 
+type ModSide string
+
 // The four possible values of Side (the side that the mod is on) are "server", "client", "both", and "" (equivalent to "both")
 const (
-	ServerSide    = "server"
-	ClientSide    = "client"
-	UniversalSide = "both"
-	EmptySide     = ""
+	ServerSide    ModSide = "server"
+	ClientSide    ModSide = "client"
+	UniversalSide ModSide = "both"
+	EmptySide     ModSide = ""
 )
 
 func (m *ModToml) ReflectUpdateData() error {
