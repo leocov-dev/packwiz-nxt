@@ -4,19 +4,20 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/dlclark/regexp2"
-	"github.com/leocov-dev/packwiz-nxt/core"
 	"io"
 	"regexp"
+
+	"github.com/dlclark/regexp2"
+	"github.com/leocov-dev/packwiz-nxt/core"
 )
 
 func init() {
-	core.AddUpdater("github", ghUpdater{})
+	core.AddUpdater(ghUpdater{})
 }
 
 var GithubRegex = regexp.MustCompile(`^https?://(?:www\.)?github\.com/([^/]+/[^/]+)`)
 
-func AddGitHubMod(slugOrUrl, branch, regex string) (core.ModToml, Repo, Asset, error) {
+func AddGitHubMod(slugOrUrl, branch, regex, modType string) (*core.Mod, Repo, Asset, error) {
 	var slug string
 
 	// Check if the argument is a valid GitHub repository URL; if so, extract the slug from the URL.
@@ -31,7 +32,7 @@ func AddGitHubMod(slugOrUrl, branch, regex string) (core.ModToml, Repo, Asset, e
 	repo, err := fetchRepo(slug)
 
 	if err != nil {
-		return core.ModToml{}, repo, Asset{}, err
+		return nil, repo, Asset{}, err
 	}
 
 	if regex == "" {
@@ -46,21 +47,21 @@ func AddGitHubMod(slugOrUrl, branch, regex string) (core.ModToml, Repo, Asset, e
 		regex = `^.+(?<!-api|-dev|-dev-preshadow|-sources)\.jar$`
 	}
 
-	modMeta, file, err := installMod(repo, branch, regex)
+	mod, file, err := installMod(repo, branch, regex, modType)
 	if err != nil {
-		return core.ModToml{}, repo, file, err
+		return nil, repo, file, err
 	}
 
-	return modMeta, repo, file, nil
+	return mod, repo, file, nil
 }
 
-func installMod(repo Repo, branch, regex string) (core.ModToml, Asset, error) {
+func installMod(repo Repo, branch, regex, modType string) (*core.Mod, Asset, error) {
 	latestRelease, err := getLatestRelease(repo.FullName, branch)
 	if err != nil {
-		return core.ModToml{}, Asset{}, fmt.Errorf("failed to get latest release: %v", err)
+		return nil, Asset{}, fmt.Errorf("failed to get latest release: %v", err)
 	}
 
-	return installRelease(repo, latestRelease, regex)
+	return installRelease(repo, latestRelease, regex, modType)
 }
 
 func getLatestRelease(slug string, branch string) (Release, error) {
@@ -99,13 +100,14 @@ func installRelease(
 	repo Repo,
 	release Release,
 	regex string,
-) (core.ModToml, Asset, error) {
+	modType string,
+) (*core.Mod, Asset, error) {
 	expr := regexp2.MustCompile(regex, 0)
 
 	var file Asset
 
 	if len(release.Assets) == 0 {
-		return core.ModToml{}, file, errors.New("release doesn't have any assets attached")
+		return nil, file, errors.New("release doesn't have any assets attached")
 	}
 
 	var files []Asset
@@ -118,12 +120,12 @@ func installRelease(
 	}
 
 	if len(files) == 0 {
-		return core.ModToml{}, file, errors.New("release doesn't have any assets matching regex")
+		return nil, file, errors.New("release doesn't have any assets matching regex")
 	}
 
 	if len(files) > 1 {
 		// TODO: also print file names
-		return core.ModToml{}, file, errors.New("release has more than one asset matching regex")
+		return nil, file, errors.New("release has more than one asset matching regex")
 	}
 
 	file = files[0]
@@ -131,7 +133,7 @@ func installRelease(
 	// Install the file
 	fmt.Printf("Installing %s from release %s\n", file.Name, release.TagName)
 
-	updateMap := make(map[string]map[string]interface{})
+	updateMap := make(core.ModUpdate)
 
 	var err error
 
@@ -142,25 +144,34 @@ func installRelease(
 		Regex:  regex,                   // TODO: ditto!
 	}.ToMap()
 	if err != nil {
-		return core.ModToml{}, file, err
+		return nil, file, err
 	}
 
 	hash, err := file.getSha256()
 	if err != nil {
-		return core.ModToml{}, file, err
+		return nil, file, err
 	}
 
-	modMeta := core.ModToml{
-		Name:     repo.Name,
-		FileName: file.Name,
-		Side:     core.UniversalSide,
-		Download: core.ModDownload{
-			URL:        file.BrowserDownloadURL,
-			HashFormat: "sha256",
-			Hash:       hash,
-		},
-		Update: updateMap,
+	download := core.ModDownload{
+		URL:        file.BrowserDownloadURL,
+		HashFormat: "sha256",
+		Hash:       hash,
 	}
 
-	return modMeta, file, nil
+	mod := core.NewMod(
+		core.SlugifyName(repo.Name),
+		repo.Name,
+		file.Name,
+		core.UniversalSide,
+		modType,
+		"",
+		false,
+		true,
+		false,
+		updateMap,
+		download,
+		nil,
+	)
+
+	return mod, file, nil
 }

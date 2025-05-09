@@ -11,6 +11,16 @@ import (
 	"path/filepath"
 )
 
+var branchFlag string
+var regexFlag string
+
+func init() {
+	githubCmd.AddCommand(installCmd)
+
+	installCmd.Flags().StringVar(&branchFlag, "branch", "", "The GitHub repository branch to retrieve releases for")
+	installCmd.Flags().StringVar(&regexFlag, "regex", "", "The regular expression to match releases against")
+}
+
 // installCmd represents the install command
 var installCmd = &cobra.Command{
 	Use:     "add [URL|slug]",
@@ -27,7 +37,19 @@ var installCmd = &cobra.Command{
 			shared.Exitln("You must specify a GitHub repository URL.")
 		}
 
-		modMeta, repo, file, err := sources.AddGitHubMod(args[0], branchFlag, regexFlag)
+		modType := viper.GetString("meta-folder")
+		if modType == "" {
+			modType = "mods"
+		}
+
+		mod, repo, file, err := sources.AddGitHubMod(
+			args[0],
+			branchFlag,
+			regexFlag,
+			modType,
+		)
+
+		modMeta := mod.ToModMeta()
 
 		if err != nil {
 			shared.Exitf("Failed to add project: %s\n", err)
@@ -35,11 +57,7 @@ var installCmd = &cobra.Command{
 
 		var path string
 
-		metaFolder := viper.GetString("meta-folder")
-		if metaFolder == "" {
-			metaFolder = "mods"
-		}
-		path = modMeta.SetMetaPath(filepath.Join(viper.GetString("meta-folder-base"), metaFolder, core.SlugifyName(repo.Name)+core.MetaExtension))
+		path = modMeta.SetMetaPath(filepath.Join(viper.GetString("meta-folder-base"), modMeta.GetMetaRelativePath()))
 
 		err = writeMod(pack, modMeta, path)
 		if err != nil {
@@ -87,14 +105,4 @@ func writeMod(pack core.PackToml, modMeta core.ModToml, path string) error {
 	}
 
 	return nil
-}
-
-var branchFlag string
-var regexFlag string
-
-func init() {
-	githubCmd.AddCommand(installCmd)
-
-	installCmd.Flags().StringVar(&branchFlag, "branch", "", "The GitHub repository branch to retrieve releases for")
-	installCmd.Flags().StringVar(&regexFlag, "regex", "", "The regular expression to match releases against")
 }

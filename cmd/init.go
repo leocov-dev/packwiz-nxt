@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"github.com/fatih/camelcase"
 	"github.com/igorsobreira/titlecase"
@@ -22,146 +23,41 @@ var initCmd = &cobra.Command{
 	Short: "Initialise a packwiz modpack",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		_, err := os.Stat(viper.GetString("pack-file"))
-		if err == nil && !viper.GetBool("init.reinit") {
-			shared.Exitf("Modpack metadata file already exists, use -r to override!")
-		} else if err != nil && !os.IsNotExist(err) {
-			shared.Exitf("Error checking pack file: %s\n", err)
-		}
-
-		name, err := cmd.Flags().GetString("name")
-		if err != nil || len(name) == 0 {
-			// Get current file directory name
-			wd, err := os.Getwd()
-			directoryName := "."
-			if err == nil {
-				directoryName = filepath.Base(wd)
-			}
-			if directoryName != "." && len(directoryName) > 0 {
-				// Turn directory name into a space-seperated proper name
-				name = titlecase.Title(strings.ReplaceAll(strings.ReplaceAll(strings.Join(camelcase.Split(directoryName), " "), " - ", " "), " _ ", " "))
-				name = initReadValue("Modpack name ["+name+"]: ", name)
-			} else {
-				name = initReadValue("Modpack name: ", "")
-			}
-		}
-
-		author, err := cmd.Flags().GetString("author")
-		if err != nil || len(author) == 0 {
-			author = initReadValue("Author: ", "")
-		}
-
-		version, err := cmd.Flags().GetString("version")
-		if err != nil || len(version) == 0 {
-			version = initReadValue("Version [1.0.0]: ", "1.0.0")
-		}
-
-		mcVersions, err := shared.GetValidMCVersions()
+		packFile, packDir, err := shared.GetPackPaths()
 		if err != nil {
-			shared.Exitf("Failed to get latest minecraft versions: %s\n", err)
+			shared.Exitln(err)
 		}
 
-		mcVersion := viper.GetString("init.mc-version")
-		if len(mcVersion) == 0 {
-			var latestVersion string
-			if viper.GetBool("init.snapshot") {
-				latestVersion = mcVersions.Latest.Snapshot
-			} else {
-				latestVersion = mcVersions.Latest.Release
-			}
-			if viper.GetBool("init.latest") {
-				mcVersion = latestVersion
-			} else {
-				mcVersion = initReadValue("Minecraft version ["+latestVersion+"]: ", latestVersion)
-			}
-		}
-		mcVersions.CheckValid(mcVersion)
-
-		modLoaderName := strings.ToLower(viper.GetString("init.modloader"))
-		if len(modLoaderName) == 0 {
-			modLoaderName = strings.ToLower(initReadValue("ModToml loader [quilt]: ", "quilt"))
+		if err := checkReinit(packFile); err != nil {
+			shared.Exitln(err)
 		}
 
-		loader, ok := core.ModLoaders[modLoaderName]
-		modLoaderVersions := make(map[string]string)
-		if modLoaderName != "none" {
-			if ok {
-				versions, latestVersion, err := loader.VersionListGetter(mcVersion)
-				if err != nil {
-					shared.Exitf("Error loading versions: %s\n", err)
-				}
-				componentVersion := viper.GetString("init." + loader.Name + "-version")
-				if len(componentVersion) == 0 {
-					if viper.GetBool("init." + loader.Name + "-latest") {
-						componentVersion = latestVersion
-					} else {
-						componentVersion = initReadValue(loader.FriendlyName+" version ["+latestVersion+"]: ", latestVersion)
-					}
-				}
-				v := componentVersion
-				if loader.Name == "forge" || loader.Name == "neoforge" {
-					v = shared.GetRawForgeVersion(componentVersion)
-				}
-				if !slices.Contains(versions, v) {
-					shared.Exitf("Given " + loader.FriendlyName + " version cannot be found!")
-				}
-				modLoaderVersions[loader.Name] = v
-			} else {
-				fmt.Println("Given mod loader is not supported! Use \"none\" to specify no modloader, or to configure one manually.")
-				fmt.Print("The following mod loaders are supported: ")
-				keys := make([]string, len(core.ModLoaders))
-				i := 0
-				for k := range core.ModLoaders {
-					keys[i] = k
-					i++
-				}
-				shared.Exitln(strings.Join(keys, ", "))
-			}
+		name := getPackName(cmd)
+
+		author := getAuthorName(cmd)
+
+		version := getPackVersion(cmd)
+
+		mcVersion, err := getMcVersion()
+		if err != nil {
+			shared.Exitln(err)
 		}
 
-		pack := core.CreatePackToml(
+		modLoaderVersions, err := getModLoader(mcVersion)
+		if err != nil {
+			shared.Exitln(err)
+		}
+
+		pack := core.NewPack(
 			name,
 			author,
 			version,
-			map[string]string{
-				"minecraft": mcVersion,
-			},
+			"",
+			mcVersion,
+			modLoaderVersions,
 		)
 
-		err = fileio.InitIndexFile(*pack)
-		if err != nil {
-			shared.Exitf("Error creating index file: %s\n", err)
-		}
-
-		if modLoaderName != "none" {
-			for k, v := range modLoaderVersions {
-				pack.Versions[k] = v
-			}
-		}
-		pack.SetFilePath(viper.GetString("pack-file"))
-
-		// Refresh the index and pack
-		index, err := fileio.LoadPackIndexFile(pack)
-		if err != nil {
-			shared.Exitln(err)
-		}
-		err = fileio.RefreshIndexFiles(&index)
-		if err != nil {
-			shared.Exitln(err)
-		}
-
-		repr := index.ToWritable()
-		writer := fileio.NewIndexWriter()
-		err = writer.Write(&repr)
-		if err != nil {
-			shared.Exitln(err)
-		}
-
-		pack.RefreshIndexHash(index)
-
-		packWriter := fileio.NewPackWriter()
-		err = packWriter.Write(pack)
-		if err != nil {
+		if err := fileio.WriteAll(*pack, packDir); err != nil {
 			shared.Exitln(err)
 		}
 
@@ -211,4 +107,124 @@ func initReadValue(prompt string, def string) string {
 		return value
 	}
 	return def
+}
+
+func checkReinit(packFile string) error {
+	_, err := os.Stat(packFile)
+	if err == nil && !viper.GetBool("init.reinit") {
+		return errors.New("modpack metadata file already exists, use -r to override")
+	} else if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("error checking pack file: %s", err)
+	}
+	return nil
+}
+
+func getPackName(cmd *cobra.Command) string {
+	name, err := cmd.Flags().GetString("name")
+	if err != nil || len(name) == 0 {
+		// Get current file directory name
+		wd, err := os.Getwd()
+		directoryName := "."
+		if err == nil {
+			directoryName = filepath.Base(wd)
+		}
+		if directoryName != "." && len(directoryName) > 0 {
+			// Turn directory name into a space-seperated proper name
+			name = titlecase.Title(strings.ReplaceAll(strings.ReplaceAll(strings.Join(camelcase.Split(directoryName), " "), " - ", " "), " _ ", " "))
+			name = initReadValue("Modpack name ["+name+"]: ", name)
+		} else {
+			name = initReadValue("Modpack name: ", "")
+		}
+	}
+
+	return name
+}
+
+func getAuthorName(cmd *cobra.Command) string {
+	author, err := cmd.Flags().GetString("author")
+	if err != nil || len(author) == 0 {
+		author = initReadValue("Author: ", "")
+	}
+
+	return author
+}
+
+func getPackVersion(cmd *cobra.Command) string {
+	version, err := cmd.Flags().GetString("version")
+	if err != nil || len(version) == 0 {
+		version = initReadValue("Version [1.0.0]: ", "1.0.0")
+	}
+
+	return version
+}
+
+func getMcVersion() (string, error) {
+	mcVersions, err := shared.GetValidMCVersions()
+	if err != nil {
+		return "", fmt.Errorf("failed to get latest minecraft versions: %s", err)
+	}
+
+	mcVersion := viper.GetString("init.mc-version")
+	if len(mcVersion) == 0 {
+		var latestVersion string
+		if viper.GetBool("init.snapshot") {
+			latestVersion = mcVersions.Latest.Snapshot
+		} else {
+			latestVersion = mcVersions.Latest.Release
+		}
+		if viper.GetBool("init.latest") {
+			mcVersion = latestVersion
+		} else {
+			mcVersion = initReadValue("Minecraft version ["+latestVersion+"]: ", latestVersion)
+		}
+	}
+	mcVersions.CheckValid(mcVersion)
+
+	return mcVersion, nil
+}
+
+func getModLoader(mcVersion string) (core.LoaderInfo, error) {
+	modLoaderName := strings.ToLower(viper.GetString("init.modloader"))
+	if len(modLoaderName) == 0 {
+		modLoaderName = strings.ToLower(initReadValue("ModToml loader [quilt]: ", "quilt"))
+	}
+
+	loader, ok := core.ModLoaders[modLoaderName]
+	modLoaderVersions := make(core.LoaderInfo)
+	if modLoaderName != "none" {
+		if ok {
+			versions, latestVersion, err := loader.VersionListGetter(mcVersion)
+			if err != nil {
+				return modLoaderVersions, fmt.Errorf("error loading versions: %s", err)
+			}
+			componentVersion := viper.GetString("init." + loader.Name + "-version")
+			if len(componentVersion) == 0 {
+				if viper.GetBool("init." + loader.Name + "-latest") {
+					componentVersion = latestVersion
+				} else {
+					componentVersion = initReadValue(loader.FriendlyName+" version ["+latestVersion+"]: ", latestVersion)
+				}
+			}
+			v := componentVersion
+			if loader.Name == "forge" || loader.Name == "neoforge" {
+				v = shared.GetRawForgeVersion(componentVersion)
+			}
+			if !slices.Contains(versions, v) {
+				return modLoaderVersions, fmt.Errorf("given %s version cannot be found", loader.FriendlyName)
+			}
+			modLoaderVersions[loader.Name] = v
+		} else {
+			fmt.Println("Given mod loader is not supported! Use \"none\" to specify no modloader, or to configure one manually.")
+			fmt.Print("The following mod loaders are supported: ")
+			keys := make([]string, len(core.ModLoaders))
+			i := 0
+			for k := range core.ModLoaders {
+				keys[i] = k
+				i++
+			}
+			shared.Exitln(strings.Join(keys, ", "))
+		}
+	}
+
+	return modLoaderVersions, nil
 }

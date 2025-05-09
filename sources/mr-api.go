@@ -1,17 +1,18 @@
 package sources
 
 import (
-	modrinthApi "codeberg.org/jmansfield/go-modrinth/modrinth"
 	"errors"
 	"fmt"
-	"github.com/leocov-dev/packwiz-nxt/core"
-	"github.com/spf13/viper"
-	"github.com/unascribed/FlexVer/go/flexver"
-	"golang.org/x/exp/slices"
 	"math"
 	"net/http"
 	"net/url"
 	"regexp"
+
+	modrinthApi "codeberg.org/jmansfield/go-modrinth/modrinth"
+	"github.com/leocov-dev/packwiz-nxt/core"
+	"github.com/spf13/viper"
+	"github.com/unascribed/FlexVer/go/flexver"
+	"golang.org/x/exp/slices"
 )
 
 var mrDefaultClient = modrinthApi.NewClient(&http.Client{})
@@ -300,7 +301,7 @@ func mrFindLatestVersion(versions []*modrinthApi.Version, gameVersions []string,
 	return latestValidVersion
 }
 
-func GetModrinthLatestVersion(projectID string, name string, pack core.PackToml) (*modrinthApi.Version, error) {
+func GetModrinthLatestVersion(projectID string, name string, pack core.Pack) (*modrinthApi.Version, error) {
 	gameVersions, err := pack.GetSupportedMCVersions()
 	if err != nil {
 		return nil, err
@@ -387,17 +388,15 @@ func mrGetBestHash(v *modrinthApi.File) (string, string) {
 	return "", ""
 }
 
-func mrGetInstalledProjectIDs(mods []*core.ModToml) []string {
+func mrGetInstalledProjectIDs(mods []*core.Mod) []string {
 	var installedProjects []string
 
 	for _, mod := range mods {
-		data, ok := mod.GetParsedUpdateData("modrinth")
-		if ok {
-			updateData, ok := data.(mrUpdateData)
-			if ok {
-				if len(updateData.ProjectID) > 0 {
-					installedProjects = append(installedProjects, updateData.ProjectID)
-				}
+		var updateData mrUpdateData
+		err := mod.DecodeNamedModSourceData("modrinth", updateData)
+		if err == nil {
+			if len(updateData.ProjectID) > 0 {
+				installedProjects = append(installedProjects, updateData.ProjectID)
 			}
 		}
 	}

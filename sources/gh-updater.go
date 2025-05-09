@@ -19,6 +19,10 @@ type ghUpdateData struct {
 
 type ghUpdater struct{}
 
+func (u ghUpdater) GetName() string {
+	return "github"
+}
+
 func (u ghUpdater) ParseUpdate(updateUnparsed map[string]interface{}) (interface{}, error) {
 	var updateData ghUpdateData
 	err := mapstructure.Decode(updateUnparsed, &updateData)
@@ -30,17 +34,17 @@ type ghCachedStateStore struct {
 	Release Release
 }
 
-func (u ghUpdater) CheckUpdate(mods []*core.ModToml, pack core.PackToml) ([]core.UpdateCheck, error) {
+func (u ghUpdater) CheckUpdate(mods []*core.Mod, _ core.Pack) ([]core.UpdateCheck, error) {
 	results := make([]core.UpdateCheck, len(mods))
 
 	for i, mod := range mods {
-		rawData, ok := mod.GetParsedUpdateData("github")
-		if !ok {
+
+		var data ghUpdateData
+		err := mod.DecodeNamedModSourceData("github", &data)
+		if err != nil {
 			results[i] = core.UpdateCheck{Error: errors.New("failed to parse update metadata")}
 			continue
 		}
-
-		data := rawData.(ghUpdateData)
 
 		newRelease, err := getLatestRelease(data.Slug, data.Branch)
 		if err != nil {
@@ -92,7 +96,7 @@ func (u ghUpdater) CheckUpdate(mods []*core.ModToml, pack core.PackToml) ([]core
 	return results, nil
 }
 
-func (u ghUpdater) DoUpdate(mods []*core.ModToml, cachedState []interface{}) error {
+func (u ghUpdater) DoUpdate(mods []*core.Mod, cachedState []interface{}) error {
 	for i, mod := range mods {
 		modState := cachedState[i].(ghCachedStateStore)
 		var release = modState.Release

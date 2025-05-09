@@ -1,8 +1,7 @@
-package packwiz
+package core
 
 import (
 	"github.com/bradleyjkemp/cupaloy"
-	"github.com/leocov-dev/packwiz-nxt/core"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -20,14 +19,14 @@ func TestPackStruct(t *testing.T) {
 		},
 	)
 
-	download := core.ModDownload{
+	download := ModDownload{
 		URL:        "",
 		HashFormat: "sha1",
 		Hash:       "5694a7bdfd508cf23bb4f2ab2fca7d45a517def7",
 		Mode:       "metadata:curseforge",
 	}
 
-	update := core.ModUpdate{
+	update := ModUpdate{
 		"curseforge": map[string]interface{}{
 			"file-id":    6459015,
 			"project-id": 531761,
@@ -49,7 +48,7 @@ func TestPackStruct(t *testing.T) {
 		nil,
 	)
 
-	pack.SetMod("balm", mod)
+	pack.SetMod(mod)
 
 	packText, err := pack.AsPackToml()
 	assert.NoError(t, err)

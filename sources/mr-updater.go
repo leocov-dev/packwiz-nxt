@@ -1,15 +1,16 @@
 package sources
 
 import (
-	modrinthApi "codeberg.org/jmansfield/go-modrinth/modrinth"
 	"errors"
 	"fmt"
+
+	modrinthApi "codeberg.org/jmansfield/go-modrinth/modrinth"
 	"github.com/leocov-dev/packwiz-nxt/core"
 	"github.com/mitchellh/mapstructure"
 )
 
 func init() {
-	core.AddUpdater("modrinth", mrUpdater{})
+	core.AddUpdater(mrUpdater{})
 }
 
 type mrUpdateData struct {
@@ -27,6 +28,10 @@ func (u mrUpdateData) ToMap() (map[string]interface{}, error) {
 
 type mrUpdater struct{}
 
+func (u mrUpdater) GetName() string {
+	return "modrinth"
+}
+
 func (u mrUpdater) ParseUpdate(updateUnparsed map[string]interface{}) (interface{}, error) {
 	var updateData mrUpdateData
 	err := mapstructure.Decode(updateUnparsed, &updateData)
@@ -38,17 +43,16 @@ type mrCachedStateStore struct {
 	Version   *modrinthApi.Version
 }
 
-func (u mrUpdater) CheckUpdate(mods []*core.ModToml, pack core.PackToml) ([]core.UpdateCheck, error) {
+func (u mrUpdater) CheckUpdate(mods []*core.Mod, pack core.Pack) ([]core.UpdateCheck, error) {
 	results := make([]core.UpdateCheck, len(mods))
 
 	for i, mod := range mods {
-		rawData, ok := mod.GetParsedUpdateData("modrinth")
-		if !ok {
+		var data mrUpdateData
+		err := mod.DecodeNamedModSourceData("modrinth", &data)
+		if err != nil {
 			results[i] = core.UpdateCheck{Error: errors.New("failed to parse update metadata")}
 			continue
 		}
-
-		data := rawData.(mrUpdateData)
 
 		newVersion, err := GetModrinthLatestVersion(data.ProjectID, mod.Name, pack)
 		if err != nil {
@@ -84,7 +88,7 @@ func (u mrUpdater) CheckUpdate(mods []*core.ModToml, pack core.PackToml) ([]core
 	return results, nil
 }
 
-func (u mrUpdater) DoUpdate(mods []*core.ModToml, cachedState []interface{}) error {
+func (u mrUpdater) DoUpdate(mods []*core.Mod, cachedState []interface{}) error {
 	for i, mod := range mods {
 		modState := cachedState[i].(mrCachedStateStore)
 		var version = modState.Version

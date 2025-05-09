@@ -2,11 +2,13 @@ package core
 
 import (
 	"errors"
+	"fmt"
 	"github.com/pelletier/go-toml/v2"
 	"path/filepath"
 )
 
-type ModUpdate map[string]map[string]interface{}
+type ModSourceData map[string]interface{}
+type ModUpdate map[string]ModSourceData
 
 // ModToml stores metadata about a mod. This is written to a TOML file for each mod.
 type ModToml struct {
@@ -24,6 +26,7 @@ type ModToml struct {
 	Option *ModOption `toml:"option,omitempty"`
 
 	hash       string
+	slug       string
 	metaFolder string
 }
 
@@ -63,7 +66,7 @@ func (m *ModToml) ReflectUpdateData() error {
 
 	// Horrible reflection library to convert map[string]interface to proper struct
 	for k, v := range m.Update {
-		updater, ok := Updaters[k]
+		updater, ok := GetUpdater(k)
 		if ok {
 			updateData, err := updater.ParseUpdate(v)
 			if err != nil {
@@ -78,6 +81,14 @@ func (m *ModToml) ReflectUpdateData() error {
 	return nil
 }
 
+func (m *ModToml) GetSlug() string {
+	return m.slug
+}
+
+func (m *ModToml) SetSlug(value string) {
+	m.slug = value
+}
+
 func (m *ModToml) GetMetaFolder() string {
 	return m.metaFolder
 }
@@ -86,10 +97,24 @@ func (m *ModToml) SetMetaFolder(value string) {
 	m.metaFolder = value
 }
 
+func (m *ModToml) GetMetaRelativePath() string {
+	return fmt.Sprintf("%s/%s%s", m.metaFolder, m.slug, MetaExtension)
+}
+
 // SetMetaPath sets the file path of a metadata file
 func (m *ModToml) SetMetaPath(metaFile string) string {
 	m.metaFile = metaFile
 	return m.metaFile
+}
+
+func (m *ModToml) GetUpdater() (Updater, error) {
+	for k := range m.Update {
+		updater, ok := GetUpdater(k)
+		if ok {
+			return updater, nil
+		}
+	}
+	return nil, fmt.Errorf("no updater found for mod: %s", m.Name)
 }
 
 // GetParsedUpdateData can be used to retrieve updater-specific information after parsing a mod file
@@ -109,7 +134,7 @@ func (m *ModToml) GetDestFilePath() string {
 }
 
 // UpdateHash updates the hash of a mod file, used with ModWriter
-func (m *ModToml) UpdateHash(hashFormat string, hash string) {
+func (m *ModToml) UpdateHash(_ string, hash string) {
 	m.hash = hash
 }
 

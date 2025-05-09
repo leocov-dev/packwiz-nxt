@@ -27,7 +27,7 @@ var curseforgeCmd = &cobra.Command{
 
 func init() {
 	cmd.Add(curseforgeCmd)
-	core.Updaters["curseforge"] = cfUpdater{}
+	core.AddUpdater(cfUpdater{})
 	core.MetaDownloaders["curseforge"] = cfDownloader{}
 }
 
@@ -177,7 +177,7 @@ func getPathForFile(gameID uint32, classID uint32, categoryID uint32, slug strin
 }
 
 func createModFile(modInfo modInfo, fileInfo modFileInfo, index *core.IndexFS, optionalDisabled bool) error {
-	updateMap := make(map[string]map[string]interface{})
+	updateMap := make(core.ModUpdate)
 	var err error
 
 	updateMap["curseforge"], err = cfUpdateData{
@@ -371,6 +371,10 @@ func (u cfUpdateData) ToMap() (map[string]interface{}, error) {
 
 type cfUpdater struct{}
 
+func (u cfUpdater) GetName() string {
+	return "curseforge"
+}
+
 func (u cfUpdater) ParseUpdate(updateUnparsed map[string]interface{}) (interface{}, error) {
 	var updateData cfUpdateData
 	err := mapstructure.Decode(updateUnparsed, &updateData)
@@ -383,7 +387,7 @@ type cachedStateStore struct {
 	fileInfo *modFileInfo
 }
 
-func (u cfUpdater) CheckUpdate(mods []*core.ModToml, pack core.PackToml) ([]core.UpdateCheck, error) {
+func (u cfUpdater) CheckUpdate(mods []*core.Mod, pack core.Pack) ([]core.UpdateCheck, error) {
 	results := make([]core.UpdateCheck, len(mods))
 	modIDs := make([]uint32, len(mods))
 	modInfos := make([]modInfo, len(mods))
@@ -393,13 +397,13 @@ func (u cfUpdater) CheckUpdate(mods []*core.ModToml, pack core.PackToml) ([]core
 		return nil, err
 	}
 
-	for i, v := range mods {
-		projectRaw, ok := v.GetParsedUpdateData("curseforge")
-		if !ok {
+	for i, m := range mods {
+		var project cfUpdateData
+		err = m.DecodeNamedModSourceData("curseforge", &project)
+		if err != nil {
 			results[i] = core.UpdateCheck{Error: errors.New("failed to parse update metadata")}
 			continue
 		}
-		project := projectRaw.(cfUpdateData)
 		modIDs[i] = project.ProjectID
 	}
 
@@ -418,20 +422,20 @@ func (u cfUpdater) CheckUpdate(mods []*core.ModToml, pack core.PackToml) ([]core
 
 	packLoaders := pack.GetCompatibleLoaders()
 
-	for i, v := range mods {
-		projectRaw, ok := v.GetParsedUpdateData("curseforge")
-		if !ok {
+	for i, m := range mods {
+		var project cfUpdateData
+		err = m.DecodeNamedModSourceData("curseforge", &project)
+		if err != nil {
 			results[i] = core.UpdateCheck{Error: errors.New("failed to parse update metadata")}
 			continue
 		}
-		project := projectRaw.(cfUpdateData)
 
 		fileID, fileInfoData, fileName := findLatestFile(modInfos[i], mcVersions, packLoaders)
 		if fileID != project.FileID && fileID != 0 {
 			// Update (or downgrade, if changing to an older version) available!
 			results[i] = core.UpdateCheck{
 				UpdateAvailable: true,
-				UpdateString:    v.FileName + " -> " + fileName,
+				UpdateString:    m.FileName + " -> " + fileName,
 				CachedState:     cachedStateStore{modInfos[i], fileID, fileInfoData},
 			}
 		} else {
@@ -443,9 +447,9 @@ func (u cfUpdater) CheckUpdate(mods []*core.ModToml, pack core.PackToml) ([]core
 	return results, nil
 }
 
-func (u cfUpdater) DoUpdate(mods []*core.ModToml, cachedState []interface{}) error {
+func (u cfUpdater) DoUpdate(mods []*core.Mod, cachedState []interface{}) error {
 	// "Do" isn't really that accurate, more like "Apply", because all the work is done in CheckUpdate!
-	for i, v := range mods {
+	for i, m := range mods {
 		modState := cachedState[i].(cachedStateStore)
 
 		var fileInfoData modFileInfo
@@ -459,17 +463,17 @@ func (u cfUpdater) DoUpdate(mods []*core.ModToml, cachedState []interface{}) err
 			}
 		}
 
-		v.FileName = fileInfoData.FileName
-		v.Name = modState.Name
+		m.FileName = fileInfoData.FileName
+		m.Name = modState.Name
 		hash, hashFormat := fileInfoData.getBestHash()
-		v.Download = core.ModDownload{
+		m.Download = core.ModDownload{
 			HashFormat: hashFormat,
 			Hash:       hash,
 			Mode:       core.ModeCF,
 		}
 
-		v.Update["curseforge"]["project-id"] = modState.ID
-		v.Update["curseforge"]["file-id"] = fileInfoData.ID
+		m.Update["curseforge"]["project-id"] = modState.ID
+		m.Update["curseforge"]["file-id"] = fileInfoData.ID
 	}
 
 	return nil

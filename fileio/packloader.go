@@ -34,3 +34,23 @@ func LoadPackIndexFile(pack *core.PackToml) (core.IndexFS, error) {
 	fileNative := filepath.FromSlash(pack.Index.File)
 	return LoadIndex(filepath.Join(pack.GetPackDir(), fileNative))
 }
+
+func LoadAll(packPath string) (*core.Pack, error) {
+	packMeta, err := LoadPackFile(packPath)
+	if err != nil {
+		return nil, err
+	}
+
+	indexMeta, err := LoadPackIndexFile(&packMeta)
+	if err != nil {
+		return nil, err
+	}
+
+	modMetas, err := LoadAllMods(&indexMeta)
+	if err != nil {
+		return nil, err
+	}
+
+	pack := core.FromPackAndModsMeta(packMeta, modMetas)
+	return pack, nil
+}

@@ -11,7 +11,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"gopkg.in/dixonwille/wmenu.v4"
-	"path/filepath"
 	"strings"
 )
 
@@ -68,19 +67,20 @@ var installCmd = &cobra.Command{
 			}
 		}
 
-		pack, err := fileio.LoadPackFile(viper.GetString("pack-file"))
+		packFile, packDir, err := shared.GetPackPaths()
 		if err != nil {
 			shared.Exitln(err)
 		}
 
-		index, err := fileio.LoadPackIndexFile(&pack)
+		fmt.Printf("Loading modpack %s\n", packFile)
+		pack, err := fileio.LoadAll(packFile)
 		if err != nil {
 			shared.Exitln(err)
 		}
 
 		// Got version ID; install using this ID
 		if versionID != "" {
-			err = installVersionById(versionID, versionFilename, pack, &index)
+			err = installVersionById(versionID, versionFilename, pack)
 			if err != nil {
 				shared.Exitf("Failed to add project: %s\n", err)
 			}
@@ -95,7 +95,7 @@ var installCmd = &cobra.Command{
 			if err == nil {
 				var versionData *modrinthApi.Version
 				if version == "" {
-					versionData, err = sources.GetModrinthLatestVersion(*project.ID, *project.Title, pack)
+					versionData, err = sources.GetModrinthLatestVersion(*project.ID, *project.Title, *pack)
 					if err != nil {
 						shared.Exitf("failed to get latest version: %v", err)
 					}
@@ -107,7 +107,7 @@ var installCmd = &cobra.Command{
 					return
 				}
 
-				err = installVersion(project, versionData, versionFilename, pack, &index)
+				err = installVersion(project, versionData, versionFilename, pack)
 				if err != nil {
 					shared.Exitf("Failed to add project: %s\n", err)
 				}
@@ -117,17 +117,23 @@ var installCmd = &cobra.Command{
 
 		// Arguments weren't a valid slug/project ID, try to search for it instead (if it was not parsed as a URL)
 		if projectID == "" || parsedSlug {
-			err = installViaSearch(strings.Join(args, " "), versionFilename, !parsedSlug, pack, &index)
+			err = installViaSearch(strings.Join(args, " "), versionFilename, !parsedSlug, pack)
 			if err != nil {
 				shared.Exitf("Failed to add project: %s\n", err)
 			}
 		} else {
 			shared.Exitf("Failed to add project: %s\n", err)
 		}
+
+		err = fileio.WriteAll(*pack, packDir)
+		if err != nil {
+			shared.Exitf("Failed to write pack file: %s\n", err)
+		}
+		fmt.Printf("Pack file written to %s\n", viper.GetString("pack-file"))
 	},
 }
 
-func installVersionById(versionId string, versionFilename string, pack core.PackToml, index *core.IndexFS) error {
+func installVersionById(versionId string, versionFilename string, pack *core.Pack) error {
 	version, err := sources.GetModrinthClient().Versions.Get(versionId)
 	if err != nil {
 		return fmt.Errorf("failed to fetch version %s: %v", versionId, err)
@@ -138,10 +144,10 @@ func installVersionById(versionId string, versionFilename string, pack core.Pack
 		return fmt.Errorf("failed to fetch project %s: %v", *version.ProjectID, err)
 	}
 
-	return installVersion(project, version, versionFilename, pack, index)
+	return installVersion(project, version, versionFilename, pack)
 }
 
-func installViaSearch(query string, versionFilename string, autoAcceptFirst bool, pack core.PackToml, index *core.IndexFS) error {
+func installViaSearch(query string, versionFilename string, autoAcceptFirst bool, pack *core.Pack) error {
 	mcVersions, err := pack.GetSupportedMCVersions()
 	if err != nil {
 		return err
@@ -165,7 +171,7 @@ func installViaSearch(query string, versionFilename string, autoAcceptFirst bool
 			return err
 		}
 
-		return installProject(project, versionFilename, pack, index)
+		return installProject(project, versionFilename, pack)
 	}
 
 	// Create menu for the user to choose the correct project
@@ -193,38 +199,39 @@ func installViaSearch(query string, versionFilename string, autoAcceptFirst bool
 			return err
 		}
 
-		return installProject(project, versionFilename, pack, index)
+		return installProject(project, versionFilename, pack)
 	})
 
 	return menu.Run()
 }
 
-func installProject(project *modrinthApi.Project, versionFilename string, pack core.PackToml, index *core.IndexFS) error {
-	latestVersion, err := sources.GetModrinthLatestVersion(*project.ID, *project.Title, pack)
+func installProject(project *modrinthApi.Project, versionFilename string, pack *core.Pack) error {
+	latestVersion, err := sources.GetModrinthLatestVersion(*project.ID, *project.Title, *pack)
 	if err != nil {
 		return fmt.Errorf("failed to get latest version: %v", err)
 	}
 
-	return installVersion(project, latestVersion, versionFilename, pack, index)
+	return installVersion(project, latestVersion, versionFilename, pack)
 }
 
-func installVersion(project *modrinthApi.Project, version *modrinthApi.Version, versionFilename string, pack core.PackToml, index *core.IndexFS) error {
+func installVersion(project *modrinthApi.Project, version *modrinthApi.Version, versionFilename string, pack *core.Pack) error {
 	if len(version.Files) == 0 {
 		return errors.New("version doesn't have any files attached")
 	}
 
 	if len(version.Dependencies) > 0 {
-		mods, err := fileio.LoadAllMods(index)
-		if err != nil {
-			return err
+
+		mods := make([]*core.Mod, 1)
+		for _, v := range pack.Mods {
+			mods = append(mods, v)
 		}
 
-		missingDependencies, err := sources.GetModrinthModMissingDependencies(version, pack, mods)
+		missingDependencies, err := sources.GetModrinthModMissingDependencies(version, *pack, mods)
 		if err != nil {
 			return err
 		}
 		if len(missingDependencies) > 0 {
-			if err = maybeInstallDependencies(missingDependencies, pack, index); err != nil {
+			if err = maybeInstallDependencies(missingDependencies, pack); err != nil {
 				return err
 			}
 		}
@@ -235,29 +242,12 @@ func installVersion(project *modrinthApi.Project, version *modrinthApi.Version, 
 	// TODO: handle optional/required resource pack files
 
 	// Create the metadata file
-	modMeta, err := createFileMeta(project, version, file, pack)
-	if err != nil {
-		return err
-	}
-	err = writeModFile(modMeta, index, project)
+	mod, err := sources.CreateModrinthMod(project, version, file, pack, viper.GetString("meta-folder"))
 	if err != nil {
 		return err
 	}
 
-	repr := index.ToWritable()
-	writer := fileio.NewIndexWriter()
-	err = writer.Write(&repr)
-	if err != nil {
-		return err
-	}
-
-	pack.RefreshIndexHash(*index)
-
-	packWriter := fileio.NewPackWriter()
-	err = packWriter.Write(&pack)
-	if err != nil {
-		return err
-	}
+	pack.SetMod(mod)
 
 	fmt.Printf("Project \"%s\" successfully added! (%s)\n", *project.Title, *file.Filename)
 	return nil
@@ -265,62 +255,20 @@ func installVersion(project *modrinthApi.Project, version *modrinthApi.Version, 
 
 func maybeInstallDependencies(
 	depMetadata []sources.ModrinthDepMetadataStore,
-	pack core.PackToml,
-	index *core.IndexFS,
+	pack *core.Pack,
 ) error {
 	if shared.PromptYesNo("Would you like to add them? [Y/n]: ") {
 		for _, v := range depMetadata {
-			modMeta, err := createFileMeta(v.ProjectInfo, v.VersionInfo, v.FileInfo, pack)
+			mod, err := sources.CreateModrinthMod(v.ProjectInfo, v.VersionInfo, v.FileInfo, pack, viper.GetString("meta-folder"))
 			if err != nil {
 				return err
 			}
 
-			err = writeModFile(modMeta, index, v.ProjectInfo)
-			if err != nil {
-				return err
-			}
+			pack.SetMod(mod)
 
 			fmt.Printf("Dependency \"%s\" successfully added! (%s)\n", *v.ProjectInfo.Title, *v.FileInfo.Filename)
 		}
 	}
 
 	return nil
-}
-
-func createFileMeta(
-	project *modrinthApi.Project,
-	version *modrinthApi.Version,
-	file *modrinthApi.File,
-	pack core.PackToml,
-) (core.ModToml, error) {
-
-	modMeta, err := sources.CreateModrinthMod(
-		project, version, file, pack, viper.GetString("meta-folder"))
-	if err != nil {
-		return core.ModToml{}, err
-	}
-	return modMeta, err
-}
-
-func writeModFile(modMeta core.ModToml, index *core.IndexFS, project *modrinthApi.Project) error {
-	path := modMeta.SetMetaPath(
-		filepath.Join(
-			viper.GetString("meta-folder-base"),
-			modMeta.GetMetaFolder(),
-			sources.GetModrinthProjectSlug(project)+core.MetaExtension,
-		),
-	)
-
-	// If the file already exists, this will overwrite it!!!
-	// TODO: Should this be improved?
-	// Current strategy is to go ahead and do stuff without asking, with the assumption that you are using
-	// VCS anyway.
-
-	modWriter := fileio.NewModWriter()
-	format, hash, err := modWriter.Write(&modMeta)
-	if err != nil {
-		return err
-	}
-
-	return index.UpdateFileHashGiven(path, format, hash, true)
 }

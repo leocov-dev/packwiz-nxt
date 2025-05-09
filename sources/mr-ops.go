@@ -1,9 +1,10 @@
 package sources
 
 import (
-	modrinthApi "codeberg.org/jmansfield/go-modrinth/modrinth"
 	"errors"
 	"fmt"
+
+	modrinthApi "codeberg.org/jmansfield/go-modrinth/modrinth"
 	"github.com/leocov-dev/packwiz-nxt/core"
 	"golang.org/x/exp/slices"
 )
@@ -18,8 +19,8 @@ type ModrinthDepMetadataStore struct {
 
 func GetModrinthModMissingDependencies(
 	version *modrinthApi.Version,
-	pack core.PackToml,
-	currentMods []*core.ModToml,
+	pack core.Pack,
+	currentMods []*core.Mod,
 ) ([]ModrinthDepMetadataStore, error) {
 	// TODO: could get installed version IDs, and compare to install the newest - i.e. preferring pinned versions over getting absolute latest?
 	installedProjects := mrGetInstalledProjectIDs(currentMods)
@@ -170,17 +171,17 @@ func CreateModrinthMod(
 	project *modrinthApi.Project,
 	version *modrinthApi.Version,
 	file *modrinthApi.File,
-	pack core.PackToml,
+	pack *core.Pack,
 	customMetaFolder string,
-) (core.ModToml, error) {
-	updateMap := make(map[string]map[string]interface{})
+) (*core.Mod, error) {
+	updateMap := make(core.ModUpdate)
 
 	var err error
 	metaFolder := customMetaFolder
 	if metaFolder == "" {
 		metaFolder, err = mrGetProjectTypeFolder(*project.ProjectType, version.Loaders, pack.GetCompatibleLoaders())
 		if err != nil {
-			return core.ModToml{}, err
+			return nil, err
 		}
 	}
 
@@ -189,34 +190,41 @@ func CreateModrinthMod(
 		InstalledVersion: *version.ID,
 	}.ToMap()
 	if err != nil {
-		return core.ModToml{}, err
+		return nil, err
 	}
 
 	side := mrGetSide(project)
 	if side == core.EmptySide {
-		return core.ModToml{}, errors.New("version doesn't have a side that's supported. Server: " + *project.ServerSide + " Client: " + *project.ClientSide)
+		return nil, errors.New("version doesn't have a side that's supported. Server: " + *project.ServerSide + " Client: " + *project.ClientSide)
 	}
 
 	algorithm, hash := mrGetBestHash(file)
 	if algorithm == "" {
-		return core.ModToml{}, errors.New("file doesn't have a hash")
+		return nil, errors.New("file doesn't have a hash")
 	}
 
-	modMeta := core.ModToml{
-		Name:     *project.Title,
-		FileName: *file.Filename,
-		Side:     side,
-		Download: core.ModDownload{
-			URL:        *file.URL,
-			HashFormat: algorithm,
-			Hash:       hash,
-		},
-		Update: updateMap,
+	download := core.ModDownload{
+		URL:        *file.URL,
+		HashFormat: algorithm,
+		Hash:       hash,
 	}
 
-	modMeta.SetMetaFolder(metaFolder)
+	mod := core.NewMod(
+		GetModrinthProjectSlug(project),
+		*project.Title,
+		*file.Filename,
+		side,
+		metaFolder,
+		"",
+		false,
+		true,
+		false,
+		updateMap,
+		download,
+		nil,
+	)
 
-	return modMeta, nil
+	return mod, nil
 }
 
 func GetModrinthProjectSlug(project *modrinthApi.Project) string {
