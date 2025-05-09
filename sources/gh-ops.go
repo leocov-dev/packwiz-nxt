@@ -66,22 +66,21 @@ func installMod(repo Repo, branch, regex, modType string) (*core.Mod, Asset, err
 
 func getLatestRelease(slug string, branch string) (Release, error) {
 	var releases []Release
-	var release Release
 
 	resp, err := ghDefaultClient.getReleases(slug)
 	if err != nil {
-		return release, err
+		return Release{}, err
 	}
 
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return release, err
+		return Release{}, err
 	}
 
 	err = json.Unmarshal(body, &releases)
 	if err != nil {
-		return release, err
+		return Release{}, err
 	}
 
 	if branch != "" {
@@ -90,7 +89,11 @@ func getLatestRelease(slug string, branch string) (Release, error) {
 				return r, nil
 			}
 		}
-		return release, fmt.Errorf("failed to find release for branch %v", branch)
+		return Release{}, fmt.Errorf("failed to find release for branch %v", branch)
+	}
+
+	if len(releases) < 1 {
+		return Release{}, fmt.Errorf("no releases for %s", slug)
 	}
 
 	return releases[0], nil
@@ -166,7 +169,6 @@ func installRelease(
 		modType,
 		"",
 		false,
-		true,
 		false,
 		updateMap,
 		download,

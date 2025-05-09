@@ -17,7 +17,6 @@ type Mod struct {
 	// for index
 	Slug       string
 	ModType    string // mods, shaders, resourcepacks, etc.
-	MetaFile   bool
 	HashFormat string
 	Alias      string
 	Preserve   bool
@@ -31,7 +30,6 @@ func NewMod(
 	modType,
 	alias string,
 	pin,
-	metaFile,
 	preserve bool,
 	update ModUpdate,
 	download ModDownload,
@@ -44,7 +42,6 @@ func NewMod(
 		Side:     side,
 		Pin:      pin,
 		ModType:  modType,
-		MetaFile: metaFile,
 		Alias:    alias,
 		Preserve: preserve,
 		Update:   update,
@@ -55,14 +52,21 @@ func NewMod(
 
 func FromModMeta(modMeta ModToml) *Mod {
 	return &Mod{
-		Name:     modMeta.Name,
-		FileName: modMeta.FileName,
-		Side:     modMeta.Side,
-		Pin:      modMeta.Pin,
-		Download: modMeta.Download,
-		Update:   modMeta.Update,
-		Option:   modMeta.Option,
+		Name:       modMeta.Name,
+		FileName:   modMeta.FileName,
+		Side:       modMeta.Side,
+		Pin:        modMeta.Pin,
+		Download:   modMeta.Download,
+		Update:     modMeta.Update,
+		Option:     modMeta.Option,
+		Slug:       modMeta.slug,
+		ModType:    modMeta.metaFolder,
+		HashFormat: modMeta.GetHashFormat(),
 	}
+}
+
+func (m *Mod) GetMetaPath() string {
+	return m.ModType + "/" + m.Slug + MetaExtension
 }
 
 func (m *Mod) AsModToml() (string, string, error) {
@@ -84,11 +88,11 @@ func (m *Mod) toIndexEntry() (IndexFile, error) {
 	}
 
 	return IndexFile{
-		File:       fmt.Sprintf("%s/%s%s", m.ModType, m.Slug, MetaExtension),
+		File:       m.GetMetaPath(),
 		Hash:       hash,
 		HashFormat: m.HashFormat,
 		Alias:      m.Alias,
-		MetaFile:   m.MetaFile,
+		MetaFile:   true,
 		Preserve:   m.Preserve,
 	}, nil
 }
@@ -103,8 +107,7 @@ func (m *Mod) ToModMeta() ModToml {
 		Update:   m.Update,
 		Option:   m.Option,
 	}
-	modToml.SetSlug(m.Slug)
-	modToml.SetMetaFolder(m.ModType)
+	modToml.SetMetaPath(m.GetMetaPath())
 
 	return modToml
 }

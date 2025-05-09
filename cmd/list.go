@@ -20,23 +20,17 @@ var listCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 
-		// Load pack
-		pack, err := fileio.LoadPackFile(viper.GetString("pack-file"))
+		packFile, _, err := shared.GetPackPaths()
 		if err != nil {
 			shared.Exitln(err)
 		}
 
-		// Load index
-		index, err := fileio.LoadPackIndexFile(&pack)
+		pack, err := fileio.LoadAll(packFile)
 		if err != nil {
 			shared.Exitln(err)
 		}
 
-		// Load mods
-		mods, err := fileio.LoadAllMods(&index)
-		if err != nil {
-			shared.Exitln(err)
-		}
+		var mods []*core.Mod
 
 		// Filter mods by side
 		if viper.IsSet("list.side") {
@@ -46,7 +40,7 @@ var listCmd = &cobra.Command{
 			}
 
 			i := 0
-			for _, mod := range mods {
+			for _, mod := range pack.Mods {
 				if mod.Side == side || mod.Side == core.EmptySide || mod.Side == core.UniversalSide || side == core.UniversalSide {
 					mods[i] = mod
 					i++

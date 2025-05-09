@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/pelletier/go-toml/v2"
 	"path/filepath"
+	"strings"
 )
 
 type ModSourceData map[string]interface{}
@@ -28,6 +29,8 @@ type ModToml struct {
 	hash       string
 	slug       string
 	metaFolder string
+	alias      string
+	preserve   bool
 }
 
 const (
@@ -104,6 +107,15 @@ func (m *ModToml) GetMetaRelativePath() string {
 // SetMetaPath sets the file path of a metadata file
 func (m *ModToml) SetMetaPath(metaFile string) string {
 	m.metaFile = metaFile
+	m.SetMetaFolder(filepath.Base(filepath.Dir(metaFile)))
+
+	filename := filepath.Base(metaFile)
+	dotIndex := strings.Index(filename, ".")
+	if dotIndex == -1 {
+		m.SetSlug(filename)
+	}
+	m.SetSlug(filename[:dotIndex])
+
 	return m.metaFile
 }
 

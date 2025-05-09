@@ -41,7 +41,6 @@ func TestPackStruct(t *testing.T) {
 		"mods",
 		"",
 		false,
-		true,
 		false,
 		update,
 		download,

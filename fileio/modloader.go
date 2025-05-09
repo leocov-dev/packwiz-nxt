@@ -9,6 +9,9 @@ import (
 // LoadMod attempts to load a mod file from a path
 func LoadMod(modFile string) (core.ModToml, error) {
 	var mod core.ModToml
+
+	// TODO: currently not loading Alias and Preserve from index.toml
+
 	raw, err := os.ReadFile(modFile)
 	if err != nil {
 		return mod, err

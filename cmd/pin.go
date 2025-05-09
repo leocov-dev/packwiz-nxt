@@ -5,51 +5,24 @@ import (
 	"github.com/leocov-dev/packwiz-nxt/fileio"
 	"github.com/leocov-dev/packwiz-nxt/internal/shared"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 func pinMod(args []string, pinned bool) {
 	fmt.Println("Loading modpack...")
-	pack, err := fileio.LoadPackFile(viper.GetString("pack-file"))
-	if err != nil {
-		shared.Exitln(err)
-	}
-	index, err := fileio.LoadPackIndexFile(&pack)
-	if err != nil {
-		shared.Exitln(err)
-	}
-	modPath, ok := index.FindMod(args[0])
-	if !ok {
-		shared.Exitln("Can't find this file; please ensure you have run packwiz refresh and use the name of the .pw.toml file (defaults to the project slug)")
-	}
-	modData, err := fileio.LoadMod(modPath)
-	if err != nil {
-		shared.Exitln(err)
-	}
-	modData.Pin = pinned
 
-	modWriter := fileio.NewModWriter()
-	format, hash, err := modWriter.Write(&modData)
+	packFile, packDir, err := shared.GetPackPaths()
 	if err != nil {
 		shared.Exitln(err)
 	}
 
-	err = index.UpdateFileHashGiven(modPath, format, hash, true)
+	pack, err := fileio.LoadAll(packFile)
 	if err != nil {
 		shared.Exitln(err)
 	}
 
-	repr := index.ToWritable()
-	writer := fileio.NewIndexWriter()
-	err = writer.Write(&repr)
-	if err != nil {
-		shared.Exitln(err)
-	}
+	pack.Mods[args[0]].Pin = pinned
 
-	pack.RefreshIndexHash(index)
-
-	packWriter := fileio.NewPackWriter()
-	err = packWriter.Write(&pack)
+	err = fileio.WritePackAndIndex(*pack, packDir)
 	if err != nil {
 		shared.Exitln(err)
 	}

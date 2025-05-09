@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"github.com/leocov-dev/packwiz-nxt/fileio"
 	"github.com/leocov-dev/packwiz-nxt/internal/shared"
-	"github.com/spf13/viper"
-	"os"
-
 	"github.com/spf13/cobra"
+	"os"
+	"path/filepath"
 )
 
 // removeCmd represents the remove command
@@ -18,39 +17,33 @@ var removeCmd = &cobra.Command{
 	Args:    cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Loading modpack...")
-		pack, err := fileio.LoadPackFile(viper.GetString("pack-file"))
+
+		packFile, packDir, err := shared.GetPackPaths()
 		if err != nil {
 			shared.Exitln(err)
 		}
-		index, err := fileio.LoadPackIndexFile(&pack)
+
+		pack, err := fileio.LoadAll(packFile)
 		if err != nil {
 			shared.Exitln(err)
 		}
-		resolvedMod, ok := index.FindMod(args[0])
+
+		targetMod := args[0]
+
+		removedMod, ok := pack.Mods[targetMod]
 		if !ok {
 			shared.Exitln("Can't find this file; please ensure you have run packwiz refresh and use the name of the .pw.toml file (defaults to the project slug)")
 		}
-		err = os.Remove(resolvedMod)
-		if err != nil {
-			shared.Exitln(err)
-		}
+
 		fmt.Println("Removing file from index...")
-		err = index.RemoveFile(resolvedMod)
+		err = os.Remove(filepath.Join(packDir, removedMod.GetMetaPath()))
 		if err != nil {
-			shared.Exitln(err)
+			shared.Exitln("Failed to delete mod meta file")
 		}
 
-		repr := index.ToWritable()
-		writer := fileio.NewIndexWriter()
-		err = writer.Write(&repr)
-		if err != nil {
-			shared.Exitln(err)
-		}
+		delete(pack.Mods, targetMod)
 
-		pack.RefreshIndexHash(index)
-
-		packWriter := fileio.NewPackWriter()
-		err = packWriter.Write(&pack)
+		err = fileio.WritePackAndIndex(*pack, packDir)
 		if err != nil {
 			shared.Exitln(err)
 		}

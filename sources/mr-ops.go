@@ -217,7 +217,6 @@ func CreateModrinthMod(
 		metaFolder,
 		"",
 		false,
-		true,
 		false,
 		updateMap,
 		download,

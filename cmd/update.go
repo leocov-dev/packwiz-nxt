@@ -2,12 +2,11 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/leocov-dev/packwiz-nxt/core"
 	"github.com/leocov-dev/packwiz-nxt/fileio"
+	"github.com/leocov-dev/packwiz-nxt/internal/shared"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-
-	"github.com/leocov-dev/packwiz-nxt/core"
-	"github.com/leocov-dev/packwiz-nxt/internal/shared"
 )
 
 // UpdateCmd represents the update command
@@ -57,6 +56,7 @@ var UpdateCmd = &cobra.Command{
 			if len(args) < 1 || len(args[0]) == 0 {
 				shared.Exitln("Must specify a valid file, or use the --all flag!")
 			}
+
 			mod, ok := pack.Mods[args[0]]
 			if !ok {
 				shared.Exitln("Can't find this file; please ensure you have run packwiz refresh and use the name of the .pw.toml file (defaults to the project slug)")

@@ -48,12 +48,11 @@ var installCmd = &cobra.Command{
 			regexFlag,
 			modType,
 		)
-
-		modMeta := mod.ToModMeta()
-
 		if err != nil {
 			shared.Exitf("Failed to add project: %s\n", err)
 		}
+
+		modMeta := mod.ToModMeta()
 
 		var path string
 
