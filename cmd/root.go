@@ -2,15 +2,16 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/leocov-dev/packwiz-nxt/fileio"
-	"github.com/leocov-dev/packwiz-nxt/internal/shared"
-	"github.com/spf13/pflag"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+
+	"github.com/leocov-dev/packwiz-nxt/fileio"
+	"github.com/leocov-dev/packwiz-nxt/internal/shared"
 )
 
 var packFile string

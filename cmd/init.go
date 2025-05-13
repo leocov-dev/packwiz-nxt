@@ -4,17 +4,19 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"github.com/fatih/camelcase"
-	"github.com/igorsobreira/titlecase"
-	"github.com/leocov-dev/packwiz-nxt/core"
-	"github.com/leocov-dev/packwiz-nxt/fileio"
-	"github.com/leocov-dev/packwiz-nxt/internal/shared"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
-	"golang.org/x/exp/slices"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/fatih/camelcase"
+	"github.com/igorsobreira/titlecase"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"golang.org/x/exp/slices"
+
+	"github.com/leocov-dev/packwiz-nxt/core"
+	"github.com/leocov-dev/packwiz-nxt/fileio"
+	"github.com/leocov-dev/packwiz-nxt/internal/shared"
 )
 
 // initCmd represents the init command

@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"github.com/mitchellh/mapstructure"
+	"path/filepath"
 )
 
 type Mod struct {
@@ -65,8 +66,12 @@ func FromModMeta(modMeta ModToml) *Mod {
 	}
 }
 
-func (m *Mod) GetMetaPath() string {
+func (m *Mod) GetRelMetaPath() string {
 	return m.ModType + "/" + m.Slug + MetaExtension
+}
+
+func (m *Mod) GetRelDownloadPath() string {
+	return filepath.Join(m.ModType, filepath.FromSlash(m.FileName))
 }
 
 func (m *Mod) AsModToml() (string, string, error) {
@@ -88,7 +93,7 @@ func (m *Mod) toIndexEntry() (IndexFile, error) {
 	}
 
 	return IndexFile{
-		File:       m.GetMetaPath(),
+		File:       m.GetRelMetaPath(),
 		Hash:       hash,
 		HashFormat: m.HashFormat,
 		Alias:      m.Alias,
@@ -107,7 +112,7 @@ func (m *Mod) ToModMeta() ModToml {
 		Update:   m.Update,
 		Option:   m.Option,
 	}
-	modToml.SetMetaPath(m.GetMetaPath())
+	modToml.SetMetaPath(m.GetRelMetaPath())
 
 	return modToml
 }

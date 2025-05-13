@@ -80,7 +80,7 @@ func WriteAll(pack core.Pack, targetDir string) error {
 		if err != nil {
 			return err
 		}
-		modTarget := filepath.Join(targetDir, mod.GetMetaPath())
+		modTarget := filepath.Join(targetDir, mod.GetRelMetaPath())
 		if err = writeFile(modToml, modTarget); err != nil {
 			return err
 		}

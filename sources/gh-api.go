@@ -5,8 +5,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/leocov-dev/packwiz-nxt/core"
 	"github.com/spf13/viper"
+
+	"github.com/leocov-dev/packwiz-nxt/core"
 )
 
 const ghApiServer = "api.github.com"

@@ -67,6 +67,16 @@ func FromPackAndModsMeta(packMeta PackToml, modMetas []*ModToml) *Pack {
 	return pack
 }
 
+func (p *Pack) GetExportName() string {
+	if p.Name == "" {
+		return "export"
+	}
+	if p.Version == "" {
+		return p.Name
+	}
+	return p.Name + "-" + p.Version
+}
+
 func (p *Pack) SetMod(mod *Mod) {
 	if p.Mods == nil {
 		p.Mods = make(map[string]*Mod)

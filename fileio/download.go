@@ -24,7 +24,7 @@ type DownloadSession interface {
 type CompletedDownload struct {
 	// File is only populated when the download is successful; points to the opened cache file
 	File *os.File
-	Mod  *core.ModToml
+	Mod  *core.Mod
 	// Hashes is only populated when the download is successful; contains all stored hashes of the file
 	Hashes map[string]string
 	// Error indicates if/why downloading this file failed
@@ -44,7 +44,7 @@ type downloadSessionInternal struct {
 
 type downloadTask struct {
 	metaDownloaderData core.MetaDownloaderData
-	mod                *core.ModToml
+	mod                *core.Mod
 	url                string
 	hashFormat         string
 	hash               string
@@ -106,7 +106,7 @@ func (d *downloadSessionInternal) SaveIndex() error {
 	return nil
 }
 
-func reuseExistingFile(cacheHandle *CacheIndexHandle, hashesToObtain []string, mod *core.ModToml) (CompletedDownload, error) {
+func reuseExistingFile(cacheHandle *CacheIndexHandle, hashesToObtain []string, mod *core.Mod) (CompletedDownload, error) {
 	// Already stored; try using it!
 	file, err := cacheHandle.Open()
 	if err == nil {
@@ -572,7 +572,7 @@ func removeEmpty(hashList []string) ([]string, []int) {
 	return hashList[:i], indices
 }
 
-func CreateDownloadSession(mods []*core.ModToml, hashesToObtain []string) (DownloadSession, error) {
+func CreateDownloadSession(mods []*core.Mod, hashesToObtain []string) (DownloadSession, error) {
 	// Load cache index
 	cacheIndex := CacheIndex{Version: 1, Hashes: make(map[string][]string)}
 	cachePath, err := GetPackwizCache()
@@ -640,7 +640,7 @@ func CreateDownloadSession(mods []*core.ModToml, hashesToObtain []string) (Downl
 		hashesToObtain: hashesToObtain,
 	}
 
-	pendingMetadata := make(map[string][]*core.ModToml)
+	pendingMetadata := make(map[string][]*core.Mod)
 
 	// Get necessary metadata for all files
 	for _, mod := range mods {

@@ -27,40 +27,18 @@ var exportCmd = &cobra.Command{
 		}
 
 		fmt.Println("Loading modpack...")
-		pack, err := fileio.LoadPackFile(viper.GetString("pack-file"))
-		if err != nil {
-			shared.Exitln(err)
-		}
-		index, err := fileio.LoadPackIndexFile(&pack)
-		if err != nil {
-			shared.Exitln(err)
-		}
-		// Do a refresh to ensure files are up to date
-		err = fileio.RefreshIndexFiles(&index)
+		packFile, _, err := shared.GetPackPaths()
 		if err != nil {
 			shared.Exitln(err)
 		}
 
-		repr := index.ToWritable()
-		writer := fileio.NewIndexWriter()
-		err = writer.Write(&repr)
+		pack, err := fileio.LoadAll(packFile)
 		if err != nil {
 			shared.Exitln(err)
 		}
 
-		pack.RefreshIndexHash(index)
+		mods := pack.GetModsList()
 
-		packWriter := fileio.NewPackWriter()
-		err = packWriter.Write(&pack)
-		if err != nil {
-			shared.Exitln(err)
-		}
-
-		fmt.Println("Reading external files...")
-		mods, err := fileio.LoadAllMods(&index)
-		if err != nil {
-			shared.Exitf("Error reading file: %v\n", err)
-		}
 		i := 0
 		// Filter mods by side
 		// TODO: opt-in optional disabled filtering?
@@ -83,7 +61,7 @@ var exportCmd = &cobra.Command{
 
 		fileName := viper.GetString("curseforge.export.output")
 		if fileName == "" {
-			fileName = pack.GetPackName() + ".zip"
+			fileName = pack.GetExportName() + ".zip"
 		}
 
 		expFile, err := os.Create(fileName)
@@ -99,12 +77,12 @@ var exportCmd = &cobra.Command{
 		}
 
 		cfFileRefs := make([]packinterop.AddonFileReference, 0, len(mods))
-		nonCfMods := make([]*core.ModToml, 0)
+		nonCfMods := make([]*core.Mod, 0)
 		for _, mod := range mods {
-			projectRaw, ok := mod.GetParsedUpdateData("curseforge")
+			var p cfUpdateData
+			err = mod.DecodeNamedModSourceData("curseforge", &p)
 			// If the mod has curseforge metadata, add it to cfFileRefs
-			if ok {
-				p := projectRaw.(cfUpdateData)
+			if err == nil {
 				cfFileRefs = append(cfFileRefs, packinterop.AddonFileReference{
 					ProjectID:        p.ProjectID,
 					FileID:           p.FileID,
@@ -128,7 +106,7 @@ var exportCmd = &cobra.Command{
 			shared.ListManualDownloads(session)
 
 			for dl := range session.StartDownloads() {
-				_ = shared.AddToZip(dl, exp, "overrides", &index)
+				_ = shared.AddToZip(dl, exp, "overrides")
 			}
 
 			err = session.SaveIndex()
@@ -144,7 +122,7 @@ var exportCmd = &cobra.Command{
 			shared.Exitln("Error creating manifest: " + err.Error())
 		}
 
-		err = packinterop.WriteManifestFromPack(pack, cfFileRefs, exportData.ProjectID, manifestFile)
+		err = packinterop.WriteManifestFromPack(*pack, cfFileRefs, exportData.ProjectID, manifestFile)
 		if err != nil {
 			_ = exp.Close()
 			_ = expFile.Close()
@@ -158,7 +136,7 @@ var exportCmd = &cobra.Command{
 			shared.Exitln("Error creating mod list: " + err.Error())
 		}
 
-		shared.AddNonMetafileOverrides(&index, exp)
+		//shared.AddNonMetafileOverrides(&index, exp)
 
 		err = exp.Close()
 		if err != nil {
@@ -173,7 +151,7 @@ var exportCmd = &cobra.Command{
 	},
 }
 
-func createModlist(zw *zip.Writer, mods []*core.ModToml) error {
+func createModlist(zw *zip.Writer, mods []*core.Mod) error {
 	modlistFile, err := zw.Create("modlist.html")
 	if err != nil {
 		return err
@@ -186,8 +164,9 @@ func createModlist(zw *zip.Writer, mods []*core.ModToml) error {
 		return err
 	}
 	for _, mod := range mods {
-		projectRaw, ok := mod.GetParsedUpdateData("curseforge")
-		if !ok {
+		var project cfUpdateData
+		err = mod.DecodeNamedModSourceData("curseforge", &project)
+		if err != nil {
 			// TODO: read homepage URL or something similar?
 			// TODO: how to handle mods that don't have metadata???
 			_, err = w.WriteString("<li>" + mod.Name + "</li>\r\n")
@@ -196,7 +175,6 @@ func createModlist(zw *zip.Writer, mods []*core.ModToml) error {
 			}
 			continue
 		}
-		project := projectRaw.(cfUpdateData)
 		_, err = w.WriteString("<li><a href=\"https://www.curseforge.com/projects/" + strconv.FormatUint(uint64(project.ProjectID), 10) + "\">" + mod.Name + "</a></li>\r\n")
 		if err != nil {
 			return err

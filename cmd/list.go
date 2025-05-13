@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/leocov-dev/packwiz-nxt/fileio"
 	"sort"
 	"strings"
 
@@ -10,6 +9,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/leocov-dev/packwiz-nxt/core"
+	"github.com/leocov-dev/packwiz-nxt/fileio"
 	"github.com/leocov-dev/packwiz-nxt/internal/shared"
 )
 

@@ -2,12 +2,11 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/leocov-dev/packwiz-nxt/fileio"
-	"github.com/spf13/viper"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
 
+	"github.com/leocov-dev/packwiz-nxt/fileio"
 	"github.com/leocov-dev/packwiz-nxt/internal/shared"
 )
 
@@ -18,20 +17,13 @@ var rehashCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 
+		packPath, packDir, err := shared.GetPackPaths()
+		if err != nil {
+			shared.Exitln(err)
+		}
+
 		// Load pack
-		pack, err := fileio.LoadPackFile(viper.GetString("pack-file"))
-		if err != nil {
-			shared.Exitln(err)
-		}
-
-		// Load index
-		index, err := fileio.LoadPackIndexFile(&pack)
-		if err != nil {
-			shared.Exitln(err)
-		}
-
-		// Load mods
-		mods, err := fileio.LoadAllMods(&index)
+		pack, err := fileio.LoadAll(packPath)
 		if err != nil {
 			shared.Exitln(err)
 		}
@@ -40,7 +32,7 @@ var rehashCmd = &cobra.Command{
 			shared.Exitf("Hash format '%s' is not supported\n", args[0])
 		}
 
-		session, err := fileio.CreateDownloadSession(mods, []string{args[0]})
+		session, err := fileio.CreateDownloadSession(pack.GetModsList(), []string{args[0]})
 		if err != nil {
 			shared.Exitf("Error retrieving external files: %v\n", err)
 		}
@@ -53,14 +45,7 @@ var rehashCmd = &cobra.Command{
 			} else {
 				dl.Mod.Download.HashFormat = args[0]
 				dl.Mod.Download.Hash = dl.Hashes[args[0]]
-
-				modWriter := fileio.NewModWriter()
-				_, _, err := modWriter.Write(dl.Mod)
-				if err != nil {
-					shared.Exitf("Error saving mod %s: %v\n", dl.Mod.Name, err)
-				}
 			}
-			// TODO pass the hash to index instead of recomputing from scratch
 		}
 
 		err = session.SaveIndex()
@@ -68,22 +53,7 @@ var rehashCmd = &cobra.Command{
 			shared.Exitf("Error saving cache index: %v\n", err)
 		}
 
-		err = fileio.RefreshIndexFiles(&index)
-		if err != nil {
-			shared.Exitf("Error refreshing index: %v\n", err)
-		}
-
-		repr := index.ToWritable()
-		writer := fileio.NewIndexWriter()
-		err = writer.Write(&repr)
-		if err != nil {
-			shared.Exitf("Error writing index: %v\n", err)
-		}
-
-		pack.RefreshIndexHash(index)
-
-		packWriter := fileio.NewPackWriter()
-		err = packWriter.Write(&pack)
+		err = fileio.WriteAll(*pack, packDir)
 		if err != nil {
 			shared.Exitf("Error writing pack: %v\n", err)
 		}

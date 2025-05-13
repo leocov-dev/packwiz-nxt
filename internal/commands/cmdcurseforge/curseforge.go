@@ -497,7 +497,7 @@ func parseExportData(from map[string]interface{}) (cfExportData, error) {
 
 type cfDownloader struct{}
 
-func (c cfDownloader) GetFilesMetadata(mods []*core.ModToml) ([]core.MetaDownloaderData, error) {
+func (c cfDownloader) GetFilesMetadata(mods []*core.Mod) ([]core.MetaDownloaderData, error) {
 	if len(mods) == 0 {
 		return []core.MetaDownloaderData{}, nil
 	}
@@ -508,11 +508,11 @@ func (c cfDownloader) GetFilesMetadata(mods []*core.ModToml) ([]core.MetaDownloa
 	projectMetadata := make([]cfUpdateData, len(mods))
 	fileIDs := make([]uint32, len(mods))
 	for i, v := range mods {
-		updateData, ok := v.GetParsedUpdateData("curseforge")
-		if !ok {
+		var project cfUpdateData
+		err := v.DecodeNamedModSourceData("curseforge", &project)
+		if err != nil {
 			return nil, fmt.Errorf("failed to read CurseForge update metadata from %s", v.Name)
 		}
-		project := updateData.(cfUpdateData)
 		indexMap[project.ProjectID] = append(indexMap[project.ProjectID], i)
 		projectMetadata[i] = project
 		fileIDs[i] = project.FileID

@@ -62,7 +62,7 @@ type AddonFileReference struct {
 	OptionalDisabled bool
 }
 
-func WriteManifestFromPack(pack core.PackToml, fileRefs []AddonFileReference, projectID uint32, out io.Writer) error {
+func WriteManifestFromPack(pack core.Pack, fileRefs []AddonFileReference, projectID uint32, out io.Writer) error {
 	files := make([]struct {
 		ProjectID uint32 `json:"projectID"`
 		FileID    uint32 `json:"fileID"`

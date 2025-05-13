@@ -5,9 +5,14 @@ import (
 	"fmt"
 
 	modrinthApi "codeberg.org/jmansfield/go-modrinth/modrinth"
-	"github.com/leocov-dev/packwiz-nxt/core"
 	"golang.org/x/exp/slices"
+
+	"github.com/leocov-dev/packwiz-nxt/core"
 )
+
+func NewModrinthMod() (*core.Mod, error) {
+	return nil, errors.New("not implemented")
+}
 
 const mrMaxCycles = 20
 

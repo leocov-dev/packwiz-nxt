@@ -30,7 +30,7 @@ func ListManualDownloads(session fileio.DownloadSession) {
 	}
 }
 
-func AddToZip(dl fileio.CompletedDownload, exp *zip.Writer, dir string, index *core.IndexFS) bool {
+func AddToZip(dl fileio.CompletedDownload, exp *zip.Writer, dir string) bool {
 	if dl.Error != nil {
 		fmt.Printf("Download of %s (%s) failed: %v\n", dl.Mod.Name, dl.Mod.FileName, dl.Error)
 		return false
@@ -39,11 +39,8 @@ func AddToZip(dl fileio.CompletedDownload, exp *zip.Writer, dir string, index *c
 		fmt.Printf("Warning for %s (%s): %v\n", dl.Mod.Name, dl.Mod.FileName, warning)
 	}
 
-	p, err := index.RelIndexPath(dl.Mod.GetDestFilePath())
-	if err != nil {
-		fmt.Printf("Error resolving external file: %v\n", err)
-		return false
-	}
+	p := dl.Mod.GetRelDownloadPath()
+
 	modFile, err := exp.Create(path.Join(dir, p))
 	if err != nil {
 		fmt.Printf("Error creating metadata file %s: %v\n", p, err)
@@ -66,6 +63,8 @@ func AddToZip(dl fileio.CompletedDownload, exp *zip.Writer, dir string, index *c
 
 // AddNonMetafileOverrides saves all non-metadata files into an overrides folder in the zip
 func AddNonMetafileOverrides(index *core.IndexFS, exp *zip.Writer) {
+	// TODO: what to do about index files that are not metafile mods,
+	//  currently we are not handling them correctly
 	for p, v := range index.Files {
 		if !v.IsMetaFile() {
 			file, err := exp.Create(path.Join("overrides", p))

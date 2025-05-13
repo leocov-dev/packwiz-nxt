@@ -107,11 +107,25 @@ func UpdateSingleMod(pack Pack, mod *Mod) error {
 		updateData := make(UpdateDataList)
 		updateData.Append(updater.GetName(), mod, check.CachedState)
 
-		return UpdateMods(updateData)
+		return updateMods(updateData)
 	}
 }
 
-func UpdateMods(updateData UpdateDataList) error {
+func UpdateAllMods(pack Pack) error {
+	updateData, err := GetUpdatableMods(pack)
+	if err != nil {
+		return err
+	}
+
+	if len(updateData) == 0 {
+		fmt.Println("all mods already up to date")
+		return nil
+	}
+
+	return updateMods(updateData)
+}
+
+func updateMods(updateData UpdateDataList) error {
 	for source, data := range updateData {
 		updater, _ := GetUpdater(source)
 

@@ -5,8 +5,9 @@ import (
 	"fmt"
 
 	modrinthApi "codeberg.org/jmansfield/go-modrinth/modrinth"
-	"github.com/leocov-dev/packwiz-nxt/core"
 	"github.com/mitchellh/mapstructure"
+
+	"github.com/leocov-dev/packwiz-nxt/core"
 )
 
 func init() {

@@ -2,9 +2,11 @@ package cmd
 
 import (
 	"fmt"
+
+	"github.com/spf13/cobra"
+
 	"github.com/leocov-dev/packwiz-nxt/fileio"
 	"github.com/leocov-dev/packwiz-nxt/internal/shared"
-	"github.com/spf13/cobra"
 )
 
 // refreshCmd represents the refresh command

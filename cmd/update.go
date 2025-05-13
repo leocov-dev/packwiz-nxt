@@ -2,11 +2,13 @@ package cmd
 
 import (
 	"fmt"
+
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+
 	"github.com/leocov-dev/packwiz-nxt/core"
 	"github.com/leocov-dev/packwiz-nxt/fileio"
 	"github.com/leocov-dev/packwiz-nxt/internal/shared"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // UpdateCmd represents the update command
@@ -34,22 +36,7 @@ var UpdateCmd = &cobra.Command{
 		var singleUpdatedName string
 		if viper.GetBool("update.all") {
 			fmt.Println("Checking for updates...")
-			updateData, err := core.GetUpdatableMods(*pack)
-			if err != nil {
-				shared.Exitln(err)
-			}
-
-			if len(updateData) == 0 {
-				fmt.Println("All files are up to date!")
-				return
-			}
-
-			if !shared.PromptYesNo("Do you want to update? [Y/n]: ") {
-				fmt.Println("Cancelled!")
-				return
-			}
-
-			if err := core.UpdateMods(updateData); err != nil {
+			if err := core.UpdateAllMods(*pack); err != nil {
 				shared.Exitln(err)
 			}
 		} else {

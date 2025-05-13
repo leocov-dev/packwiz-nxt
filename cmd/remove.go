@@ -2,11 +2,13 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/leocov-dev/packwiz-nxt/fileio"
-	"github.com/leocov-dev/packwiz-nxt/internal/shared"
-	"github.com/spf13/cobra"
 	"os"
 	"path/filepath"
+
+	"github.com/spf13/cobra"
+
+	"github.com/leocov-dev/packwiz-nxt/fileio"
+	"github.com/leocov-dev/packwiz-nxt/internal/shared"
 )
 
 // removeCmd represents the remove command
@@ -36,7 +38,7 @@ var removeCmd = &cobra.Command{
 		}
 
 		fmt.Println("Removing file from index...")
-		err = os.Remove(filepath.Join(packDir, removedMod.GetMetaPath()))
+		err = os.Remove(filepath.Join(packDir, removedMod.GetRelMetaPath()))
 		if err != nil {
 			shared.Exitln("Failed to delete mod meta file")
 		}

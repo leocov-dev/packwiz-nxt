@@ -5,8 +5,9 @@ import (
 	"errors"
 	"io"
 
-	"github.com/leocov-dev/packwiz-nxt/core"
 	"github.com/mitchellh/mapstructure"
+
+	"github.com/leocov-dev/packwiz-nxt/core"
 )
 
 func fetchRepo(slug string) (Repo, error) {

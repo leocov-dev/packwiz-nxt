@@ -25,47 +25,19 @@ var exportCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Loading modpack...")
-		pack, err := fileio.LoadPackFile(viper.GetString("pack-file"))
+		packFile, _, err := shared.GetPackPaths()
 		if err != nil {
 			shared.Exitln(err)
 		}
-		index, err := fileio.LoadPackIndexFile(&pack)
+
+		pack, err := fileio.LoadAll(packFile)
 		if err != nil {
 			shared.Exitln(err)
-		}
-		// Do a refresh to ensure files are up to date
-		err = fileio.RefreshIndexFiles(&index)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-		repr := index.ToWritable()
-		writer := fileio.NewIndexWriter()
-		err = writer.Write(&repr)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-		pack.RefreshIndexHash(index)
-
-		packWriter := fileio.NewPackWriter()
-		err = packWriter.Write(&pack)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-		fmt.Println("Reading external files...")
-		mods, err := fileio.LoadAllMods(&index)
-		if err != nil {
-			shared.Exitf("Error reading file: %v\n", err)
 		}
 
 		fileName := viper.GetString("modrinth.export.output")
 		if fileName == "" {
-			fileName = pack.GetPackName() + ".mrpack"
+			fileName = pack.GetExportName() + ".mrpack"
 		}
 		expFile, err := os.Create(fileName)
 		if err != nil {
@@ -78,6 +50,8 @@ var exportCmd = &cobra.Command{
 		if err != nil {
 			shared.Exitf("Failed to add overrides folder: %s\n", err.Error())
 		}
+
+		mods := pack.GetModsList()
 
 		fmt.Printf("Retrieving %v external files...\n", len(mods))
 
@@ -108,12 +82,7 @@ var exportCmd = &cobra.Command{
 					fmt.Printf("Warning for %s (%s): %v\n", dl.Mod.Name, dl.Mod.FileName, warning)
 				}
 
-				path, err := index.RelIndexPath(dl.Mod.GetDestFilePath())
-				if err != nil {
-					fmt.Printf("Error resolving external file: %s\n", err.Error())
-					// TODO: exit(1)?
-					continue
-				}
+				path := dl.Mod.GetRelDownloadPath()
 
 				hashes := make(map[string]string)
 				hashes["sha1"] = dl.Hashes["sha1"]
@@ -163,11 +132,11 @@ var exportCmd = &cobra.Command{
 				fmt.Printf("%s (%s) added to manifest\n", dl.Mod.Name, dl.Mod.FileName)
 			} else {
 				if dl.Mod.Side == core.ClientSide {
-					_ = shared.AddToZip(dl, exp, "client-overrides", &index)
+					_ = shared.AddToZip(dl, exp, "client-overrides")
 				} else if dl.Mod.Side == core.ServerSide {
-					_ = shared.AddToZip(dl, exp, "server-overrides", &index)
+					_ = shared.AddToZip(dl, exp, "server-overrides")
 				} else {
-					_ = shared.AddToZip(dl, exp, "overrides", &index)
+					_ = shared.AddToZip(dl, exp, "overrides")
 				}
 			}
 		}
@@ -228,7 +197,7 @@ var exportCmd = &cobra.Command{
 			shared.Exitln("Error writing manifest: " + err.Error())
 		}
 
-		shared.AddNonMetafileOverrides(&index, exp)
+		//shared.AddNonMetafileOverrides(&index, exp)
 
 		err = exp.Close()
 		if err != nil {
@@ -250,7 +219,7 @@ var whitelistedHosts = []string{
 	"gitlab.com",
 }
 
-func canBeIncludedDirectly(mod *core.ModToml, restrictDomains bool) bool {
+func canBeIncludedDirectly(mod *core.Mod, restrictDomains bool) bool {
 	if mod.Download.Mode == core.ModeURL || mod.Download.Mode == "" {
 		if !restrictDomains {
 			return true

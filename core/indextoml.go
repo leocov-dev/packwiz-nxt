@@ -1,10 +1,11 @@
 package core
 
 import (
-	"github.com/pelletier/go-toml/v2"
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/pelletier/go-toml/v2"
 )
 
 // IndexFS is a representation of the index.toml file for referencing all the files in a pack.

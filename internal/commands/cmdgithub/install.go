@@ -42,7 +42,9 @@ var installCmd = &cobra.Command{
 			modType = "mods"
 		}
 
-		mod, repo, file, err := sources.AddGitHubMod(
+		slugOrUrl := args[0]
+
+		mod, err := sources.NewGitHubMod(
 			args[0],
 			branchFlag,
 			regexFlag,
@@ -63,7 +65,7 @@ var installCmd = &cobra.Command{
 			shared.Exitf("Failed to add project: %s\n", err)
 		}
 
-		fmt.Printf("Project \"%s\" successfully added! (%s)\n", repo.Name, file.Name)
+		fmt.Printf("Project \"%s\" successfully added! (%s)\n", slugOrUrl, mod.FileName)
 	},
 }
 

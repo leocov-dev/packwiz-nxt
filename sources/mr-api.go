@@ -9,10 +9,11 @@ import (
 	"regexp"
 
 	modrinthApi "codeberg.org/jmansfield/go-modrinth/modrinth"
-	"github.com/leocov-dev/packwiz-nxt/core"
 	"github.com/spf13/viper"
 	"github.com/unascribed/FlexVer/go/flexver"
 	"golang.org/x/exp/slices"
+
+	"github.com/leocov-dev/packwiz-nxt/core"
 )
 
 var mrDefaultClient = modrinthApi.NewClient(&http.Client{})

@@ -8,6 +8,7 @@ import (
 	"regexp"
 
 	"github.com/dlclark/regexp2"
+
 	"github.com/leocov-dev/packwiz-nxt/core"
 )
 
@@ -17,7 +18,7 @@ func init() {
 
 var GithubRegex = regexp.MustCompile(`^https?://(?:www\.)?github\.com/([^/]+/[^/]+)`)
 
-func AddGitHubMod(slugOrUrl, branch, regex, modType string) (*core.Mod, Repo, Asset, error) {
+func NewGitHubMod(slugOrUrl, branch, regex, modType string) (*core.Mod, error) {
 	var slug string
 
 	// Check if the argument is a valid GitHub repository URL; if so, extract the slug from the URL.
@@ -32,7 +33,7 @@ func AddGitHubMod(slugOrUrl, branch, regex, modType string) (*core.Mod, Repo, As
 	repo, err := fetchRepo(slug)
 
 	if err != nil {
-		return nil, repo, Asset{}, err
+		return nil, err
 	}
 
 	if regex == "" {
@@ -47,18 +48,18 @@ func AddGitHubMod(slugOrUrl, branch, regex, modType string) (*core.Mod, Repo, As
 		regex = `^.+(?<!-api|-dev|-dev-preshadow|-sources)\.jar$`
 	}
 
-	mod, file, err := installMod(repo, branch, regex, modType)
+	mod, err := installMod(repo, branch, regex, modType)
 	if err != nil {
-		return nil, repo, file, err
+		return nil, err
 	}
 
-	return mod, repo, file, nil
+	return mod, nil
 }
 
-func installMod(repo Repo, branch, regex, modType string) (*core.Mod, Asset, error) {
+func installMod(repo Repo, branch, regex, modType string) (*core.Mod, error) {
 	latestRelease, err := getLatestRelease(repo.FullName, branch)
 	if err != nil {
-		return nil, Asset{}, fmt.Errorf("failed to get latest release: %v", err)
+		return nil, fmt.Errorf("failed to get latest release: %v", err)
 	}
 
 	return installRelease(repo, latestRelease, regex, modType)
@@ -104,13 +105,13 @@ func installRelease(
 	release Release,
 	regex string,
 	modType string,
-) (*core.Mod, Asset, error) {
+) (*core.Mod, error) {
 	expr := regexp2.MustCompile(regex, 0)
 
 	var file Asset
 
 	if len(release.Assets) == 0 {
-		return nil, file, errors.New("release doesn't have any assets attached")
+		return nil, errors.New("release doesn't have any assets attached")
 	}
 
 	var files []Asset
@@ -123,12 +124,12 @@ func installRelease(
 	}
 
 	if len(files) == 0 {
-		return nil, file, errors.New("release doesn't have any assets matching regex")
+		return nil, errors.New("release doesn't have any assets matching regex")
 	}
 
 	if len(files) > 1 {
 		// TODO: also print file names
-		return nil, file, errors.New("release has more than one asset matching regex")
+		return nil, errors.New("release has more than one asset matching regex")
 	}
 
 	file = files[0]
@@ -147,12 +148,12 @@ func installRelease(
 		Regex:  regex,                   // TODO: ditto!
 	}.ToMap()
 	if err != nil {
-		return nil, file, err
+		return nil, err
 	}
 
 	hash, err := file.getSha256()
 	if err != nil {
-		return nil, file, err
+		return nil, err
 	}
 
 	download := core.ModDownload{
@@ -175,5 +176,5 @@ func installRelease(
 		nil,
 	)
 
-	return mod, file, nil
+	return mod, nil
 }

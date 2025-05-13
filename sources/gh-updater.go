@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/dlclark/regexp2"
+
 	"github.com/leocov-dev/packwiz-nxt/core"
 	"github.com/mitchellh/mapstructure"
 )

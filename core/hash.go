@@ -8,10 +8,11 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"github.com/leocov-dev/packwiz-nxt/core/murmur2"
 	"hash"
 	"strconv"
 	"strings"
+
+	"github.com/leocov-dev/packwiz-nxt/core/murmur2"
 )
 
 // GetHashImpl gets an implementation of hash.Hash for the given hash type string
