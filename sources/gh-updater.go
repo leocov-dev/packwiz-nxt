@@ -11,6 +11,10 @@ import (
 	"github.com/mitchellh/mapstructure"
 )
 
+func init() {
+	core.AddUpdater(ghUpdater{})
+}
+
 type ghUpdateData struct {
 	Slug   string `mapstructure:"slug"`
 	Tag    string `mapstructure:"tag"`

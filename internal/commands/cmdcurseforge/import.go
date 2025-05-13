@@ -9,6 +9,7 @@ import (
 	"github.com/leocov-dev/packwiz-nxt/fileio"
 	"github.com/leocov-dev/packwiz-nxt/internal/commands/cmdcurseforge/packinterop"
 	"github.com/leocov-dev/packwiz-nxt/internal/shared"
+	"github.com/leocov-dev/packwiz-nxt/sources"
 	"io"
 	"os"
 	"path/filepath"
@@ -19,6 +20,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
+
+func init() {
+	curseforgeCmd.AddCommand(importCmd)
+}
 
 // importCmd represents the import command
 var importCmd = &cobra.Command{
@@ -167,19 +172,19 @@ var importCmd = &cobra.Command{
 
 		fmt.Println("Querying Curse API for dependency info...")
 
-		modInfos, err := cfDefaultClient.getModInfoMultiple(modIDs)
+		modInfos, err := sources.GetCurseforgeClient().GetModInfoMultiple(modIDs)
 		if err != nil {
 			shared.Exitf("Failed to obtain project information: %s\n", err)
 		}
 
-		modInfosMap := make(map[uint32]modInfo)
+		modInfosMap := make(map[uint32]sources.ModInfo)
 		for _, v := range modInfos {
 			modInfosMap[v.ID] = v
 		}
 
 		// TODO: multithreading????
 
-		modFileInfosMap := make(map[uint32]modFileInfo)
+		modFileInfosMap := make(map[uint32]sources.ModFileInfo)
 		referencedModPaths := make([]string, 0, len(modsList))
 		successes := 0
 		remainingFileIDs := make([]uint32, 0, len(modsList))
@@ -193,7 +198,7 @@ var importCmd = &cobra.Command{
 			}
 
 			found := false
-			var fileInfo modFileInfo
+			var fileInfo sources.ModFileInfo
 			for _, fileInfo = range modInfoValue.LatestFiles {
 				if fileInfo.ID == v.FileID {
 					found = true
@@ -210,7 +215,7 @@ var importCmd = &cobra.Command{
 		// 2nd pass: query files that weren't in the previous results
 		fmt.Println("Querying Curse API for file info...")
 
-		modFileInfos, err := cfDefaultClient.getFileInfoMultiple(remainingFileIDs)
+		modFileInfos, err := sources.GetCurseforgeClient().GetFileInfoMultiple(remainingFileIDs)
 		if err != nil {
 			shared.Exitf("Failed to obtain project file information: %s\n", err)
 		}
@@ -233,12 +238,12 @@ var importCmd = &cobra.Command{
 				continue
 			}
 
-			err = createModFile(modInfoValue, modFileInfoValue, &index, v.OptionalDisabled)
+			err = sources.CreateModFile(modInfoValue, modFileInfoValue, &index, v.OptionalDisabled)
 			if err != nil {
 				shared.Exitf("Failed to save project \"%s\": %s\n", modInfoValue.Name, err)
 			}
 
-			modFilePath := getPathForFile(modInfoValue.GameID, modInfoValue.ClassID, modInfoValue.PrimaryCategoryID, modInfoValue.Slug)
+			modFilePath := sources.GetPathForFile(modInfoValue.GameID, modInfoValue.ClassID, modInfoValue.PrimaryCategoryID, modInfoValue.Slug)
 			ref, err := filepath.Abs(filepath.Join(filepath.Dir(modFilePath), modFileInfoValue.FileName))
 			if err == nil {
 				referencedModPaths = append(referencedModPaths, ref)
@@ -339,8 +344,4 @@ var importCmd = &cobra.Command{
 			shared.Exitln(err)
 		}
 	},
-}
-
-func init() {
-	curseforgeCmd.AddCommand(importCmd)
 }

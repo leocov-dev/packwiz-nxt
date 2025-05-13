@@ -4,16 +4,27 @@ import (
 	"archive/zip"
 	"bufio"
 	"fmt"
-	"github.com/leocov-dev/packwiz-nxt/fileio"
 	"os"
 	"strconv"
 
-	"github.com/leocov-dev/packwiz-nxt/core"
-	"github.com/leocov-dev/packwiz-nxt/internal/commands/cmdcurseforge/packinterop"
-	"github.com/leocov-dev/packwiz-nxt/internal/shared"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/leocov-dev/packwiz-nxt/core"
+	"github.com/leocov-dev/packwiz-nxt/fileio"
+	"github.com/leocov-dev/packwiz-nxt/internal/commands/cmdcurseforge/packinterop"
+	"github.com/leocov-dev/packwiz-nxt/internal/shared"
+	"github.com/leocov-dev/packwiz-nxt/sources"
 )
+
+func init() {
+	curseforgeCmd.AddCommand(exportCmd)
+
+	exportCmd.Flags().StringP("side", "s", "client", "The side to export mods with")
+	_ = viper.BindPFlag("curseforge.export.side", exportCmd.Flags().Lookup("side"))
+	exportCmd.Flags().StringP("output", "o", "", "The file to export the modpack to")
+	_ = viper.BindPFlag("curseforge.export.output", exportCmd.Flags().Lookup("output"))
+}
 
 // exportCmd represents the export command
 var exportCmd = &cobra.Command{
@@ -50,10 +61,10 @@ var exportCmd = &cobra.Command{
 		}
 		mods = mods[:i]
 
-		var exportData cfExportData
+		var exportData sources.CfExportData
 		exportDataUnparsed, ok := pack.Export["curseforge"]
 		if ok {
-			exportData, err = parseExportData(exportDataUnparsed)
+			exportData, err = sources.ParseExportData(exportDataUnparsed)
 			if err != nil {
 				shared.Exitf("Failed to parse export metadata: %s\n", err.Error())
 			}
@@ -79,7 +90,7 @@ var exportCmd = &cobra.Command{
 		cfFileRefs := make([]packinterop.AddonFileReference, 0, len(mods))
 		nonCfMods := make([]*core.Mod, 0)
 		for _, mod := range mods {
-			var p cfUpdateData
+			var p sources.CfUpdateData
 			err = mod.DecodeNamedModSourceData("curseforge", &p)
 			// If the mod has curseforge metadata, add it to cfFileRefs
 			if err == nil {
@@ -129,7 +140,7 @@ var exportCmd = &cobra.Command{
 			shared.Exitln("Error writing manifest: " + err.Error())
 		}
 
-		err = createModlist(exp, mods)
+		err = createModList(exp, mods)
 		if err != nil {
 			_ = exp.Close()
 			_ = expFile.Close()
@@ -151,7 +162,7 @@ var exportCmd = &cobra.Command{
 	},
 }
 
-func createModlist(zw *zip.Writer, mods []*core.Mod) error {
+func createModList(zw *zip.Writer, mods []*core.Mod) error {
 	modlistFile, err := zw.Create("modlist.html")
 	if err != nil {
 		return err
@@ -164,7 +175,7 @@ func createModlist(zw *zip.Writer, mods []*core.Mod) error {
 		return err
 	}
 	for _, mod := range mods {
-		var project cfUpdateData
+		var project sources.CfUpdateData
 		err = mod.DecodeNamedModSourceData("curseforge", &project)
 		if err != nil {
 			// TODO: read homepage URL or something similar?
@@ -185,13 +196,4 @@ func createModlist(zw *zip.Writer, mods []*core.Mod) error {
 		return err
 	}
 	return w.Flush()
-}
-
-func init() {
-	curseforgeCmd.AddCommand(exportCmd)
-
-	exportCmd.Flags().StringP("side", "s", "client", "The side to export mods with")
-	_ = viper.BindPFlag("curseforge.export.side", exportCmd.Flags().Lookup("side"))
-	exportCmd.Flags().StringP("output", "o", "", "The file to export the modpack to")
-	_ = viper.BindPFlag("curseforge.export.output", exportCmd.Flags().Lookup("output"))
 }

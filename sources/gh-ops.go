@@ -12,10 +12,6 @@ import (
 	"github.com/leocov-dev/packwiz-nxt/core"
 )
 
-func init() {
-	core.AddUpdater(ghUpdater{})
-}
-
 var GithubRegex = regexp.MustCompile(`^https?://(?:www\.)?github\.com/([^/]+/[^/]+)`)
 
 func NewGitHubMod(slugOrUrl, branch, regex, modType string) (*core.Mod, error) {

@@ -5,6 +5,7 @@ import (
 	"github.com/aviddiviner/go-murmur"
 	"github.com/leocov-dev/packwiz-nxt/fileio"
 	"github.com/leocov-dev/packwiz-nxt/internal/shared"
+	"github.com/leocov-dev/packwiz-nxt/sources"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"os"
@@ -59,7 +60,7 @@ var detectCmd = &cobra.Command{
 		}
 		fmt.Printf("Found %d files, submitting...\n", len(hashes))
 
-		res, err := cfDefaultClient.getFingerprintInfo(hashes)
+		res, err := sources.GetCurseforgeClient().GetFingerprintInfo(hashes)
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -84,18 +85,18 @@ var detectCmd = &cobra.Command{
 		for i, v := range res.ExactMatches {
 			ids[i] = v.ID
 		}
-		modInfos, err := cfDefaultClient.getModInfoMultiple(ids)
+		modInfos, err := sources.GetCurseforgeClient().GetModInfoMultiple(ids)
 		if err != nil {
 			shared.Exitf("Failed to retrieve metadata: %v", err)
 		}
-		modInfosMap := make(map[uint32]modInfo)
+		modInfosMap := make(map[uint32]sources.ModInfo)
 		for _, v := range modInfos {
 			modInfosMap[v.ID] = v
 		}
 
 		fmt.Println("Creating metadata files...")
 		for _, v := range res.ExactMatches {
-			err = createModFile(modInfosMap[v.ID], v.File, &index, false)
+			err = sources.CreateModFile(modInfosMap[v.ID], v.File, &index, false)
 			if err != nil {
 				shared.Exitln(err)
 			}
