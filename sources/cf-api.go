@@ -4,28 +4,29 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/leocov-dev/packwiz-nxt/config"
-	"github.com/leocov-dev/packwiz-nxt/core"
 	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
+
+	"github.com/leocov-dev/packwiz-nxt/config"
+	"github.com/leocov-dev/packwiz-nxt/core"
 )
 
 const cfApiServer = "api.curseforge.com"
 
-type CfApiClient struct {
+type cfApiClient struct {
 	httpClient *http.Client
 }
 
-var cfDefaultClient = CfApiClient{&http.Client{}}
+var cfDefaultClient = cfApiClient{&http.Client{}}
 
-func GetCurseforgeClient() *CfApiClient {
+func GetCurseforgeClient() *cfApiClient {
 	return &cfDefaultClient
 }
 
-func (c *CfApiClient) makeGet(endpoint string) (*http.Response, error) {
+func (c *cfApiClient) makeGet(endpoint string) (*http.Response, error) {
 	req, err := http.NewRequest("GET", "https://"+cfApiServer+endpoint, nil)
 	if err != nil {
 		return nil, err
@@ -51,7 +52,7 @@ func (c *CfApiClient) makeGet(endpoint string) (*http.Response, error) {
 	return resp, nil
 }
 
-func (c *CfApiClient) makePost(endpoint string, body io.Reader) (*http.Response, error) {
+func (c *cfApiClient) makePost(endpoint string, body io.Reader) (*http.Response, error) {
 	req, err := http.NewRequest("POST", "https://"+cfApiServer+endpoint, body)
 	if err != nil {
 		return nil, err
@@ -166,7 +167,7 @@ type ModInfo struct {
 	} `json:"links"`
 }
 
-func (c *CfApiClient) GetModInfo(modID uint32) (ModInfo, error) {
+func (c *cfApiClient) GetModInfo(modID uint32) (ModInfo, error) {
 	var infoRes struct {
 		Data ModInfo `json:"data"`
 	}
@@ -189,7 +190,7 @@ func (c *CfApiClient) GetModInfo(modID uint32) (ModInfo, error) {
 	return infoRes.Data, nil
 }
 
-func (c *CfApiClient) GetModInfoMultiple(modIDs []uint32) ([]ModInfo, error) {
+func (c *cfApiClient) GetModInfoMultiple(modIDs []uint32) ([]ModInfo, error) {
 	var infoRes struct {
 		Data []ModInfo `json:"data"`
 	}
@@ -266,7 +267,7 @@ func (i ModFileInfo) GetBestHash() (hash string, hashFormat string) {
 	return
 }
 
-func (c *CfApiClient) GetFileInfo(modID uint32, fileID uint32) (ModFileInfo, error) {
+func (c *cfApiClient) GetFileInfo(modID uint32, fileID uint32) (ModFileInfo, error) {
 	var infoRes struct {
 		Data ModFileInfo `json:"data"`
 	}
@@ -291,7 +292,7 @@ func (c *CfApiClient) GetFileInfo(modID uint32, fileID uint32) (ModFileInfo, err
 	return infoRes.Data, nil
 }
 
-func (c *CfApiClient) GetFileInfoMultiple(fileIDs []uint32) ([]ModFileInfo, error) {
+func (c *cfApiClient) GetFileInfoMultiple(fileIDs []uint32) ([]ModFileInfo, error) {
 	var infoRes struct {
 		Data []ModFileInfo `json:"data"`
 	}
@@ -318,7 +319,7 @@ func (c *CfApiClient) GetFileInfoMultiple(fileIDs []uint32) ([]ModFileInfo, erro
 	return infoRes.Data, nil
 }
 
-func (c *CfApiClient) GetSearch(searchTerm string, slug string, gameID uint32, classID uint32, categoryID uint32, gameVersion string, modloaderType ModloaderType) ([]ModInfo, error) {
+func (c *cfApiClient) GetSearch(searchTerm string, slug string, gameID uint32, classID uint32, categoryID uint32, gameVersion string, modloaderType ModloaderType) ([]ModInfo, error) {
 	var infoRes struct {
 		Data []ModInfo `json:"data"`
 	}
@@ -389,7 +390,7 @@ type cfGame struct {
 	APIStatus gameApiStatus `json:"apiStatus"`
 }
 
-func (c *CfApiClient) GetGames() ([]cfGame, error) {
+func (c *cfApiClient) GetGames() ([]cfGame, error) {
 	var infoRes struct {
 		Data []cfGame `json:"data"`
 	}
@@ -414,7 +415,7 @@ type cfCategory struct {
 	ClassID uint32 `json:"classId"`
 }
 
-func (c *CfApiClient) GetCategories(gameID uint32) ([]cfCategory, error) {
+func (c *cfApiClient) GetCategories(gameID uint32) ([]cfCategory, error) {
 	var infoRes struct {
 		Data []cfCategory `json:"data"`
 	}
@@ -446,7 +447,7 @@ type addonFingerprintResponse struct {
 	UnmatchedFingerprints    []uint32 `json:"unmatchedFingerprints"`
 }
 
-func (c *CfApiClient) GetFingerprintInfo(hashes []uint32) (addonFingerprintResponse, error) {
+func (c *cfApiClient) GetFingerprintInfo(hashes []uint32) (addonFingerprintResponse, error) {
 	var infoRes struct {
 		Data addonFingerprintResponse `json:"data"`
 	}

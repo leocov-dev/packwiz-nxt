@@ -45,14 +45,16 @@ var installCmd = &cobra.Command{
 	Aliases: []string{"install", "get"},
 	Args:    cobra.ArbitraryArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		pack, err := fileio.LoadPackFile(viper.GetString("pack-file"))
+		packFile, packDir, err := shared.GetPackPaths()
 		if err != nil {
 			shared.Exitln(err)
 		}
-		index, err := fileio.LoadPackIndexFile(&pack)
+
+		pack, err := fileio.LoadAll(packFile)
 		if err != nil {
 			shared.Exitln(err)
 		}
+
 		mcVersions, err := pack.GetSupportedMCVersions()
 		if err != nil {
 			shared.Exitln(err)
@@ -79,7 +81,7 @@ var installCmd = &cobra.Command{
 			shared.Exitln("You must specify a project; with the ID flags, or by passing a URL, slug or search term directly.")
 		}
 		if modID == 0 && len(args) == 1 {
-			parsedGame, parsedCategory, parsedSlug, parsedFileID, err := sources.ParseSlugOrUrl(args[0])
+			parsedGame, parsedCategory, parsedSlug, parsedFileID, err := sources.CfParseSlugOrUrl(args[0])
 			if err != nil {
 				shared.Exitf("Failed to parse URL: %v\n", err)
 			}
@@ -105,9 +107,9 @@ var installCmd = &cobra.Command{
 			var cancelled bool
 			if slug == "" {
 				searchTerm := strings.Join(args, " ")
-				cancelled, modInfoData = SearchCurseforgeInternal(searchTerm, false, game, category, mcVersions, sources.GetSearchLoaderType(pack))
+				cancelled, modInfoData = SearchCurseforgeInternal(searchTerm, false, game, category, mcVersions, sources.GetSearchLoaderType(*pack))
 			} else {
-				cancelled, modInfoData = SearchCurseforgeInternal(slug, true, game, category, mcVersions, sources.GetSearchLoaderType(pack))
+				cancelled, modInfoData = SearchCurseforgeInternal(slug, true, game, category, mcVersions, sources.GetSearchLoaderType(*pack))
 			}
 			if cancelled {
 				return
@@ -152,19 +154,18 @@ var installCmd = &cobra.Command{
 				for len(depIDPendingQueue) > 0 && cycles < maxCycles {
 					if installedIDList == nil {
 						// Get modids of all mods
-						mods, err := fileio.LoadAllMods(&index)
 						if err != nil {
 							fmt.Printf("Failed to determine existing projects: %v\n", err)
 						} else {
-							for _, mod := range mods {
-								data, ok := mod.GetParsedUpdateData("curseforge")
-								if ok {
-									updateData, ok := data.(sources.CfUpdateData)
-									if ok {
-										if updateData.ProjectID > 0 {
-											installedIDList = append(installedIDList, updateData.ProjectID)
-										}
-									}
+							for _, mod := range pack.GetModsList() {
+								var updateData sources.CfExportData
+								err = mod.DecodeNamedModSourceData("curseforge", updateData)
+								if err != nil {
+									shared.Exitln(err)
+								}
+
+								if updateData.ProjectID > 0 {
+									installedIDList = append(installedIDList, updateData.ProjectID)
 								}
 							}
 						}
@@ -229,10 +230,11 @@ var installCmd = &cobra.Command{
 
 					if shared.PromptYesNo("Would you like to add them? [Y/n]: ") {
 						for _, v := range depsInstallable {
-							err = sources.CreateModFile(v.ModInfo, v.fileInfo, &index, false)
+							mod, err := sources.CreateModFile(v.ModInfo, v.fileInfo, false)
 							if err != nil {
 								shared.Exitln(err)
 							}
+							pack.SetMod(mod)
 							fmt.Printf("Dependency \"%s\" successfully added! (%s)\n", v.ModInfo.Name, v.fileInfo.FileName)
 						}
 					}
@@ -242,22 +244,13 @@ var installCmd = &cobra.Command{
 			}
 		}
 
-		err = sources.CreateModFile(modInfoData, fileInfoData, &index, false)
+		mod, err := sources.CreateModFile(modInfoData, fileInfoData, false)
 		if err != nil {
 			shared.Exitln(err)
 		}
+		pack.SetMod(mod)
 
-		repr := index.ToWritable()
-		writer := fileio.NewIndexWriter()
-		err = writer.Write(&repr)
-		if err != nil {
-			shared.Exitln(err)
-		}
-
-		pack.RefreshIndexHash(index)
-
-		packWriter := fileio.NewPackWriter()
-		err = packWriter.Write(&pack)
+		err = fileio.WriteAll(*pack, packDir)
 		if err != nil {
 			shared.Exitln(err)
 		}

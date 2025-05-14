@@ -6,6 +6,6 @@ import (
 	"github.com/leocov-dev/packwiz-nxt/core"
 )
 
-func NewCurseforgeMod() (*core.Mod, error) {
+func CurseforgeNewMod() (*core.Mod, error) {
 	return nil, errors.New("not implemented")
 }

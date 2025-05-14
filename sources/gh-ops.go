@@ -14,7 +14,7 @@ import (
 
 var GithubRegex = regexp.MustCompile(`^https?://(?:www\.)?github\.com/([^/]+/[^/]+)`)
 
-func NewGitHubMod(slugOrUrl, branch, regex, modType string) (*core.Mod, error) {
+func GitHubNewMod(slugOrUrl, branch, regex, modType string) (*core.Mod, error) {
 	var slug string
 
 	// Check if the argument is a valid GitHub repository URL; if so, extract the slug from the URL.

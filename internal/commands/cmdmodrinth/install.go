@@ -34,38 +34,7 @@ var installCmd = &cobra.Command{
 	Args:    cobra.ArbitraryArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 
-		// If project/version IDs/version file name is provided in command line, use those
-		var projectID, versionID, versionFilename string
-		if projectIDFlag != "" {
-			projectID = projectIDFlag
-			if len(args) != 0 {
-				shared.Exitln("--project-id cannot be used with a separately specified URL/slug/search term")
-			}
-		}
-		if versionIDFlag != "" {
-			versionID = versionIDFlag
-			if len(args) != 0 {
-				shared.Exitln("--version-id cannot be used with a separately specified URL/slug/search term")
-			}
-		}
-		if versionFilenameFlag != "" {
-			versionFilename = versionFilenameFlag
-		}
-
-		if (len(args) == 0 || len(args[0]) == 0) && projectID == "" {
-			shared.Exitln("You must specify a project; with the ID flags, or by passing a URL, slug or search term directly.")
-		}
-
 		var err error
-		var version string
-		var parsedSlug bool
-		if projectID == "" && versionID == "" && len(args) == 1 {
-			// Try interpreting the argument as a slug/project ID, or project/version/CDN URL
-			parsedSlug, err = sources.ParseModrinthSlugOrUrl(args[0], &projectID, &version, &versionID, &versionFilename)
-			if err != nil {
-				shared.Exitf("Failed to parse URL: %v\n", err)
-			}
-		}
 
 		packFile, packDir, err := shared.GetPackPaths()
 		if err != nil {
@@ -78,9 +47,48 @@ var installCmd = &cobra.Command{
 			shared.Exitln(err)
 		}
 
+		// ---
+		var projectSlug, version, versionID, optionalFilenameMatch string
+
+		// If project/version IDs/version file name is provided in command line, use those
+		if projectIDFlag != "" {
+			projectSlug = projectIDFlag
+			if len(args) != 0 {
+				shared.Exitln("--project-id cannot be used with a separately specified URL/slug/search term")
+			}
+		}
+		if versionIDFlag != "" {
+			versionID = versionIDFlag
+			if len(args) != 0 {
+				shared.Exitln("--version-id cannot be used with a separately specified URL/slug/search term")
+			}
+		}
+		if versionFilenameFlag != "" {
+			optionalFilenameMatch = versionFilenameFlag
+		}
+
+		if (len(args) == 0 || len(args[0]) == 0) && projectSlug == "" {
+			shared.Exitln("You must specify a project; with the ID flags, or by passing a URL, slug or search term directly.")
+		}
+
+		if projectSlug == "" && versionID == "" && len(args) == 1 {
+			if parsedSlug := sources.ParseAsModrinthSlug(args[0]); parsedSlug != "" {
+				projectSlug = parsedSlug
+			}
+			if parsedVersion := sources.ParseAsModrinthVersion(args[0]); parsedVersion != "" {
+				version = parsedVersion
+			}
+			if parsedVersionID := sources.ParseAsModrinthVersionID(args[0]); parsedVersionID != "" {
+				versionID = parsedVersionID
+			}
+			if parsedFilename := sources.ParseAsParseAsFilename(args[0]); parsedFilename != "" {
+				optionalFilenameMatch = parsedFilename
+			}
+		}
+
 		// Got version ID; install using this ID
 		if versionID != "" {
-			err = installVersionById(versionID, versionFilename, pack)
+			err = installVersionById(versionID, optionalFilenameMatch, pack)
 			if err != nil {
 				shared.Exitf("Failed to add project: %s\n", err)
 			}
@@ -88,14 +96,14 @@ var installCmd = &cobra.Command{
 		}
 
 		// Look up project ID
-		if projectID != "" {
+		if projectSlug != "" {
 			// Modrinth transparently handles slugs/project IDs in their API; we don't have to detect which one it is.
 			var project *modrinthApi.Project
-			project, err = sources.GetModrinthClient().Projects.Get(projectID)
+			project, err = sources.GetModrinthClient().Projects.Get(projectSlug)
 			if err == nil {
 				var versionData *modrinthApi.Version
 				if version == "" {
-					versionData, err = sources.GetModrinthLatestVersion(*project.ID, *project.Title, *pack)
+					versionData, err = sources.ModrinthGetLatestVersion(*project.ID, *project.Title, *pack, viper.GetString("datapack-folder"))
 					if err != nil {
 						shared.Exitf("failed to get latest version: %v", err)
 					}
@@ -107,17 +115,16 @@ var installCmd = &cobra.Command{
 					return
 				}
 
-				err = installVersion(project, versionData, versionFilename, pack)
+				err = installVersion(project, versionData, optionalFilenameMatch, pack)
 				if err != nil {
 					shared.Exitf("Failed to add project: %s\n", err)
 				}
 				return
 			}
-		}
-
-		// Arguments weren't a valid slug/project ID, try to search for it instead (if it was not parsed as a URL)
-		if projectID == "" || parsedSlug {
-			err = installViaSearch(strings.Join(args, " "), versionFilename, !parsedSlug, pack)
+		} else if len(args) > 0 {
+			// Arguments weren't a valid slug/project ID, try to search for it instead
+			// (if it was not parsed as a URL)
+			err = installViaSearch(strings.Join(args, " "), optionalFilenameMatch, pack)
 			if err != nil {
 				shared.Exitf("Failed to add project: %s\n", err)
 			}
@@ -133,21 +140,16 @@ var installCmd = &cobra.Command{
 	},
 }
 
-func installVersionById(versionId string, versionFilename string, pack *core.Pack) error {
-	version, err := sources.GetModrinthClient().Versions.Get(versionId)
+func installVersionById(versionId string, optionalFilenameMatch string, pack *core.Pack) error {
+	project, version, err := sources.ModrinthProjectFromVersionID(versionId)
 	if err != nil {
-		return fmt.Errorf("failed to fetch version %s: %v", versionId, err)
+		return fmt.Errorf("failed to fetch project for versionId %s: %v", versionId, err)
 	}
 
-	project, err := sources.GetModrinthClient().Projects.Get(*version.ProjectID)
-	if err != nil {
-		return fmt.Errorf("failed to fetch project %s: %v", *version.ProjectID, err)
-	}
-
-	return installVersion(project, version, versionFilename, pack)
+	return installVersion(project, version, optionalFilenameMatch, pack)
 }
 
-func installViaSearch(query string, versionFilename string, autoAcceptFirst bool, pack *core.Pack) error {
+func installViaSearch(query string, optionalFilenameMatch string, pack *core.Pack) error {
 	mcVersions, err := pack.GetSupportedMCVersions()
 	if err != nil {
 		return err
@@ -155,29 +157,20 @@ func installViaSearch(query string, versionFilename string, autoAcceptFirst bool
 
 	fmt.Println("Searching Modrinth...")
 
-	results, err := sources.GetModrinthProjectIdsViaSearch(query, mcVersions)
+	projects, err := sources.ModrinthSearchForProjects(query, mcVersions)
 	if err != nil {
 		return err
 	}
 
-	if len(results) == 0 {
-		return errors.New("no projects found")
-	}
-
-	if viper.GetBool("non-interactive") || (len(results) == 1 && autoAcceptFirst) {
+	if viper.GetBool("non-interactive") || (len(projects) == 1 && optionalFilenameMatch != "") {
 		// Install the first project found
-		project, err := sources.GetModrinthClient().Projects.Get(*results[0].ProjectID)
-		if err != nil {
-			return err
-		}
-
-		return installProject(project, versionFilename, pack)
+		return installProject(projects[0], optionalFilenameMatch, pack)
 	}
 
-	// Create menu for the user to choose the correct project
+	// Create a menu for the user to choose the correct project
 	menu := wmenu.NewMenu("Choose a number:")
 	menu.Option("Cancel", nil, false, nil)
-	for i, v := range results {
+	for i, v := range projects {
 		// Should be non-nil (Title is a required field)
 		menu.Option(*v.Title, v, i == 0, nil)
 	}
@@ -188,87 +181,55 @@ func installViaSearch(query string, versionFilename string, autoAcceptFirst bool
 		}
 
 		// Get the selected project
-		selectedProject, ok := menuRes[0].Value.(*modrinthApi.SearchResult)
+		selectedProject, ok := menuRes[0].Value.(*modrinthApi.Project)
 		if !ok {
 			return errors.New("error converting interface from wmenu")
 		}
 
-		// Install the selected project
-		project, err := sources.GetModrinthClient().Projects.Get(*selectedProject.ProjectID)
-		if err != nil {
-			return err
-		}
-
-		return installProject(project, versionFilename, pack)
+		return installProject(selectedProject, optionalFilenameMatch, pack)
 	})
 
 	return menu.Run()
 }
 
-func installProject(project *modrinthApi.Project, versionFilename string, pack *core.Pack) error {
-	latestVersion, err := sources.GetModrinthLatestVersion(*project.ID, *project.Title, *pack)
+func installProject(project *modrinthApi.Project, optionalFilenameMatch string, pack *core.Pack) error {
+	latestVersion, err := sources.ModrinthGetLatestVersion(*project.ID, *project.Title, *pack, viper.GetString("datapack-folder"))
 	if err != nil {
 		return fmt.Errorf("failed to get latest version: %v", err)
 	}
 
-	return installVersion(project, latestVersion, versionFilename, pack)
+	return installVersion(project, latestVersion, optionalFilenameMatch, pack)
 }
 
-func installVersion(project *modrinthApi.Project, version *modrinthApi.Version, versionFilename string, pack *core.Pack) error {
+func installVersion(project *modrinthApi.Project, version *modrinthApi.Version, optionalFilenameMatch string, pack *core.Pack) error {
 	if len(version.Files) == 0 {
 		return errors.New("version doesn't have any files attached")
 	}
 
+	var err error
+	var missingDependencies []sources.ModrinthDepMetadataStore
 	if len(version.Dependencies) > 0 {
 
-		mods := make([]*core.Mod, 1)
-		for _, v := range pack.Mods {
-			mods = append(mods, v)
-		}
-
-		missingDependencies, err := sources.GetModrinthModMissingDependencies(version, *pack, mods)
+		missingDependencies, err = sources.ModrinthFindMissingDependencies(version, *pack, viper.GetString("datapack-folder"))
 		if err != nil {
 			return err
 		}
-		if len(missingDependencies) > 0 {
-			if err = maybeInstallDependencies(missingDependencies, pack); err != nil {
-				return err
-			}
+
+		if len(missingDependencies) > 0 && !shared.PromptYesNo("Would you like to add them? [Y/n]: ") {
+			missingDependencies = nil
 		}
 	}
 
-	var file = sources.GetModrinthVersionPrimaryFile(version, versionFilename)
+	newMods, err := sources.ModrinthNewMod(project, version, viper.GetString("meta-folder"), pack.GetCompatibleLoaders(), missingDependencies, optionalFilenameMatch)
 
-	// TODO: handle optional/required resource pack files
-
-	// Create the metadata file
-	mod, err := sources.CreateModrinthMod(project, version, file, pack, viper.GetString("meta-folder"))
-	if err != nil {
-		return err
+	if len(newMods) == 0 {
+		return errors.New("no mods were installed")
 	}
 
-	pack.SetMod(mod)
-
-	fmt.Printf("Project \"%s\" successfully added! (%s)\n", *project.Title, *file.Filename)
-	return nil
-}
-
-func maybeInstallDependencies(
-	depMetadata []sources.ModrinthDepMetadataStore,
-	pack *core.Pack,
-) error {
-	if shared.PromptYesNo("Would you like to add them? [Y/n]: ") {
-		for _, v := range depMetadata {
-			mod, err := sources.CreateModrinthMod(v.ProjectInfo, v.VersionInfo, v.FileInfo, pack, viper.GetString("meta-folder"))
-			if err != nil {
-				return err
-			}
-
-			pack.SetMod(mod)
-
-			fmt.Printf("Dependency \"%s\" successfully added! (%s)\n", *v.ProjectInfo.Title, *v.FileInfo.Filename)
-		}
+	for _, mod := range newMods {
+		pack.SetMod(mod)
 	}
 
+	fmt.Printf("Project \"%s\" successfully added! (%s)\n", *project.Title, newMods[len(newMods)-1].Slug)
 	return nil
 }

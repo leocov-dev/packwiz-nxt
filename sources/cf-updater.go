@@ -3,18 +3,16 @@ package sources
 import (
 	"errors"
 	"fmt"
-	"github.com/leocov-dev/packwiz-nxt/fileio"
-	"github.com/spf13/viper"
-	"github.com/unascribed/FlexVer/go/flexver"
 	"golang.org/x/exp/slices"
 	"io"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 
-	"github.com/leocov-dev/packwiz-nxt/core"
 	"github.com/mitchellh/mapstructure"
+	"github.com/unascribed/FlexVer/go/flexver"
+
+	"github.com/leocov-dev/packwiz-nxt/core"
 )
 
 func init() {
@@ -117,7 +115,7 @@ var urlRegexes = [...]*regexp.Regexp{
 	regexp.MustCompile(`^(?P<slug>[a-z][\da-z\-_]{0,127})$`),
 }
 
-func ParseSlugOrUrl(url string) (game string, category string, slug string, fileID uint32, err error) {
+func CfParseSlugOrUrl(url string) (game string, category string, slug string, fileID uint32, err error) {
 	for _, r := range urlRegexes {
 		matches := r.FindStringSubmatch(url)
 		if matches != nil {
@@ -152,22 +150,18 @@ var defaultFolders = map[uint32]map[uint32]string{
 	},
 }
 
-func GetPathForFile(gameID uint32, classID uint32, categoryID uint32, slug string) string {
-	metaFolder := viper.GetString("meta-folder")
-	if metaFolder == "" {
-		if m, ok := defaultFolders[gameID]; ok {
-			if folder, ok := m[classID]; ok {
-				return filepath.Join(viper.GetString("meta-folder-base"), folder, slug+core.MetaExtension)
-			} else if folder, ok := m[categoryID]; ok {
-				return filepath.Join(viper.GetString("meta-folder-base"), folder, slug+core.MetaExtension)
-			}
+func GetCfModType(gameID, classID, categoryID uint32) string {
+	if m, ok := defaultFolders[gameID]; ok {
+		if modType, ok := m[classID]; ok {
+			return modType
+		} else if modType, ok := m[categoryID]; ok {
+			return modType
 		}
-		metaFolder = "."
 	}
-	return filepath.Join(viper.GetString("meta-folder-base"), metaFolder, slug+core.MetaExtension)
+	return "unknown"
 }
 
-func CreateModFile(modInfo ModInfo, fileInfo ModFileInfo, index *core.IndexFS, optionalDisabled bool) error {
+func CreateModFile(modInfo ModInfo, fileInfo ModFileInfo, optionalDisabled bool) (*core.Mod, error) {
 	updateMap := make(core.ModUpdate)
 	var err error
 
@@ -176,7 +170,7 @@ func CreateModFile(modInfo ModInfo, fileInfo ModFileInfo, index *core.IndexFS, o
 		FileID:    fileInfo.ID,
 	}.ToMap()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	hash, hashFormat := fileInfo.GetBestHash()
@@ -189,35 +183,26 @@ func CreateModFile(modInfo ModInfo, fileInfo ModFileInfo, index *core.IndexFS, o
 		}
 	}
 
-	modMeta := core.ModToml{
-		Name:     modInfo.Name,
-		FileName: fileInfo.FileName,
-		Side:     core.UniversalSide,
-		Download: core.ModDownload{
+	return core.NewMod(
+		modInfo.Slug,
+		modInfo.Name,
+		fileInfo.FileName,
+		core.UniversalSide,
+		GetCfModType(modInfo.GameID, modInfo.ClassID, modInfo.PrimaryCategoryID),
+		"",
+		false,
+		false,
+		updateMap,
+		core.ModDownload{
 			HashFormat: hashFormat,
 			Hash:       hash,
 			Mode:       core.ModeCF,
 		},
-		Option: optional,
-		Update: updateMap,
-	}
-	path := modMeta.SetMetaPath(GetPathForFile(modInfo.GameID, modInfo.ClassID, modInfo.PrimaryCategoryID, modInfo.Slug))
-
-	// If the file already exists, this will overwrite it!!!
-	// TODO: Should this be improved?
-	// Current strategy is to go ahead and do stuff without asking, with the assumption that you are using
-	// VCS anyway.
-
-	modWriter := fileio.NewModWriter()
-	format, hash, err := modWriter.Write(&modMeta)
-	if err != nil {
-		return err
-	}
-
-	return index.UpdateFileHashGiven(path, format, hash, true)
+		optional,
+	), nil
 }
 
-func GetSearchLoaderType(pack core.PackToml) ModloaderType {
+func GetSearchLoaderType(pack core.Pack) ModloaderType {
 	dependencies := pack.Versions
 
 	_, hasFabric := dependencies["fabric"]

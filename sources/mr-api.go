@@ -9,7 +9,6 @@ import (
 	"regexp"
 
 	modrinthApi "codeberg.org/jmansfield/go-modrinth/modrinth"
-	"github.com/spf13/viper"
 	"github.com/unascribed/FlexVer/go/flexver"
 	"golang.org/x/exp/slices"
 
@@ -26,7 +25,19 @@ func GetModrinthClient() *modrinthApi.Client {
 	return mrDefaultClient
 }
 
-func GetModrinthProjectIdsViaSearch(query string, versions []string) ([]*modrinthApi.SearchResult, error) {
+func ModrinthProjectFromVersionID(versionId string) (*modrinthApi.Project, *modrinthApi.Version, error) {
+	version, err := GetModrinthClient().Versions.Get(versionId)
+	if err != nil {
+		return nil, nil, err
+	}
+	project, err := GetModrinthClient().Projects.Get(*version.ProjectID)
+	if err != nil {
+		return nil, nil, err
+	}
+	return project, version, nil
+}
+
+func ModrinthSearchForProjects(query string, versions []string) ([]*modrinthApi.Project, error) {
 	facets := make([]string, 0)
 	for _, v := range versions {
 		facets = append(facets, "versions:"+v)
@@ -38,11 +49,24 @@ func GetModrinthProjectIdsViaSearch(query string, versions []string) ([]*modrint
 		Facets: [][]string{facets},
 		Query:  query,
 	})
-
 	if err != nil {
 		return nil, err
 	}
-	return res.Hits, nil
+	if len(res.Hits) == 0 {
+		return nil, errors.New("no projects found")
+	}
+
+	projects := make([]*modrinthApi.Project, 0)
+
+	for _, result := range res.Hits {
+		project, err := GetModrinthClient().Projects.Get(*result.ProjectID)
+		if err != nil {
+			return nil, err
+		}
+		projects = append(projects, project)
+	}
+
+	return projects, nil
 }
 
 // "Loaders" that are supported regardless of the configured mod loaders
@@ -228,6 +252,78 @@ func ParseModrinthSlugOrUrl(input string, slug *string, version *string, version
 	return
 }
 
+func ParseAsModrinthSlug(input string) string {
+	for _, r := range mrUrlRegexes {
+		matches := r.FindStringSubmatch(input)
+		if matches != nil {
+			if i := r.SubexpIndex("urlCategory"); i >= 0 {
+				if !slices.Contains(mrUrlCategories, matches[i]) {
+					return ""
+				}
+			}
+			if i := r.SubexpIndex("slug"); i >= 0 {
+				return matches[i]
+			}
+		}
+	}
+	return ""
+}
+
+func ParseAsModrinthVersion(input string) string {
+	for _, r := range mrUrlRegexes {
+		matches := r.FindStringSubmatch(input)
+		if matches != nil {
+			if i := r.SubexpIndex("urlCategory"); i >= 0 {
+				if !slices.Contains(mrUrlCategories, matches[i]) {
+					return ""
+				}
+			}
+			if i := r.SubexpIndex("version"); i >= 0 {
+				return matches[i]
+			}
+		}
+	}
+	return ""
+}
+
+func ParseAsModrinthVersionID(input string) string {
+	for _, r := range mrUrlRegexes {
+		matches := r.FindStringSubmatch(input)
+		if matches != nil {
+			if i := r.SubexpIndex("urlCategory"); i >= 0 {
+				if !slices.Contains(mrUrlCategories, matches[i]) {
+					return ""
+				}
+			}
+			if i := r.SubexpIndex("versionID"); i >= 0 {
+				return matches[i]
+			}
+		}
+	}
+	return ""
+}
+
+func ParseAsParseAsFilename(input string) string {
+	for _, r := range mrUrlRegexes {
+		matches := r.FindStringSubmatch(input)
+		if matches != nil {
+			if i := r.SubexpIndex("urlCategory"); i >= 0 {
+				if !slices.Contains(mrUrlCategories, matches[i]) {
+					return ""
+				}
+			}
+			if i := r.SubexpIndex("filename"); i >= 0 {
+				parsed, err := url.PathUnescape(matches[i])
+				if err != nil {
+					return ""
+				}
+				return parsed
+			}
+		}
+	}
+	return ""
+}
+
 func mrCompareLoaderLists(a []string, b []string) int32 {
 	var compat []string
 	for k, v := range mrLoaderCompatGroups {
@@ -302,13 +398,13 @@ func mrFindLatestVersion(versions []*modrinthApi.Version, gameVersions []string,
 	return latestValidVersion
 }
 
-func GetModrinthLatestVersion(projectID string, name string, pack core.Pack) (*modrinthApi.Version, error) {
+func ModrinthGetLatestVersion(projectID string, name string, pack core.Pack, optionalDatapackFolder string) (*modrinthApi.Version, error) {
 	gameVersions, err := pack.GetSupportedMCVersions()
 	if err != nil {
 		return nil, err
 	}
 	var loaders []string
-	if viper.GetString("datapack-folder") != "" {
+	if optionalDatapackFolder != "" {
 		loaders = append(pack.GetCompatibleLoaders(), withDatapackPathMRLoaders...)
 	} else {
 		loaders = append(pack.GetCompatibleLoaders(), defaultMRLoaders...)

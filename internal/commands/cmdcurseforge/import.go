@@ -10,6 +10,7 @@ import (
 	"github.com/leocov-dev/packwiz-nxt/internal/commands/cmdcurseforge/packinterop"
 	"github.com/leocov-dev/packwiz-nxt/internal/shared"
 	"github.com/leocov-dev/packwiz-nxt/sources"
+	"github.com/spf13/viper"
 	"io"
 	"os"
 	"path/filepath"
@@ -18,7 +19,6 @@ import (
 
 	"github.com/leocov-dev/packwiz-nxt/core"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 func init() {
@@ -131,23 +131,23 @@ var importCmd = &cobra.Command{
 				packImport = packinterop.ReadMetadata(packinterop.GetDiskPackSource(buf, filepath.ToSlash(filepath.Base(inputFile)), filepath.Dir(inputFile)))
 			}
 		}
+		packFile, packDir, err := shared.GetPackPaths()
+		if err != nil {
+			shared.Exitln(err)
+		}
 
-		pack, err := fileio.LoadPackFile(viper.GetString("pack-file"))
+		pack, err := fileio.LoadAll(packFile)
 		if err != nil {
 			fmt.Println("Failed to load existing pack, creating a new one...")
 
-			pack := core.CreatePackToml(
+			pack = core.NewPack(
 				packImport.Name(),
 				packImport.PackAuthor(),
 				packImport.PackVersion(),
+				"",
+				packImport.Versions()["minecraft"],
 				packImport.Versions(),
 			)
-
-			err = fileio.InitIndexFile(*pack)
-			if err != nil {
-				shared.Exitf("Error creating index file: %s\n", err)
-			}
-
 		} else {
 			for component, version := range packImport.Versions() {
 				packVersion, ok := pack.Versions[component]
@@ -158,10 +158,6 @@ var importCmd = &cobra.Command{
 				}
 				pack.Versions[component] = version
 			}
-		}
-		index, err := fileio.LoadPackIndexFile(&pack)
-		if err != nil {
-			shared.Exitln(err)
 		}
 
 		modsList := packImport.Mods()
@@ -238,12 +234,14 @@ var importCmd = &cobra.Command{
 				continue
 			}
 
-			err = sources.CreateModFile(modInfoValue, modFileInfoValue, &index, v.OptionalDisabled)
+			mod, err := sources.CreateModFile(modInfoValue, modFileInfoValue, v.OptionalDisabled)
 			if err != nil {
 				shared.Exitf("Failed to save project \"%s\": %s\n", modInfoValue.Name, err)
 			}
 
-			modFilePath := sources.GetPathForFile(modInfoValue.GameID, modInfoValue.ClassID, modInfoValue.PrimaryCategoryID, modInfoValue.Slug)
+			pack.SetMod(mod)
+
+			modFilePath := getPathForFile(modInfoValue.GameID, modInfoValue.ClassID, modInfoValue.PrimaryCategoryID, modInfoValue.Slug)
 			ref, err := filepath.Abs(filepath.Join(filepath.Dir(modFilePath), modFileInfoValue.FileName))
 			if err == nil {
 				referencedModPaths = append(referencedModPaths, ref)
@@ -263,7 +261,7 @@ var importCmd = &cobra.Command{
 
 		successes = 0
 		for _, v := range filesList {
-			filePath := index.ResolveIndexPath(v.Name())
+			filePath := filepath.Join(packDir, filepath.FromSlash(v.Name()))
 			filePathAbs, err := filepath.Abs(filePath)
 			if err == nil {
 				found := false
@@ -300,6 +298,7 @@ var importCmd = &cobra.Command{
 					continue
 				}
 			}
+
 			src, err := v.Open()
 			if err != nil {
 				fmt.Printf("Failed to read file \"%s\": %s\n", filePath, err)
@@ -319,29 +318,18 @@ var importCmd = &cobra.Command{
 			src.Close()
 			successes++
 		}
-		if len(filesList) > 0 {
-			fmt.Printf("Successfully copied %d/%d files!\n", successes, len(filesList))
-			err = fileio.RefreshIndexFiles(&index)
-			if err != nil {
-				shared.Exitln(err)
-			}
-		} else {
-			fmt.Println("No files copied!")
-		}
 
-		repr := index.ToWritable()
-		writer := fileio.NewIndexWriter()
-		err = writer.Write(&repr)
-		if err != nil {
-			shared.Exitln(err)
-		}
-
-		pack.RefreshIndexHash(index)
-
-		packWriter := fileio.NewPackWriter()
-		err = packWriter.Write(&pack)
+		err = fileio.WriteAll(*pack, packDir)
 		if err != nil {
 			shared.Exitln(err)
 		}
 	},
+}
+
+func getPathForFile(gameID uint32, classID uint32, categoryID uint32, slug string) string {
+	metaFolder := viper.GetString("meta-folder")
+	if metaFolder == "" {
+		metaFolder = sources.GetCfModType(gameID, classID, categoryID)
+	}
+	return filepath.Join(viper.GetString("meta-folder-base"), metaFolder, slug+core.MetaExtension)
 }

@@ -3,15 +3,44 @@ package sources
 import (
 	"errors"
 	"fmt"
+	"golang.org/x/exp/slices"
 
 	modrinthApi "codeberg.org/jmansfield/go-modrinth/modrinth"
-	"golang.org/x/exp/slices"
 
 	"github.com/leocov-dev/packwiz-nxt/core"
 )
 
-func NewModrinthMod() (*core.Mod, error) {
-	return nil, errors.New("not implemented")
+func ModrinthNewMod(
+	project *modrinthApi.Project,
+	version *modrinthApi.Version,
+	modType string,
+	compatibleLoaders []string,
+	additionalDependencies []ModrinthDepMetadataStore,
+	optionalFilenameMatch string,
+) ([]*core.Mod, error) {
+
+	var mods []*core.Mod
+	var err error
+
+	if len(additionalDependencies) > 0 {
+		mods, err = CreateModrinthDependencies(compatibleLoaders, additionalDependencies)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		mods = make([]*core.Mod, 0)
+	}
+
+	primaryFile := GetModrinthVersionPrimaryFile(version, optionalFilenameMatch)
+
+	mod, err := CreateModrinthMod(project, version, primaryFile, compatibleLoaders, modType)
+	if err != nil {
+		return nil, err
+	}
+
+	mods = append(mods, mod)
+
+	return mods, nil
 }
 
 const mrMaxCycles = 20
@@ -22,13 +51,13 @@ type ModrinthDepMetadataStore struct {
 	FileInfo    *modrinthApi.File
 }
 
-func GetModrinthModMissingDependencies(
+func ModrinthFindMissingDependencies(
 	version *modrinthApi.Version,
 	pack core.Pack,
-	currentMods []*core.Mod,
+	optionalDatapackFolder string,
 ) ([]ModrinthDepMetadataStore, error) {
 	// TODO: could get installed version IDs, and compare to install the newest - i.e. preferring pinned versions over getting absolute latest?
-	installedProjects := mrGetInstalledProjectIDs(currentMods)
+	installedProjects := mrGetInstalledProjectIDs(pack.GetModsList())
 	isQuilt := slices.Contains(pack.GetCompatibleLoaders(), "quilt")
 	mcVersion, err := pack.GetMCVersion()
 	if err != nil {
@@ -106,7 +135,7 @@ func GetModrinthModMissingDependencies(
 					return nil, errors.New("failed to get dependency data: invalid response")
 				}
 				// Get latest version - could reuse version lookup data but it's not as easy (particularly since the version won't necessarily be the latest)
-				latestVersion, err := GetModrinthLatestVersion(*project.ID, *project.Title, pack)
+				latestVersion, err := ModrinthGetLatestVersion(*project.ID, *project.Title, pack, optionalDatapackFolder)
 				if err != nil {
 					fmt.Printf("Failed to get latest version of dependency %v: %v\n", *project.Title, err)
 					continue
@@ -159,12 +188,12 @@ func GetModrinthModMissingDependencies(
 
 func GetModrinthVersionPrimaryFile(
 	version *modrinthApi.Version,
-	versionFilename string,
+	optionalFilenameMatch string,
 ) *modrinthApi.File {
 	var file = version.Files[0]
 	// Prefer the primary file
 	for _, v := range version.Files {
-		if (*v.Primary) || (versionFilename != "" && versionFilename == *v.Filename) {
+		if (*v.Primary) || (optionalFilenameMatch != "" && optionalFilenameMatch == *v.Filename) {
 			file = v
 		}
 	}
@@ -176,7 +205,7 @@ func CreateModrinthMod(
 	project *modrinthApi.Project,
 	version *modrinthApi.Version,
 	file *modrinthApi.File,
-	pack *core.Pack,
+	compatibleLoaders []string,
 	customMetaFolder string,
 ) (*core.Mod, error) {
 	updateMap := make(core.ModUpdate)
@@ -184,7 +213,7 @@ func CreateModrinthMod(
 	var err error
 	metaFolder := customMetaFolder
 	if metaFolder == "" {
-		metaFolder, err = mrGetProjectTypeFolder(*project.ProjectType, version.Loaders, pack.GetCompatibleLoaders())
+		metaFolder, err = mrGetProjectTypeFolder(*project.ProjectType, version.Loaders, compatibleLoaders)
 		if err != nil {
 			return nil, err
 		}
@@ -236,4 +265,22 @@ func GetModrinthProjectSlug(project *modrinthApi.Project) string {
 		return *project.Slug
 	}
 	return core.SlugifyName(*project.Title)
+}
+
+func CreateModrinthDependencies(
+	compatibleLoaders []string,
+	depMetadata []ModrinthDepMetadataStore,
+) ([]*core.Mod, error) {
+	mods := make([]*core.Mod, 0)
+
+	for _, v := range depMetadata {
+		mod, err := CreateModrinthMod(v.ProjectInfo, v.VersionInfo, v.FileInfo, compatibleLoaders, "")
+		if err != nil {
+			return nil, err
+		}
+
+		mods = append(mods, mod)
+	}
+
+	return mods, nil
 }

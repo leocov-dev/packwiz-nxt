@@ -44,7 +44,7 @@ var installCmd = &cobra.Command{
 
 		slugOrUrl := args[0]
 
-		mod, err := sources.NewGitHubMod(
+		mod, err := sources.GitHubNewMod(
 			args[0],
 			branchFlag,
 			regexFlag,

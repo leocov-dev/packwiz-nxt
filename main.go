@@ -12,11 +12,15 @@ import (
 	_ "github.com/leocov-dev/packwiz-nxt/internal/commands/cmdutils"
 )
 
-var Version string
-var CfApiKey string
+var (
+	Version  string
+	CfApiKey string
+	GhApiKey string
+)
 
 func main() {
 	config.SetVersion(Version)
 	config.SetCurseforgeApiKey(CfApiKey)
+	config.SetGitHubApiKey(GhApiKey)
 	cmd.Execute()
 }

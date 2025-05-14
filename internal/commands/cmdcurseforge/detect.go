@@ -7,7 +7,6 @@ import (
 	"github.com/leocov-dev/packwiz-nxt/internal/shared"
 	"github.com/leocov-dev/packwiz-nxt/sources"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,11 +21,12 @@ var detectCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Loading modpack...")
-		pack, err := fileio.LoadPackFile(viper.GetString("pack-file"))
+		packFile, packDir, err := shared.GetPackPaths()
 		if err != nil {
 			shared.Exitln(err)
 		}
-		index, err := fileio.LoadPackIndexFile(&pack)
+
+		pack, err := fileio.LoadAll(packFile)
 		if err != nil {
 			shared.Exitln(err)
 		}
@@ -96,42 +96,18 @@ var detectCmd = &cobra.Command{
 
 		fmt.Println("Creating metadata files...")
 		for _, v := range res.ExactMatches {
-			err = sources.CreateModFile(modInfosMap[v.ID], v.File, &index, false)
+			mod, err := sources.CreateModFile(modInfosMap[v.ID], v.File, false)
 			if err != nil {
 				shared.Exitln(err)
 			}
 
-			path, ok := modPaths[v.File.Fingerprint]
-			if ok {
-				err = os.Remove(path)
-				if err != nil {
-					shared.Exitln(err)
-				}
-			}
+			pack.SetMod(mod)
 		}
 		fmt.Println("Detection complete!")
 
-		err = fileio.RefreshIndexFiles(&index)
+		err = fileio.WriteAll(*pack, packDir)
 		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-		repr := index.ToWritable()
-		writer := fileio.NewIndexWriter()
-		err = writer.Write(&repr)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-		pack.RefreshIndexHash(index)
-
-		packWriter := fileio.NewPackWriter()
-		err = packWriter.Write(&pack)
-		if err != nil {
-			fmt.Println(err)
-			return
+			shared.Exitln(err)
 		}
 	},
 }
