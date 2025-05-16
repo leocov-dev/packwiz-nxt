@@ -206,21 +206,34 @@ func installVersion(project *modrinthApi.Project, version *modrinthApi.Version, 
 		return errors.New("version doesn't have any files attached")
 	}
 
-	var err error
-	var missingDependencies []sources.ModrinthDepMetadataStore
+	var missingDependencies []*core.Mod
 	if len(version.Dependencies) > 0 {
 
-		missingDependencies, err = sources.ModrinthFindMissingDependencies(version, *pack, viper.GetString("datapack-folder"))
+		missingDependencies, err := sources.ModrinthFindMissingDependencies(version, *pack, viper.GetString("datapack-folder"))
 		if err != nil {
 			return err
 		}
 
-		if len(missingDependencies) > 0 && !shared.PromptYesNo("Would you like to add them? [Y/n]: ") {
-			missingDependencies = nil
+		if len(missingDependencies) > 0 {
+			fmt.Println("Dependencies found:")
+			for _, v := range missingDependencies {
+				fmt.Println(v.Slug)
+			}
+
+			if !shared.PromptYesNo("Would you like to add them? [Y/n]: ") {
+				// if NO is chosen then we'll nil the slice to prevent installing
+				missingDependencies = nil
+			}
 		}
+
 	}
 
-	newMods, err := sources.ModrinthNewMod(project, version, viper.GetString("meta-folder"), pack.GetCompatibleLoaders(), missingDependencies, optionalFilenameMatch)
+	mainMod, err := sources.ModrinthNewMod(project, version, viper.GetString("meta-folder"), pack.GetCompatibleLoaders(), optionalFilenameMatch)
+	if err != nil {
+		return err
+	}
+
+	newMods := append(missingDependencies, mainMod)
 
 	if len(newMods) == 0 {
 		return errors.New("no mods were installed")

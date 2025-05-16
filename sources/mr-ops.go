@@ -15,32 +15,19 @@ func ModrinthNewMod(
 	version *modrinthApi.Version,
 	modType string,
 	compatibleLoaders []string,
-	additionalDependencies []ModrinthDepMetadataStore,
 	optionalFilenameMatch string,
-) ([]*core.Mod, error) {
+) (*core.Mod, error) {
 
-	var mods []*core.Mod
 	var err error
-
-	if len(additionalDependencies) > 0 {
-		mods, err = CreateModrinthDependencies(compatibleLoaders, additionalDependencies)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		mods = make([]*core.Mod, 0)
-	}
 
 	primaryFile := GetModrinthVersionPrimaryFile(version, optionalFilenameMatch)
 
-	mod, err := CreateModrinthMod(project, version, primaryFile, compatibleLoaders, modType)
+	mod, err := createModrinthMod(project, version, primaryFile, compatibleLoaders, modType)
 	if err != nil {
 		return nil, err
 	}
 
-	mods = append(mods, mod)
-
-	return mods, nil
+	return mod, nil
 }
 
 const mrMaxCycles = 20
@@ -55,7 +42,7 @@ func ModrinthFindMissingDependencies(
 	version *modrinthApi.Version,
 	pack core.Pack,
 	optionalDatapackFolder string,
-) ([]ModrinthDepMetadataStore, error) {
+) ([]*core.Mod, error) {
 	// TODO: could get installed version IDs, and compare to install the newest - i.e. preferring pinned versions over getting absolute latest?
 	installedProjects := mrGetInstalledProjectIDs(pack.GetModsList())
 	isQuilt := slices.Contains(pack.GetCompatibleLoaders(), "quilt")
@@ -175,15 +162,12 @@ func ModrinthFindMissingDependencies(
 		}
 	}
 
-	if len(depMetadata) > 0 {
-		fmt.Println("Dependencies found:")
-		for _, v := range depMetadata {
-			fmt.Println(*v.ProjectInfo.Title)
-		}
-		return depMetadata, nil
+	mods, err := createModrinthDependencies(pack.GetCompatibleLoaders(), depMetadata)
+	if err != nil {
+		return nil, err
 	}
 
-	return nil, nil
+	return mods, nil
 }
 
 func GetModrinthVersionPrimaryFile(
@@ -201,7 +185,7 @@ func GetModrinthVersionPrimaryFile(
 	return file
 }
 
-func CreateModrinthMod(
+func createModrinthMod(
 	project *modrinthApi.Project,
 	version *modrinthApi.Version,
 	file *modrinthApi.File,
@@ -244,7 +228,7 @@ func CreateModrinthMod(
 	}
 
 	mod := core.NewMod(
-		GetModrinthProjectSlug(project),
+		getModrinthProjectSlug(project),
 		*project.Title,
 		*file.Filename,
 		side,
@@ -260,21 +244,21 @@ func CreateModrinthMod(
 	return mod, nil
 }
 
-func GetModrinthProjectSlug(project *modrinthApi.Project) string {
+func getModrinthProjectSlug(project *modrinthApi.Project) string {
 	if project.Slug != nil {
 		return *project.Slug
 	}
 	return core.SlugifyName(*project.Title)
 }
 
-func CreateModrinthDependencies(
+func createModrinthDependencies(
 	compatibleLoaders []string,
 	depMetadata []ModrinthDepMetadataStore,
 ) ([]*core.Mod, error) {
 	mods := make([]*core.Mod, 0)
 
 	for _, v := range depMetadata {
-		mod, err := CreateModrinthMod(v.ProjectInfo, v.VersionInfo, v.FileInfo, compatibleLoaders, "")
+		mod, err := createModrinthMod(v.ProjectInfo, v.VersionInfo, v.FileInfo, compatibleLoaders, "")
 		if err != nil {
 			return nil, err
 		}

@@ -173,14 +173,14 @@ var importCmd = &cobra.Command{
 			shared.Exitf("Failed to obtain project information: %s\n", err)
 		}
 
-		modInfosMap := make(map[uint32]sources.ModInfo)
+		modInfosMap := make(map[uint32]sources.CfModInfo)
 		for _, v := range modInfos {
 			modInfosMap[v.ID] = v
 		}
 
 		// TODO: multithreading????
 
-		modFileInfosMap := make(map[uint32]sources.ModFileInfo)
+		modFileInfosMap := make(map[uint32]sources.CfModFileInfo)
 		referencedModPaths := make([]string, 0, len(modsList))
 		successes := 0
 		remainingFileIDs := make([]uint32, 0, len(modsList))
@@ -194,7 +194,7 @@ var importCmd = &cobra.Command{
 			}
 
 			found := false
-			var fileInfo sources.ModFileInfo
+			var fileInfo sources.CfModFileInfo
 			for _, fileInfo = range modInfoValue.LatestFiles {
 				if fileInfo.ID == v.FileID {
 					found = true
@@ -234,7 +234,7 @@ var importCmd = &cobra.Command{
 				continue
 			}
 
-			mod, err := sources.CreateModFile(modInfoValue, modFileInfoValue, v.OptionalDisabled)
+			mod, err := sources.CurseforgeNewMod(modInfoValue, modFileInfoValue, v.OptionalDisabled)
 			if err != nil {
 				shared.Exitf("Failed to save project \"%s\": %s\n", modInfoValue.Name, err)
 			}

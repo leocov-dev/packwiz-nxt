@@ -89,14 +89,14 @@ var detectCmd = &cobra.Command{
 		if err != nil {
 			shared.Exitf("Failed to retrieve metadata: %v", err)
 		}
-		modInfosMap := make(map[uint32]sources.ModInfo)
+		modInfosMap := make(map[uint32]sources.CfModInfo)
 		for _, v := range modInfos {
 			modInfosMap[v.ID] = v
 		}
 
 		fmt.Println("Creating metadata files...")
 		for _, v := range res.ExactMatches {
-			mod, err := sources.CreateModFile(modInfosMap[v.ID], v.File, false)
+			mod, err := sources.CurseforgeNewMod(modInfosMap[v.ID], v.File, false)
 			if err != nil {
 				shared.Exitln(err)
 			}

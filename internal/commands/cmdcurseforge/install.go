@@ -3,13 +3,13 @@ package cmdcurseforge
 import (
 	"errors"
 	"fmt"
+	"github.com/leocov-dev/packwiz-nxt/core"
 	"github.com/leocov-dev/packwiz-nxt/sources"
 	"strings"
 
 	"github.com/sahilm/fuzzy"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"golang.org/x/exp/slices"
 	"gopkg.in/dixonwille/wmenu.v4"
 
 	"github.com/leocov-dev/packwiz-nxt/fileio"
@@ -19,7 +19,6 @@ import (
 var addonIDFlag uint32
 var fileIDFlag uint32
 
-var gameFlag string
 var categoryFlag string
 
 func init() {
@@ -27,16 +26,10 @@ func init() {
 
 	installCmd.Flags().Uint32Var(&addonIDFlag, "addon-id", 0, "The CurseForge project ID to use")
 	installCmd.Flags().Uint32Var(&fileIDFlag, "file-id", 0, "The CurseForge file ID to use")
-	installCmd.Flags().StringVar(&gameFlag, "game", "minecraft", "The game to add files from (slug, as stored in URLs); the game in the URL takes precedence")
 	installCmd.Flags().StringVar(&categoryFlag, "category", "", "The category to add files from (slug, as stored in URLs); the category in the URL takes precedence")
 }
 
 const maxCycles = 20
-
-type installableDep struct {
-	sources.ModInfo
-	fileInfo sources.ModFileInfo
-}
 
 // installCmd represents the install command
 var installCmd = &cobra.Command{
@@ -55,6 +48,7 @@ var installCmd = &cobra.Command{
 			shared.Exitln(err)
 		}
 
+		// ---
 		mcVersions, err := pack.GetSupportedMCVersions()
 		if err != nil {
 			shared.Exitln(err)
@@ -64,7 +58,7 @@ var installCmd = &cobra.Command{
 			shared.Exitln(err)
 		}
 
-		game := gameFlag
+		// ---
 		category := categoryFlag
 		var modID, fileID uint32
 		var slug string
@@ -81,14 +75,11 @@ var installCmd = &cobra.Command{
 			shared.Exitln("You must specify a project; with the ID flags, or by passing a URL, slug or search term directly.")
 		}
 		if modID == 0 && len(args) == 1 {
-			parsedGame, parsedCategory, parsedSlug, parsedFileID, err := sources.CfParseSlugOrUrl(args[0])
+			parsedCategory, parsedSlug, parsedFileID, err := sources.CurseforgeParseUrl(args[0])
 			if err != nil {
 				shared.Exitf("Failed to parse URL: %v\n", err)
 			}
 
-			if parsedGame != "" {
-				game = parsedGame
-			}
 			if parsedCategory != "" {
 				category = parsedCategory
 			}
@@ -101,15 +92,15 @@ var installCmd = &cobra.Command{
 		}
 
 		modInfoObtained := false
-		var modInfoData sources.ModInfo
+		var modInfoData sources.CfModInfo
 
 		if modID == 0 {
 			var cancelled bool
 			if slug == "" {
 				searchTerm := strings.Join(args, " ")
-				cancelled, modInfoData = SearchCurseforgeInternal(searchTerm, false, game, category, mcVersions, sources.GetSearchLoaderType(*pack))
+				cancelled, modInfoData = SearchCurseforgeInternal(searchTerm, false, category, mcVersions, sources.CfGetSearchLoaderType(*pack))
 			} else {
-				cancelled, modInfoData = SearchCurseforgeInternal(slug, true, game, category, mcVersions, sources.GetSearchLoaderType(*pack))
+				cancelled, modInfoData = SearchCurseforgeInternal(slug, true, category, mcVersions, sources.CfGetSearchLoaderType(*pack))
 			}
 			if cancelled {
 				return
@@ -129,126 +120,46 @@ var installCmd = &cobra.Command{
 			}
 		}
 
-		var fileInfoData sources.ModFileInfo
-		fileInfoData, err = GetLatestFile(modInfoData, mcVersions, fileID, pack.GetCompatibleLoaders())
+		fileInfoData, err := sources.GetLatestFile(modInfoData, mcVersions, fileID, pack.GetCompatibleLoaders())
 		if err != nil {
 			shared.Exitf("Failed to get file for project: %v\n", err)
 		}
 
+		var missingDependencies []*core.Mod
 		if len(fileInfoData.Dependencies) > 0 {
-			isQuilt := slices.Contains(pack.GetCompatibleLoaders(), "quilt")
 
-			var depsInstallable []installableDep
-			var depIDPendingQueue []uint32
-			for _, dep := range fileInfoData.Dependencies {
-				if dep.Type == sources.DependencyTypeRequired {
-					depIDPendingQueue = append(depIDPendingQueue, sources.MapDepOverride(dep.ModID, isQuilt, primaryMCVersion))
-				}
+			missingDependencies, err = sources.CurseforgeFindMissingDependencies(*pack, fileInfoData, primaryMCVersion)
+			if err != nil {
+				shared.Exitln(err)
 			}
 
-			if len(depIDPendingQueue) > 0 {
-				fmt.Println("Finding dependencies...")
-
-				cycles := 0
-				var installedIDList []uint32
-				for len(depIDPendingQueue) > 0 && cycles < maxCycles {
-					if installedIDList == nil {
-						// Get modids of all mods
-						if err != nil {
-							fmt.Printf("Failed to determine existing projects: %v\n", err)
-						} else {
-							for _, mod := range pack.GetModsList() {
-								var updateData sources.CfExportData
-								err = mod.DecodeNamedModSourceData("curseforge", updateData)
-								if err != nil {
-									shared.Exitln(err)
-								}
-
-								if updateData.ProjectID > 0 {
-									installedIDList = append(installedIDList, updateData.ProjectID)
-								}
-							}
-						}
-					}
-
-					// Remove installed IDs from dep queue
-					i := 0
-					for _, id := range depIDPendingQueue {
-						contains := slices.Contains(installedIDList, id)
-						for _, data := range depsInstallable {
-							if id == data.ID {
-								contains = true
-								break
-							}
-						}
-						if !contains {
-							depIDPendingQueue[i] = id
-							i++
-						}
-					}
-					depIDPendingQueue = depIDPendingQueue[:i]
-
-					if len(depIDPendingQueue) == 0 {
-						break
-					}
-
-					depInfoData, err := sources.GetCurseforgeClient().GetModInfoMultiple(depIDPendingQueue)
-					if err != nil {
-						fmt.Printf("Error retrieving dependency data: %s\n", err.Error())
-					}
-					depIDPendingQueue = depIDPendingQueue[:0]
-
-					for _, currData := range depInfoData {
-						depFileInfo, err := GetLatestFile(currData, mcVersions, 0, pack.GetCompatibleLoaders())
-						if err != nil {
-							fmt.Printf("Error retrieving dependency data: %s\n", err.Error())
-							continue
-						}
-
-						for _, dep := range depFileInfo.Dependencies {
-							if dep.Type == sources.DependencyTypeRequired {
-								depIDPendingQueue = append(depIDPendingQueue, sources.MapDepOverride(dep.ModID, isQuilt, primaryMCVersion))
-							}
-						}
-
-						depsInstallable = append(depsInstallable, installableDep{
-							currData, depFileInfo,
-						})
-					}
-
-					cycles++
-				}
-				if cycles >= maxCycles {
-					shared.Exitln("Dependencies recurse too deeply! Try increasing maxCycles.")
+			if len(missingDependencies) > 0 {
+				fmt.Println("Dependencies found:")
+				for _, v := range missingDependencies {
+					fmt.Println(v.Slug)
 				}
 
-				if len(depsInstallable) > 0 {
-					fmt.Println("Dependencies found:")
-					for _, v := range depsInstallable {
-						fmt.Println(v.Name)
-					}
-
-					if shared.PromptYesNo("Would you like to add them? [Y/n]: ") {
-						for _, v := range depsInstallable {
-							mod, err := sources.CreateModFile(v.ModInfo, v.fileInfo, false)
-							if err != nil {
-								shared.Exitln(err)
-							}
-							pack.SetMod(mod)
-							fmt.Printf("Dependency \"%s\" successfully added! (%s)\n", v.ModInfo.Name, v.fileInfo.FileName)
-						}
-					}
-				} else {
-					fmt.Println("All dependencies are already added!")
+				if !shared.PromptYesNo("Would you like to add them? [Y/n]: ") {
+					// if NO is chosen then we'll nil the slice to prevent installing
+					missingDependencies = nil
 				}
 			}
 		}
 
-		mod, err := sources.CreateModFile(modInfoData, fileInfoData, false)
+		mainMod, err := sources.CurseforgeNewMod(modInfoData, fileInfoData, false)
 		if err != nil {
 			shared.Exitln(err)
 		}
-		pack.SetMod(mod)
+
+		newMods := append(missingDependencies, mainMod)
+
+		if len(newMods) == 0 {
+			shared.Exitln("no mods were installed")
+		}
+
+		for _, mod := range newMods {
+			pack.SetMod(mod)
+		}
 
 		err = fileio.WriteAll(*pack, packDir)
 		if err != nil {
@@ -260,7 +171,7 @@ var installCmd = &cobra.Command{
 }
 
 // Used to implement interface for fuzzy matching
-type ModResultsList []sources.ModInfo
+type ModResultsList []sources.CfModInfo
 
 func (r ModResultsList) String(i int) string {
 	return r[i].Name
@@ -273,63 +184,27 @@ func (r ModResultsList) Len() int {
 func SearchCurseforgeInternal(
 	searchTerm string,
 	isSlug bool,
-	game string,
 	category string,
 	mcVersions []string,
 	searchLoaderType sources.ModloaderType,
-) (bool, sources.ModInfo) {
+) (bool, sources.CfModInfo) {
 	if isSlug {
 		fmt.Println("Looking up CurseForge slug...")
 	} else {
 		fmt.Println("Searching CurseForge...")
 	}
 
-	var gameID, categoryID, classID uint32
-	if game == "minecraft" {
-		gameID = 432
-	}
+	var categoryID, classID uint32
+
 	if category == "mc-mods" {
 		classID = 6
 	}
-	if gameID == 0 {
-		games, err := sources.GetCurseforgeClient().GetGames()
+
+	if classID == 0 && category != "" {
+		var err error
+		categoryID, classID, err = sources.CurseforgeCategoryLookup(category)
 		if err != nil {
-			shared.Exitf("Failed to lookup game %s: %v\n", game, err)
-		}
-		for _, v := range games {
-			if v.Slug == game {
-				if v.Status != sources.GameStatusLive {
-					shared.Exitf("Failed to lookup game %s: selected game is not live!\n", game)
-				}
-				if v.APIStatus != sources.GameApiStatusPublic {
-					shared.Exitf("Failed to lookup game %s: selected game does not have a public API!\n", game)
-				}
-				gameID = v.ID
-				break
-			}
-		}
-		if gameID == 0 {
-			shared.Exitf("Failed to lookup: game %s could not be found!\n", game)
-		}
-	}
-	if categoryID == 0 && classID == 0 && category != "" {
-		categories, err := sources.GetCurseforgeClient().GetCategories(gameID)
-		if err != nil {
-			shared.Exitf("Failed to lookup categories: %v\n", err)
-		}
-		for _, v := range categories {
-			if v.Slug == category {
-				if v.IsClass {
-					classID = v.ID
-				} else {
-					classID = v.ClassID
-					categoryID = v.ID
-				}
-				break
-			}
-		}
-		if categoryID == 0 && classID == 0 {
-			shared.Exitf("Failed to lookup: category %s could not be found!\n", category)
+			shared.Exitln(err)
 		}
 	}
 
@@ -344,13 +219,13 @@ func SearchCurseforgeInternal(
 	} else {
 		search = searchTerm
 	}
-	results, err := sources.GetCurseforgeClient().GetSearch(search, slug, gameID, classID, categoryID, filterGameVersion, searchLoaderType)
+	results, err := sources.GetCurseforgeClient().GetSearch(search, slug, classID, categoryID, filterGameVersion, searchLoaderType)
 	if err != nil {
 		shared.Exitf("Failed to search for project: %v\n", err)
 	}
 	if len(results) == 0 {
 		shared.Exitln("No projects found!")
-		return false, sources.ModInfo{}
+		return false, sources.CfModInfo{}
 	} else if len(results) == 1 {
 		return false, results[0]
 	} else {
@@ -377,7 +252,7 @@ func SearchCurseforgeInternal(
 			}
 		}
 
-		var modInfoData sources.ModInfo
+		var modInfoData sources.CfModInfo
 		var cancelled bool
 		menu.Action(func(menuRes []wmenu.Opt) error {
 			if len(menuRes) != 1 || menuRes[0].Value == nil {
@@ -388,7 +263,7 @@ func SearchCurseforgeInternal(
 
 			// Why is variable shadowing a thing!!!!
 			var ok bool
-			modInfoData, ok = menuRes[0].Value.(sources.ModInfo)
+			modInfoData, ok = menuRes[0].Value.(sources.CfModInfo)
 			if !ok {
 				return errors.New("error converting interface from wmenu")
 			}
@@ -400,33 +275,8 @@ func SearchCurseforgeInternal(
 		}
 
 		if cancelled {
-			return true, sources.ModInfo{}
+			return true, sources.CfModInfo{}
 		}
 		return false, modInfoData
 	}
-}
-
-func GetLatestFile(modInfoData sources.ModInfo, mcVersions []string, fileID uint32, packLoaders []string) (sources.ModFileInfo, error) {
-	if fileID == 0 {
-		if len(modInfoData.LatestFiles) == 0 && len(modInfoData.GameVersionLatestFiles) == 0 {
-			return sources.ModFileInfo{}, fmt.Errorf("addon %d has no files", modInfoData.ID)
-		}
-
-		var fileInfoData *sources.ModFileInfo
-		fileID, fileInfoData, _ = sources.FindLatestFile(modInfoData, mcVersions, packLoaders)
-		if fileInfoData != nil {
-			return *fileInfoData, nil
-		}
-
-		// Possible to reach this point without obtaining file info; particularly from GameVersionLatestFiles
-		if fileID == 0 {
-			return sources.ModFileInfo{}, errors.New("mod not available for the configured Minecraft version(s) (use the 'packwiz settings acceptable-versions' command to accept more) or loader")
-		}
-	}
-
-	fileInfoData, err := sources.GetCurseforgeClient().GetFileInfo(modInfoData.ID, fileID)
-	if err != nil {
-		return sources.ModFileInfo{}, err
-	}
-	return fileInfoData, nil
 }

@@ -107,11 +107,11 @@ const (
 	// ModloaderTypeAny should not be passed to the API - it does not work
 	ModloaderTypeAny ModloaderType = iota
 	ModloaderTypeForge
-	modloaderTypeCauldron
-	modloaderTypeLiteloader
+	ModloaderTypeCauldron
+	ModloaderTypeLiteloader
 	ModloaderTypeFabric
-	modloaderTypeQuilt
-	modloaderTypeNeoForge
+	ModloaderTypeQuilt
+	ModloaderTypeNeoForge
 )
 
 var ModloaderNames = [...]string{
@@ -142,16 +142,18 @@ const (
 	hashAlgoMD5
 )
 
-// ModInfo is a subset of the deserialised JSON response from the Curse API for mods (addons)
-type ModInfo struct {
-	Name                   string        `json:"name"`
-	Summary                string        `json:"summary"`
-	Slug                   string        `json:"slug"`
-	ID                     uint32        `json:"id"`
-	GameID                 uint32        `json:"gameId"`
-	PrimaryCategoryID      uint32        `json:"primaryCategoryId"`
-	ClassID                uint32        `json:"classId"`
-	LatestFiles            []ModFileInfo `json:"latestFiles"`
+const minecraftGameId uint32 = 432
+
+// CfModInfo is a subset of the deserialised JSON response from the Curse API for mods (addons)
+type CfModInfo struct {
+	Name                   string          `json:"name"`
+	Summary                string          `json:"summary"`
+	Slug                   string          `json:"slug"`
+	ID                     uint32          `json:"id"`
+	GameID                 uint32          `json:"gameId"`
+	PrimaryCategoryID      uint32          `json:"primaryCategoryId"`
+	ClassID                uint32          `json:"classId"`
+	LatestFiles            []CfModFileInfo `json:"latestFiles"`
 	GameVersionLatestFiles []struct {
 		// TODO: check how twitch launcher chooses which one to use, when you are on beta/alpha channel?!
 		// or does it not have the concept of release channels?!
@@ -167,32 +169,32 @@ type ModInfo struct {
 	} `json:"links"`
 }
 
-func (c *cfApiClient) GetModInfo(modID uint32) (ModInfo, error) {
+func (c *cfApiClient) GetModInfo(modID uint32) (CfModInfo, error) {
 	var infoRes struct {
-		Data ModInfo `json:"data"`
+		Data CfModInfo `json:"data"`
 	}
 
 	idStr := strconv.FormatUint(uint64(modID), 10)
 	resp, err := c.makeGet("/v1/mods/" + idStr)
 	if err != nil {
-		return ModInfo{}, fmt.Errorf("failed to request project data for ID %d: %w", modID, err)
+		return CfModInfo{}, fmt.Errorf("failed to request project data for ID %d: %w", modID, err)
 	}
 
 	err = json.NewDecoder(resp.Body).Decode(&infoRes)
 	if err != nil && err != io.EOF {
-		return ModInfo{}, fmt.Errorf("failed to request project data for ID %d: %w", modID, err)
+		return CfModInfo{}, fmt.Errorf("failed to request project data for ID %d: %w", modID, err)
 	}
 
 	if infoRes.Data.ID != modID {
-		return ModInfo{}, fmt.Errorf("unexpected project ID in CurseForge response: %d (expected %d)", infoRes.Data.ID, modID)
+		return CfModInfo{}, fmt.Errorf("unexpected project ID in CurseForge response: %d (expected %d)", infoRes.Data.ID, modID)
 	}
 
 	return infoRes.Data, nil
 }
 
-func (c *cfApiClient) GetModInfoMultiple(modIDs []uint32) ([]ModInfo, error) {
+func (c *cfApiClient) GetModInfoMultiple(modIDs []uint32) ([]CfModInfo, error) {
 	var infoRes struct {
-		Data []ModInfo `json:"data"`
+		Data []CfModInfo `json:"data"`
 	}
 
 	modIDsData, err := json.Marshal(struct {
@@ -201,24 +203,24 @@ func (c *cfApiClient) GetModInfoMultiple(modIDs []uint32) ([]ModInfo, error) {
 		ModIDs: modIDs,
 	})
 	if err != nil {
-		return []ModInfo{}, err
+		return []CfModInfo{}, err
 	}
 
 	resp, err := c.makePost("/v1/mods", bytes.NewBuffer(modIDsData))
 	if err != nil {
-		return []ModInfo{}, fmt.Errorf("failed to request project data: %w", err)
+		return []CfModInfo{}, fmt.Errorf("failed to request project data: %w", err)
 	}
 
 	err = json.NewDecoder(resp.Body).Decode(&infoRes)
 	if err != nil && err != io.EOF {
-		return []ModInfo{}, fmt.Errorf("failed to request project data: %w", err)
+		return []CfModInfo{}, fmt.Errorf("failed to request project data: %w", err)
 	}
 
 	return infoRes.Data, nil
 }
 
-// ModFileInfo is a subset of the deserialised JSON response from the Curse API for mod files
-type ModFileInfo struct {
+// CfModFileInfo is a subset of the deserialised JSON response from the Curse API for mod files
+type CfModFileInfo struct {
 	ID           uint32    `json:"id"`
 	ModID        uint32    `json:"modId"`
 	FileName     string    `json:"fileName"`
@@ -241,7 +243,7 @@ type ModFileInfo struct {
 	} `json:"hashes"`
 }
 
-func (i ModFileInfo) GetBestHash() (hash string, hashFormat string) {
+func (i CfModFileInfo) GetBestHash() (hash string, hashFormat string) {
 	// TODO: check if the hash is invalid (e.g. 0)
 	hash = strconv.FormatUint(uint64(i.Fingerprint), 10)
 	hashFormat = "murmur2"
@@ -267,9 +269,9 @@ func (i ModFileInfo) GetBestHash() (hash string, hashFormat string) {
 	return
 }
 
-func (c *cfApiClient) GetFileInfo(modID uint32, fileID uint32) (ModFileInfo, error) {
+func (c *cfApiClient) GetFileInfo(modID uint32, fileID uint32) (CfModFileInfo, error) {
 	var infoRes struct {
-		Data ModFileInfo `json:"data"`
+		Data CfModFileInfo `json:"data"`
 	}
 
 	modIDStr := strconv.FormatUint(uint64(modID), 10)
@@ -277,24 +279,24 @@ func (c *cfApiClient) GetFileInfo(modID uint32, fileID uint32) (ModFileInfo, err
 
 	resp, err := c.makeGet("/v1/mods/" + modIDStr + "/files/" + fileIDStr)
 	if err != nil {
-		return ModFileInfo{}, fmt.Errorf("failed to request file data for project ID %d, file ID %d: %w", modID, fileID, err)
+		return CfModFileInfo{}, fmt.Errorf("failed to request file data for project ID %d, file ID %d: %w", modID, fileID, err)
 	}
 
 	err = json.NewDecoder(resp.Body).Decode(&infoRes)
 	if err != nil && err != io.EOF {
-		return ModFileInfo{}, fmt.Errorf("failed to request file data for project ID %d, file ID %d: %w", modID, fileID, err)
+		return CfModFileInfo{}, fmt.Errorf("failed to request file data for project ID %d, file ID %d: %w", modID, fileID, err)
 	}
 
 	if infoRes.Data.ID != fileID {
-		return ModFileInfo{}, fmt.Errorf("unexpected file ID for project %d in CurseForge response: %d (expected %d)", modID, infoRes.Data.ID, fileID)
+		return CfModFileInfo{}, fmt.Errorf("unexpected file ID for project %d in CurseForge response: %d (expected %d)", modID, infoRes.Data.ID, fileID)
 	}
 
 	return infoRes.Data, nil
 }
 
-func (c *cfApiClient) GetFileInfoMultiple(fileIDs []uint32) ([]ModFileInfo, error) {
+func (c *cfApiClient) GetFileInfoMultiple(fileIDs []uint32) ([]CfModFileInfo, error) {
 	var infoRes struct {
-		Data []ModFileInfo `json:"data"`
+		Data []CfModFileInfo `json:"data"`
 	}
 
 	fileIDsData, err := json.Marshal(struct {
@@ -303,29 +305,29 @@ func (c *cfApiClient) GetFileInfoMultiple(fileIDs []uint32) ([]ModFileInfo, erro
 		FileIDs: fileIDs,
 	})
 	if err != nil {
-		return []ModFileInfo{}, err
+		return []CfModFileInfo{}, err
 	}
 
 	resp, err := c.makePost("/v1/mods/files", bytes.NewBuffer(fileIDsData))
 	if err != nil {
-		return []ModFileInfo{}, fmt.Errorf("failed to request file data: %w", err)
+		return []CfModFileInfo{}, fmt.Errorf("failed to request file data: %w", err)
 	}
 
 	err = json.NewDecoder(resp.Body).Decode(&infoRes)
 	if err != nil && err != io.EOF {
-		return []ModFileInfo{}, fmt.Errorf("failed to request file data: %w", err)
+		return []CfModFileInfo{}, fmt.Errorf("failed to request file data: %w", err)
 	}
 
 	return infoRes.Data, nil
 }
 
-func (c *cfApiClient) GetSearch(searchTerm string, slug string, gameID uint32, classID uint32, categoryID uint32, gameVersion string, modloaderType ModloaderType) ([]ModInfo, error) {
+func (c *cfApiClient) GetSearch(searchTerm string, slug string, classID uint32, categoryID uint32, gameVersion string, modloaderType ModloaderType) ([]CfModInfo, error) {
 	var infoRes struct {
-		Data []ModInfo `json:"data"`
+		Data []CfModInfo `json:"data"`
 	}
 
 	q := url.Values{}
-	q.Set("gameId", strconv.FormatUint(uint64(gameID), 10))
+	q.Set("gameId", strconv.FormatUint(uint64(minecraftGameId), 10))
 	q.Set("pageSize", "10")
 	if classID != 0 {
 		q.Set("classId", strconv.FormatUint(uint64(classID), 10))
@@ -351,12 +353,12 @@ func (c *cfApiClient) GetSearch(searchTerm string, slug string, gameID uint32, c
 
 	resp, err := c.makeGet("/v1/mods/search?" + q.Encode())
 	if err != nil {
-		return []ModInfo{}, fmt.Errorf("failed to retrieve search results: %w", err)
+		return []CfModInfo{}, fmt.Errorf("failed to retrieve search results: %w", err)
 	}
 
 	err = json.NewDecoder(resp.Body).Decode(&infoRes)
 	if err != nil && err != io.EOF {
-		return []ModInfo{}, fmt.Errorf("failed to parse search results: %w", err)
+		return []CfModInfo{}, fmt.Errorf("failed to parse search results: %w", err)
 	}
 
 	return infoRes.Data, nil
@@ -415,19 +417,19 @@ type cfCategory struct {
 	ClassID uint32 `json:"classId"`
 }
 
-func (c *cfApiClient) GetCategories(gameID uint32) ([]cfCategory, error) {
+func (c *cfApiClient) GetCategories() ([]cfCategory, error) {
 	var infoRes struct {
 		Data []cfCategory `json:"data"`
 	}
 
-	resp, err := c.makeGet("/v1/categories?gameId=" + strconv.FormatUint(uint64(gameID), 10))
+	resp, err := c.makeGet("/v1/categories?gameId=" + strconv.FormatUint(uint64(minecraftGameId), 10))
 	if err != nil {
-		return []cfCategory{}, fmt.Errorf("failed to retrieve category list for game %v: %w", gameID, err)
+		return []cfCategory{}, fmt.Errorf("failed to retrieve category list: %w", err)
 	}
 
 	err = json.NewDecoder(resp.Body).Decode(&infoRes)
 	if err != nil && err != io.EOF {
-		return []cfCategory{}, fmt.Errorf("failed to parse category list for game %v: %w", gameID, err)
+		return []cfCategory{}, fmt.Errorf("failed to parse category list: %w", err)
 	}
 
 	return infoRes.Data, nil
@@ -436,9 +438,9 @@ func (c *cfApiClient) GetCategories(gameID uint32) ([]cfCategory, error) {
 type addonFingerprintResponse struct {
 	IsCacheBuilt bool `json:"isCacheBuilt"`
 	ExactMatches []struct {
-		ID          uint32        `json:"id"`
-		File        ModFileInfo   `json:"file"`
-		LatestFiles []ModFileInfo `json:"latestFiles"`
+		ID          uint32          `json:"id"`
+		File        CfModFileInfo   `json:"file"`
+		LatestFiles []CfModFileInfo `json:"latestFiles"`
 	} `json:"exactMatches"`
 	ExactFingerprints        []uint32 `json:"exactFingerprints"`
 	PartialMatches           []uint32 `json:"partialMatches"`

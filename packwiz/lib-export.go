@@ -18,9 +18,14 @@ var (
 
 	ModrinthNewMod                  = sources.ModrinthNewMod
 	ModrinthFindMissingDependencies = sources.ModrinthFindMissingDependencies
+	ModrinthParseUrl                = sources.ParseAsModrinthSlug
 	ModrinthSearchForProjects       = sources.ModrinthSearchForProjects
 	ModrinthProjectFromVersionID    = sources.ModrinthProjectFromVersionID
 	ModrinthGetLatestVersion        = sources.ModrinthGetLatestVersion
 
-	CurseforgeNewMod = sources.CurseforgeNewMod
+	CurseforgeNewMod                  = sources.CurseforgeNewMod
+	CurseforgeFindMissingDependencies = sources.CurseforgeFindMissingDependencies
+	CurseforgeParseUrl                = sources.CurseforgeParseUrl
+	CurseforgeModInfoFromSlug         = sources.CurseforgeModInfoFromSlug
+	CurseforgeModInfo                 = sources.CurseforgeModInfoFromID
 )

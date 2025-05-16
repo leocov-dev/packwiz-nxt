@@ -115,13 +115,10 @@ var urlRegexes = [...]*regexp.Regexp{
 	regexp.MustCompile(`^(?P<slug>[a-z][\da-z\-_]{0,127})$`),
 }
 
-func CfParseSlugOrUrl(url string) (game string, category string, slug string, fileID uint32, err error) {
+func CurseforgeParseUrl(url string) (category string, slug string, fileID uint32, err error) {
 	for _, r := range urlRegexes {
 		matches := r.FindStringSubmatch(url)
 		if matches != nil {
-			if i := r.SubexpIndex("game"); i >= 0 {
-				game = matches[i]
-			}
 			if i := r.SubexpIndex("category"); i >= 0 {
 				category = matches[i]
 			}
@@ -142,7 +139,7 @@ func CfParseSlugOrUrl(url string) (game string, category string, slug string, fi
 }
 
 var defaultFolders = map[uint32]map[uint32]string{
-	432: { // Minecraft
+	minecraftGameId: { // Minecraft
 		5:  "plugins", // Bukkit Plugins
 		12: "resourcepacks",
 		6:  "mods",
@@ -161,48 +158,7 @@ func GetCfModType(gameID, classID, categoryID uint32) string {
 	return "unknown"
 }
 
-func CreateModFile(modInfo ModInfo, fileInfo ModFileInfo, optionalDisabled bool) (*core.Mod, error) {
-	updateMap := make(core.ModUpdate)
-	var err error
-
-	updateMap["curseforge"], err = CfUpdateData{
-		ProjectID: modInfo.ID,
-		FileID:    fileInfo.ID,
-	}.ToMap()
-	if err != nil {
-		return nil, err
-	}
-
-	hash, hashFormat := fileInfo.GetBestHash()
-
-	var optional *core.ModOption
-	if optionalDisabled {
-		optional = &core.ModOption{
-			Optional: true,
-			Default:  false,
-		}
-	}
-
-	return core.NewMod(
-		modInfo.Slug,
-		modInfo.Name,
-		fileInfo.FileName,
-		core.UniversalSide,
-		GetCfModType(modInfo.GameID, modInfo.ClassID, modInfo.PrimaryCategoryID),
-		"",
-		false,
-		false,
-		updateMap,
-		core.ModDownload{
-			HashFormat: hashFormat,
-			Hash:       hash,
-			Mode:       core.ModeCF,
-		},
-		optional,
-	), nil
-}
-
-func GetSearchLoaderType(pack core.Pack) ModloaderType {
+func CfGetSearchLoaderType(pack core.Pack) ModloaderType {
 	dependencies := pack.Versions
 
 	_, hasFabric := dependencies["fabric"]
@@ -222,7 +178,7 @@ func GetSearchLoaderType(pack core.Pack) ModloaderType {
 // Crude way of preferring Quilt to Fabric / NeoForge to Forge: larger types are preferred
 // so NeoForge > Quilt > Fabric > Forge > Any
 
-func FilterLoaderTypeIndex(packLoaders []string, modLoaderType ModloaderType) (ModloaderType, bool) {
+func CfFilterLoaderTypeIndex(packLoaders []string, modLoaderType ModloaderType) (ModloaderType, bool) {
 	if len(packLoaders) == 0 || modLoaderType == ModloaderTypeAny {
 		// No loaders are specified: allow all files
 		return ModloaderTypeAny, true
@@ -237,7 +193,7 @@ func FilterLoaderTypeIndex(packLoaders []string, modLoaderType ModloaderType) (M
 	}
 }
 
-func FilterFileInfoLoaderIndex(packLoaders []string, fileInfoData ModFileInfo) (ModloaderType, bool) {
+func CfFilterFileInfoLoaderIndex(packLoaders []string, fileInfoData CfModFileInfo) (ModloaderType, bool) {
 	if len(packLoaders) == 0 {
 		// No loaders are specified: allow all files
 		return ModloaderTypeAny, true
@@ -262,8 +218,8 @@ func FilterFileInfoLoaderIndex(packLoaders []string, fileInfoData ModFileInfo) (
 	}
 }
 
-// FindLatestFile looks at mod info, and finds the latest file ID (and potentially the file info for it - may be null)
-func FindLatestFile(modInfoData ModInfo, mcVersions []string, packLoaders []string) (fileID uint32, fileInfoData *ModFileInfo, fileName string) {
+// CfFindLatestFile looks at mod info, and finds the latest file ID (and potentially the file info for it - may be null)
+func CfFindLatestFile(modInfoData CfModInfo, mcVersions []string, packLoaders []string) (fileID uint32, fileInfoData *CfModFileInfo, fileName string) {
 	cfMcVersions := GetCurseforgeVersions(mcVersions)
 	bestMcVer := -1
 	bestLoaderType := ModloaderTypeAny
@@ -271,7 +227,7 @@ func FindLatestFile(modInfoData ModInfo, mcVersions []string, packLoaders []stri
 	// For snapshots, curseforge doesn't put them in GameVersionLatestFiles
 	for _, v := range modInfoData.LatestFiles {
 		mcVerIdx := core.HighestSliceIndex(mcVersions, v.GameVersions)
-		loaderIdx, loaderValid := FilterFileInfoLoaderIndex(packLoaders, v)
+		loaderIdx, loaderValid := CfFilterFileInfoLoaderIndex(packLoaders, v)
 
 		if mcVerIdx < 0 || !loaderValid {
 			continue
@@ -303,7 +259,7 @@ func FindLatestFile(modInfoData ModInfo, mcVersions []string, packLoaders []stri
 	// TODO: manage alpha/beta/release correctly, check update channel?
 	for _, v := range modInfoData.GameVersionLatestFiles {
 		mcVerIdx := slices.Index(cfMcVersions, v.GameVersion)
-		loaderIdx, loaderValid := FilterLoaderTypeIndex(packLoaders, v.Modloader)
+		loaderIdx, loaderValid := CfFilterLoaderTypeIndex(packLoaders, v.Modloader)
 
 		if mcVerIdx < 0 || !loaderValid {
 			continue
@@ -358,15 +314,15 @@ func (u CfUpdater) ParseUpdate(updateUnparsed map[string]interface{}) (interface
 }
 
 type cachedStateStore struct {
-	ModInfo
+	CfModInfo
 	fileID   uint32
-	fileInfo *ModFileInfo
+	fileInfo *CfModFileInfo
 }
 
 func (u CfUpdater) CheckUpdate(mods []*core.Mod, pack core.Pack) ([]core.UpdateCheck, error) {
 	results := make([]core.UpdateCheck, len(mods))
 	modIDs := make([]uint32, len(mods))
-	modInfos := make([]ModInfo, len(mods))
+	modInfos := make([]CfModInfo, len(mods))
 
 	mcVersions, err := pack.GetSupportedMCVersions()
 	if err != nil {
@@ -406,7 +362,7 @@ func (u CfUpdater) CheckUpdate(mods []*core.Mod, pack core.Pack) ([]core.UpdateC
 			continue
 		}
 
-		fileID, fileInfoData, fileName := FindLatestFile(modInfos[i], mcVersions, packLoaders)
+		fileID, fileInfoData, fileName := CfFindLatestFile(modInfos[i], mcVersions, packLoaders)
 		if fileID != project.FileID && fileID != 0 {
 			// Update (or downgrade, if changing to an older version) available!
 			results[i] = core.UpdateCheck{
@@ -428,7 +384,7 @@ func (u CfUpdater) DoUpdate(mods []*core.Mod, cachedState []interface{}) error {
 	for i, m := range mods {
 		modState := cachedState[i].(cachedStateStore)
 
-		var fileInfoData ModFileInfo
+		var fileInfoData CfModFileInfo
 		if modState.fileInfo != nil {
 			fileInfoData = *modState.fileInfo
 		} else {
