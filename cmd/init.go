@@ -161,7 +161,7 @@ func getPackVersion(cmd *cobra.Command) string {
 }
 
 func getMcVersion() (string, error) {
-	mcVersions, err := shared.GetValidMCVersions()
+	mcVersions, err := core.GetMinecraftVersions()
 	if err != nil {
 		return "", fmt.Errorf("failed to get latest minecraft versions: %s", err)
 	}
@@ -170,9 +170,9 @@ func getMcVersion() (string, error) {
 	if len(mcVersion) == 0 {
 		var latestVersion string
 		if viper.GetBool("init.snapshot") {
-			latestVersion = mcVersions.Latest.Snapshot
+			latestVersion = mcVersions.LatestSnapshot
 		} else {
-			latestVersion = mcVersions.Latest.Release
+			latestVersion = mcVersions.Latest
 		}
 		if viper.GetBool("init.latest") {
 			mcVersion = latestVersion
@@ -180,7 +180,9 @@ func getMcVersion() (string, error) {
 			mcVersion = initReadValue("Minecraft version ["+latestVersion+"]: ", latestVersion)
 		}
 	}
-	mcVersions.CheckValid(mcVersion)
+	if !mcVersions.CheckValid(mcVersion) {
+		shared.Exitf("the Minecraft version %s is not valid\n", mcVersion)
+	}
 
 	return mcVersion, nil
 }

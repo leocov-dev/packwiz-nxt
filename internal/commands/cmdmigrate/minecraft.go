@@ -3,6 +3,7 @@ package cmdmigrate
 import (
 	"fmt"
 	packCmd "github.com/leocov-dev/packwiz-nxt/cmd"
+	"github.com/leocov-dev/packwiz-nxt/core"
 	"github.com/leocov-dev/packwiz-nxt/fileio"
 	"github.com/leocov-dev/packwiz-nxt/internal/shared"
 	"github.com/spf13/cobra"
@@ -33,11 +34,15 @@ var minecraftCommand = &cobra.Command{
 			fmt.Printf("Minecraft version is already %s!\n", wantedMCVersion)
 			os.Exit(0)
 		}
-		mcVersions, err := shared.GetValidMCVersions()
+		mcVersions, err := core.GetMinecraftVersions()
 		if err != nil {
 			shared.Exitf("Error getting Minecraft versions: %s\n", err)
 		}
-		mcVersions.CheckValid(wantedMCVersion)
+
+		if !mcVersions.CheckValid(wantedMCVersion) {
+			shared.Exitf("the Minecraft version %s is not valid\n", wantedMCVersion)
+		}
+
 		// Set the version in the pack
 		modpack.Versions["minecraft"] = wantedMCVersion
 		// Write the pack to disk

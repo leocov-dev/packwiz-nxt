@@ -3,26 +3,12 @@ package core
 import (
 	"encoding/json"
 	"encoding/xml"
-	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/unascribed/FlexVer/go/flexver"
 )
-
-type MavenMetadata struct {
-	XMLName    xml.Name `xml:"metadata"`
-	GroupID    string   `xml:"groupId"`
-	ArtifactID string   `xml:"artifactId"`
-	Versioning struct {
-		Release  string `xml:"release"`
-		Latest   string `xml:"latest"`
-		Versions struct {
-			Version []string `xml:"version"`
-		} `xml:"versions"`
-		LastUpdated string `xml:"lastUpdated"`
-	} `xml:"versioning"`
-}
 
 type ModLoaderComponent struct {
 	Name              string
@@ -32,153 +18,40 @@ type ModLoaderComponent struct {
 
 var ModLoaders = map[string]ModLoaderComponent{
 	"fabric": {
-		// There's no need to specify yarn version - yarn isn't used outside a dev environment, and intermediary corresponds to game version anyway
-		Name:              "fabric",
-		FriendlyName:      "Fabric loader",
-		VersionListGetter: FetchMavenVersionList("https://maven.fabricmc.net/net/fabricmc/fabric-loader/maven-metadata.xml"),
+		Name:         "fabric",
+		FriendlyName: "Fabric loader",
+		VersionListGetter: func(mcVersion string) ([]string, string, error) {
+			return GetLoaderCache().GetVersions(mcVersion, "fabric")
+		},
 	},
 	"forge": {
-		Name:              "forge",
-		FriendlyName:      "Forge",
-		VersionListGetter: FetchMavenVersionPrefixedListStrip("https://files.minecraftforge.net/maven/net/minecraftforge/forge/maven-metadata.xml", "Forge"),
+		Name:         "forge",
+		FriendlyName: "Forge",
+		VersionListGetter: func(mcVersion string) ([]string, string, error) {
+			return GetLoaderCache().GetVersions(mcVersion, "forge")
+		},
 	},
 	"liteloader": {
-		Name:              "liteloader",
-		FriendlyName:      "LiteLoader",
-		VersionListGetter: FetchMavenVersionPrefixedList("https://repo.mumfrey.com/content/repositories/snapshots/com/mumfrey/liteloader/maven-metadata.xml", "LiteLoader"),
+		Name:         "liteloader",
+		FriendlyName: "LiteLoader",
+		VersionListGetter: func(mcVersion string) ([]string, string, error) {
+			return GetLoaderCache().GetVersions(mcVersion, "liteloader")
+		},
 	},
 	"quilt": {
-		Name:              "quilt",
-		FriendlyName:      "Quilt loader",
-		VersionListGetter: FetchMavenVersionList("https://maven.quiltmc.org/repository/release/org/quiltmc/quilt-loader/maven-metadata.xml"),
+		Name:         "quilt",
+		FriendlyName: "Quilt loader",
+		VersionListGetter: func(mcVersion string) ([]string, string, error) {
+			return GetLoaderCache().GetVersions(mcVersion, "quilt")
+		},
 	},
 	"neoforge": {
-		Name:              "neoforge",
-		FriendlyName:      "NeoForge",
-		VersionListGetter: FetchNeoForge(),
+		Name:         "neoforge",
+		FriendlyName: "NeoForge",
+		VersionListGetter: func(mcVersion string) ([]string, string, error) {
+			return GetLoaderCache().GetVersions(mcVersion, "neoforge")
+		},
 	},
-}
-
-func FetchMavenVersionList(url string) func(mcVersion string) ([]string, string, error) {
-	return func(mcVersion string) ([]string, string, error) {
-		res, err := GetWithUA(url, "application/xml")
-		if err != nil {
-			return []string{}, "", err
-		}
-		dec := xml.NewDecoder(res.Body)
-		out := MavenMetadata{}
-		err = dec.Decode(&out)
-		if err != nil {
-			return []string{}, "", err
-		}
-		return out.Versioning.Versions.Version, out.Versioning.Release, nil
-	}
-}
-
-func FetchMavenVersionFiltered(url string, friendlyName string, filter func(version string, mcVersion string) bool) func(mcVersion string) ([]string, string, error) {
-	return func(mcVersion string) ([]string, string, error) {
-		res, err := GetWithUA(url, "application/xml")
-		if err != nil {
-			return []string{}, "", err
-		}
-		dec := xml.NewDecoder(res.Body)
-		out := MavenMetadata{}
-		err = dec.Decode(&out)
-		if err != nil {
-			return []string{}, "", err
-		}
-		allowedVersions := make([]string, 0, len(out.Versioning.Versions.Version))
-		for _, v := range out.Versioning.Versions.Version {
-			if filter(v, mcVersion) {
-				allowedVersions = append(allowedVersions, v)
-			}
-		}
-		if len(allowedVersions) == 0 {
-			return []string{}, "", errors.New("no " + friendlyName + " versions available for this Minecraft version")
-		}
-		if filter(out.Versioning.Release, mcVersion) {
-			return allowedVersions, out.Versioning.Release, nil
-		}
-		if filter(out.Versioning.Latest, mcVersion) {
-			return allowedVersions, out.Versioning.Latest, nil
-		}
-		// Sort list to get largest version
-		flexver.VersionSlice(allowedVersions).Sort()
-		return allowedVersions, allowedVersions[len(allowedVersions)-1], nil
-	}
-}
-
-func FetchMavenVersionPrefixedList(url string, friendlyName string) func(mcVersion string) ([]string, string, error) {
-	return FetchMavenVersionFiltered(url, friendlyName, hasPrefixSplitDash)
-}
-
-func FetchMavenVersionPrefixedListStrip(url string, friendlyName string) func(mcVersion string) ([]string, string, error) {
-	noStrip := FetchMavenVersionPrefixedList(url, friendlyName)
-	return func(mcVersion string) ([]string, string, error) {
-		versions, latestVersion, err := noStrip(mcVersion)
-		if err != nil {
-			return nil, "", err
-		}
-		for k, v := range versions {
-			versions[k] = removeMcVersion(v, mcVersion)
-		}
-		latestVersion = removeMcVersion(latestVersion, mcVersion)
-		return versions, latestVersion, nil
-	}
-}
-
-func removeMcVersion(str string, mcVersion string) string {
-	components := strings.Split(str, "-")
-	newComponents := make([]string, 0)
-	for _, v := range components {
-		if v != mcVersion {
-			newComponents = append(newComponents, v)
-		}
-	}
-	return strings.Join(newComponents, "-")
-}
-
-func hasPrefixSplitDash(str string, prefix string) bool {
-	components := strings.Split(str, "-")
-	if len(components) > 1 && components[0] == prefix {
-		return true
-	}
-	return false
-}
-
-func FetchNeoForge() func(mcVersion string) ([]string, string, error) {
-	// NeoForge reused Forge's versioning scheme for 1.20.1, but moved to their own versioning scheme for 1.20.2 and above
-	neoforgeOld := FetchMavenVersionPrefixedListStrip("https://maven.neoforged.net/releases/net/neoforged/forge/maven-metadata.xml", "NeoForge")
-	neoforgeNew := FetchMavenWithNeoForgeStyleVersions("https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml", "NeoForge")
-
-	return func(mcVersion string) ([]string, string, error) {
-		if mcVersion == "1.20.1" {
-			return neoforgeOld(mcVersion)
-		} else {
-			return neoforgeNew(mcVersion)
-		}
-	}
-}
-
-func FetchMavenWithNeoForgeStyleVersions(url string, friendlyName string) func(mcVersion string) ([]string, string, error) {
-	return FetchMavenVersionFiltered(url, friendlyName, func(neoforgeVersion string, mcVersion string) bool {
-		// Minecraft versions are in the form of 1.a.b
-		// Neoforge versions are in the form of a.b.x
-		// Eg, for minecraft 1.20.6, neoforge version 20.6.2 and 20.6.83-beta would both be valid versions
-		// for minecraft 1.20.2, neoforge version 20.2.23-beta
-		// for minecraft 1.21, neoforge version 21.0.143 would be valid
-		var mcSplit = strings.Split(mcVersion, ".")
-		if len(mcSplit) < 2 {
-			// This does not appear to be a minecraft version that's formatted in a way that matches neoforge
-			return false
-		}
-		var mcMajor = mcSplit[1]
-		var mcMinor = "0"
-		if len(mcSplit) > 2 {
-			mcMinor = mcSplit[2]
-		}
-		return strings.HasPrefix(neoforgeVersion, mcMajor+"."+mcMinor)
-	})
 }
 
 func ComponentToFriendlyName(component string) string {
@@ -250,4 +123,270 @@ func SortAndDedupeVersions(versions []string) {
 		}
 		versions = versions[:j+1]
 	}
+}
+
+// VersionMap keys are minecraft versions and value is list of valid loader
+// versions for that minecraft version
+type VersionMap map[string][]string
+
+type LoaderVersionCache struct {
+	Fabric     []string
+	Forge      VersionMap
+	Liteloader []string
+	Quilt      []string
+	Neoforge   VersionMap
+}
+
+var defaultLoaderCache LoaderVersionCache
+
+func GetLoaderCache() *LoaderVersionCache {
+	return &defaultLoaderCache
+}
+
+func (l *LoaderVersionCache) IsEmpty() bool {
+	return len(l.Fabric) == 0 || len(l.Forge) == 0 || len(l.Liteloader) == 0 || len(l.Quilt) == 0 || len(l.Neoforge) == 0
+}
+
+func (l *LoaderVersionCache) RefreshCache() error {
+	if fabricVersions, err := fetchFabricVersions(); err != nil {
+		return err
+	} else {
+		l.Fabric = fabricVersions
+	}
+
+	if forgeVersions, err := fetchForgeVersions(); err != nil {
+		return err
+	} else {
+		l.Forge = forgeVersions
+	}
+
+	if liteloaderVersions, err := fetchLiteloaderVersions(); err != nil {
+		return err
+	} else {
+		l.Liteloader = liteloaderVersions
+	}
+
+	if quiltVersions, err := fetchQuiltVersions(); err != nil {
+		return err
+	} else {
+		l.Quilt = quiltVersions
+	}
+
+	if neoforgeVersions, err := fetchNeoforgeVersions(); err != nil {
+		return err
+	} else {
+		l.Neoforge = neoforgeVersions
+	}
+
+	return nil
+}
+
+func (l *LoaderVersionCache) GetVersions(mcVersion string, loader string) ([]string, string, error) {
+	if l.IsEmpty() {
+		if err := l.RefreshCache(); err != nil {
+			return nil, "", err
+		}
+	}
+
+	var versions []string
+
+	if loader == "fabric" {
+		versions = l.Fabric
+	} else if loader == "forge" {
+		versions = l.Forge[mcVersion]
+	} else if loader == "liteloader" {
+		versions = l.Liteloader
+	} else if loader == "quilt" {
+		versions = l.Quilt
+	} else if loader == "neoforge" {
+		versions = l.Neoforge[mcVersion]
+	}
+
+	if len(versions) == 0 {
+		return nil, "", fmt.Errorf("unknown loader %s", loader)
+	}
+
+	return versions, versions[0], nil
+}
+
+func fetchFabricVersions() ([]string, error) {
+	versions, err := fetchMavenList(
+		"https://maven.fabricmc.net/net/fabricmc/fabric-loader/maven-metadata.xml",
+		func(version string) string {
+			// Skip versions containing "+"
+			if strings.Contains(version, "+") {
+				return ""
+			}
+			return version
+		},
+	)
+
+	return SortDescending(versions), err
+}
+
+func fetchForgeVersions() (VersionMap, error) {
+	versionMap, err := fetchMavenMap(
+		"https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml",
+		func(version string) (string, string) {
+			parts := strings.Split(version, "-")
+
+			return parts[0], parts[1]
+		},
+	)
+
+	for mcVersion, loaderVersions := range versionMap {
+		versionMap[mcVersion] = SortDescending(loaderVersions)
+	}
+
+	return versionMap, err
+}
+
+func fetchLiteloaderVersions() ([]string, error) {
+	versions, err := fetchMavenList(
+		"https://repo.mumfrey.com/content/repositories/snapshots/com/mumfrey/liteloader/maven-metadata.xml",
+		func(version string) string {
+			// versions are in the format <version>-SNAPSHOT
+			return strings.Split(version, "-")[0]
+		},
+	)
+	return SortDescending(versions), err
+}
+
+func fetchQuiltVersions() ([]string, error) {
+	versions, err := fetchMavenList(
+		"https://maven.quiltmc.org/repository/release/org/quiltmc/quilt-loader/maven-metadata.xml",
+		func(version string) string {
+			return version
+		},
+	)
+
+	return SortDescending(versions), err
+}
+
+func fetchNeoforgeVersions() (VersionMap, error) {
+	versions, err := fetchMavenMap(
+		"https://maven.neoforged.net/releases/net/neoforged/forge/maven-metadata.xml",
+		func(version string) (string, string) {
+			parts := strings.Split(version, "-")
+			if len(parts) < 2 {
+				return "", ""
+			}
+
+			return parts[0], parts[1]
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	moreVersions, err := fetchMavenMap(
+		"https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml",
+		func(version string) (string, string) {
+			parts := strings.Split(version, ".")
+
+			if len(parts) < 2 {
+				return "", ""
+			}
+
+			return "1." + parts[0] + "." + parts[1], version
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	for mcVersion, loaderVersions := range moreVersions {
+		if _, exists := versions[mcVersion]; !exists {
+			versions[mcVersion] = make([]string, 0)
+		}
+		versions[mcVersion] = append(versions[mcVersion], loaderVersions...)
+	}
+
+	for mcVersion, loaderVersions := range versions {
+		versions[mcVersion] = SortDescending(loaderVersions)
+	}
+
+	return versions, nil
+}
+
+// ----
+type mavenXmlMetadata struct {
+	Versioning struct {
+		Versions struct {
+			Version []string `xml:"version"`
+		} `xml:"versions"`
+	} `xml:"versioning"`
+}
+
+func fetchMavenList(url string, versionCb func(version string) string) ([]string, error) {
+	resp, err := GetWithUA(url, "application/xml")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var metadata mavenXmlMetadata
+	if err := xml.Unmarshal(body, &metadata); err != nil {
+		return nil, err
+	}
+
+	var filteredVersions []string
+	// we want in reverse order
+	for i := len(metadata.Versioning.Versions.Version) - 1; i >= 0; i-- {
+		version := metadata.Versioning.Versions.Version[i]
+
+		processedVersion := versionCb(version)
+		if processedVersion == "" {
+			continue
+		}
+
+		filteredVersions = append(filteredVersions, processedVersion)
+	}
+
+	return filteredVersions, nil
+}
+
+func fetchMavenMap(url string, keyValueCb func(version string) (string, string)) (VersionMap, error) {
+	resp, err := GetWithUA(url, "application/xml")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var metadata mavenXmlMetadata
+	if err := xml.Unmarshal(body, &metadata); err != nil {
+		return nil, err
+	}
+
+	versionMap := make(VersionMap)
+
+	for _, version := range metadata.Versioning.Versions.Version {
+		if version == "" {
+			continue
+		}
+
+		minecraftVersion, loaderVersion := keyValueCb(version)
+
+		if minecraftVersion == "" || loaderVersion == "" {
+			continue
+		}
+
+		if _, exists := versionMap[minecraftVersion]; !exists {
+			versionMap[minecraftVersion] = make([]string, 0)
+		}
+		versionMap[minecraftVersion] = append(versionMap[minecraftVersion], loaderVersion)
+
+	}
+
+	return versionMap, nil
 }
