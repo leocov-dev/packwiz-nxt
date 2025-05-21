@@ -23,9 +23,9 @@ type versionDef struct {
 }
 
 type McVersionInfo struct {
-	Latest         string   `json:"latest"`
-	LatestSnapshot string   `json:"snapshot"`
-	Versions       []string `json:"versions"`
+	Latest         string
+	LatestSnapshot string
+	Versions       []string
 }
 
 func (m McVersionInfo) CheckValid(version string) bool {
