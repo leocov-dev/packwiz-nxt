@@ -419,7 +419,7 @@ func ModrinthGetLatestVersion(projectID string, name string, pack core.Pack, opt
 	}
 	if len(result) == 0 {
 		// TODO: retry with datapack specified, to determine what the issue is? or just request all and filter afterwards
-		return nil, errors.New("no valid versions found\n\tUse the 'packwiz settings acceptable-versions' command to accept more game versions\n\tTo use datapacks, add a datapack loader mod and specify the datapack-folder option with the folder this mod loads datapacks from")
+		return nil, errors.New("no valid versions found")
 	}
 
 	// TODO: option to always compare using flexver?

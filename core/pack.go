@@ -252,7 +252,7 @@ func (p *Pack) GetSupportedMCVersions() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	allVersions := append(append([]string(nil), p.GetAcceptableGameVersions()...), mcVersion)
+	allVersions := append(p.GetAcceptableGameVersions(), mcVersion)
 	SortAndDedupeVersions(allVersions)
 	return allVersions, nil
 }
