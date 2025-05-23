@@ -2,7 +2,7 @@ module github.com/leocov-dev/packwiz-nxt
 
 go 1.23.0
 
-toolchain go1.23.3
+toolchain go1.23.9
 
 require (
 	codeberg.org/jmansfield/go-modrinth v0.6.0
