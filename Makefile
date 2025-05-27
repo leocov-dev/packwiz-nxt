@@ -8,7 +8,7 @@ test:
 	@go tool cover -html=.coverage/coverage.out -o .coverage/coverage.html
 
 dev: tidy fmt
-	@go build -race -o "bin/packwiz" -tags=netgo -ldflags="-extldflags=-static -X main.CfApiKey=$(CF_API_KEY)" .
+	@go build -race -o "bin/packwiz" -tags=netgo -ldflags="-extldflags=-static -X 'main.CfApiKey=$(CF_API_KEY)' -X 'main.GhApiKey=$(GH_API_KEY)'" .
 
 fmt:
 	@gofmt -w $(GOFMT_FILES)

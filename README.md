@@ -5,14 +5,22 @@ This repo focuses on changing the codebase so that packwiz can be used as a
 library without needing to write to the file system.
 The original CLI functionality is mostly maintained.
 
-Note:
+### Curseforge
 This fork does not include a Curseforge API key in its source code. 
 You can apply for one [here](https://forms.monday.com/forms/dce5ccb7afda9a1c21dab1a1aa1d84eb?r=use1).
 You must supply it with one of these methods:
 
-- if building the project locally, include the ldflag `-X main.CfApiKey=<base64-encoded-key>`
-  - using the `make` file: `CF_API_KEY=<base-64-encoded-key> make`
+- if building the project locally, include the ldflag `-X 'main.CfApiKey=<base64-encoded-key>'`
+  - using the `make` file: `CF_API_KEY=<base64-encoded-key> make`
 - if using as a library, call `config.SetCurseforgeApiKey(<base-64-encoded-key>)` at some point in your code
+
+### GitHub
+This fork does not include a GitHub API key in its source code.
+You can supply it with these methods do avoid being rate limited:
+
+- if building the project locally, include the ldflag `-X 'main.GhApiKey=<key>'`
+  - using the `make` file: `GH_API_KEY=<key> make` 
+- if using as a library, call `config.SetGitHubApiKey(<key>)` at some point in your code
 
 ---
 

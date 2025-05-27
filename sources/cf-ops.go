@@ -269,6 +269,7 @@ func CurseforgeModInfoFromSlug(
 		return CfModInfo{}, CfModFileInfo{}, err
 	}
 
+	// TODO: do we need to fuzzy search by slug as well?
 	modInfo := results[0]
 
 	fileInfo, err := GetLatestFile(modInfo, mcVersions, fileID, packLoaders)

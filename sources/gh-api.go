@@ -1,7 +1,6 @@
 package sources
 
 import (
-	"errors"
 	"fmt"
 	"github.com/leocov-dev/packwiz-nxt/config"
 	"net/http"
@@ -20,9 +19,6 @@ var ghDefaultClient = ghApiClient{&http.Client{}}
 
 func (c *ghApiClient) makeGet(url string) (*http.Response, error) {
 	ghApiToken := config.GetGhApiKey()
-	if ghApiToken == "" {
-		return nil, errors.New("GitHub API Token not set")
-	}
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
