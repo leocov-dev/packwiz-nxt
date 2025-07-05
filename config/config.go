@@ -2,7 +2,7 @@ package config
 
 import (
 	"encoding/base64"
-	"errors"
+	"fmt"
 )
 
 var (
@@ -26,7 +26,7 @@ func SetGitHubApiKey(key string) {
 func DecodeCfApiKey() (string, error) {
 	k, err := base64.StdEncoding.DecodeString(cfApiKey)
 	if err != nil || len(k) == 0 {
-		return "", errors.New("failed to decode CF API key")
+		return "", fmt.Errorf("failed to decode CF API key: %s", err)
 	}
 	return string(k), nil
 }
