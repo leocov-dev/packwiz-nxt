@@ -26,7 +26,7 @@ func SetGitHubApiKey(key string) {
 func DecodeCfApiKey() (string, error) {
 	k, err := base64.StdEncoding.DecodeString(cfApiKey)
 	if err != nil || len(k) == 0 {
-		return "", fmt.Errorf("failed to decode CF API key: %s", err)
+		return "", fmt.Errorf("failed to decode CF API key: %w", err)
 	}
 	return string(k), nil
 }
