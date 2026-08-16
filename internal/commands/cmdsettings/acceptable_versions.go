@@ -59,7 +59,11 @@ var acceptableVersionsCommand = &cobra.Command{
 		}
 
 		// Print success message
-		prettyList := strings.Join(modpack.GetAcceptableGameVersions(), ", ")
+		finalVersions, err := modpack.GetAcceptableGameVersions()
+		if err != nil {
+			shared.Exitf("Error reading acceptable versions: %s\n", err)
+		}
+		prettyList := strings.Join(finalVersions, ", ")
 		prettyList += ", " + modpack.Versions["minecraft"]
 		fmt.Printf("%s %s\n", msgPrefix, prettyList)
 	},

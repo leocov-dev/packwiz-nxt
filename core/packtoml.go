@@ -117,17 +117,39 @@ func (pack *PackToml) GetSupportedMCVersions() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	allVersions := append(append([]string(nil), pack.GetAcceptableGameVersions()...), mcVersion)
+	acceptableVersions, err := pack.GetAcceptableGameVersions()
+	if err != nil {
+		return nil, err
+	}
+	allVersions := append(append([]string(nil), acceptableVersions...), mcVersion)
 	SortAndDedupeVersions(allVersions)
 	return allVersions, nil
 }
 
-func (pack *PackToml) GetAcceptableGameVersions() []string {
-	acceptableVersions, ok := pack.Options["acceptable-game-versions"]
+// GetAcceptableGameVersions returns the pack's "acceptable-game-versions" option as a []string.
+// TOML-decoded options stored as interface{} may come back as either []string (if set
+// programmatically) or []interface{} (if decoded from a TOML file), so both are handled here
+// instead of panicking on an unchecked type assertion.
+func (pack *PackToml) GetAcceptableGameVersions() ([]string, error) {
+	acceptableVersionsRaw, ok := pack.Options["acceptable-game-versions"]
 	if !ok {
-		return []string{}
+		return []string{}, nil
 	}
-	return acceptableVersions.([]string)
+	if versions, ok := acceptableVersionsRaw.([]string); ok {
+		return versions, nil
+	}
+	if versionsAny, ok := acceptableVersionsRaw.([]interface{}); ok {
+		versions := make([]string, 0, len(versionsAny))
+		for _, v := range versionsAny {
+			s, ok := v.(string)
+			if !ok {
+				return nil, fmt.Errorf("acceptable-game-versions contains a non-string value: %v", v)
+			}
+			versions = append(versions, s)
+		}
+		return versions, nil
+	}
+	return nil, fmt.Errorf("acceptable-game-versions has an unexpected type: %T", acceptableVersionsRaw)
 }
 
 func (pack *PackToml) SetAcceptableGameVersions(versions []string) {
@@ -138,7 +160,10 @@ func (pack *PackToml) SetAcceptableGameVersions(versions []string) {
 // AddAcceptableVersion adds a single version to the pack's acceptable Minecraft versions list.
 // It returns an error if the version is already present in the list.
 func (pack *PackToml) AddAcceptableVersion(version string) error {
-	currentVersions := pack.GetAcceptableGameVersions()
+	currentVersions, err := pack.GetAcceptableGameVersions()
+	if err != nil {
+		return err
+	}
 	if slices.Contains(currentVersions, version) {
 		return fmt.Errorf("version %s is already in the acceptable versions list", version)
 	}
@@ -149,7 +174,10 @@ func (pack *PackToml) AddAcceptableVersion(version string) error {
 // RemoveAcceptableVersion removes a single version from the pack's acceptable Minecraft versions list.
 // It returns an error if the version is not present in the list.
 func (pack *PackToml) RemoveAcceptableVersion(version string) error {
-	currentVersions := pack.GetAcceptableGameVersions()
+	currentVersions, err := pack.GetAcceptableGameVersions()
+	if err != nil {
+		return err
+	}
 	i := slices.Index(currentVersions, version)
 	if i == -1 {
 		return fmt.Errorf("version %s is not in the acceptable versions list", version)
