@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 )
 
@@ -575,7 +576,7 @@ func removeEmpty(hashList []string) ([]string, []int) {
 func CreateDownloadSession(mods []*core.Mod, hashesToObtain []string) (DownloadSession, error) {
 	// Load cache index
 	cacheIndex := CacheIndex{Version: 1, Hashes: make(map[string][]string)}
-	cachePath, err := GetPackwizCache()
+	cachePath, err := GetPackwizCache(viper.GetString("cache.directory"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to load cache: %w", err)
 	}

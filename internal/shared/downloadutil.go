@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/leocov-dev/packwiz-nxt/core"
 	"github.com/leocov-dev/packwiz-nxt/fileio"
+	"github.com/spf13/viper"
 	"io"
 	"os"
 	"path"
@@ -19,7 +20,7 @@ func ListManualDownloads(session fileio.DownloadSession) {
 		for _, dl := range manualDownloads {
 			fmt.Printf("%s (%s) from %s\n", dl.Name, dl.FileName, dl.URL)
 		}
-		cacheDir, err := fileio.GetPackwizCache()
+		cacheDir, err := fileio.GetPackwizCache(viper.GetString("cache.directory"))
 		if err != nil {
 			Exitf("Error locating cache folder: %v", err)
 		}

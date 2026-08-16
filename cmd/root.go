@@ -58,7 +58,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&metaFolderBase, "meta-folder-base", ".", "The base folder from which meta-folder will be resolved, defaulting to the current directory (so you can put all mods/etc in a subfolder while still using the default behaviour)")
 	_ = viper.BindPFlag("meta-folder-base", rootCmd.PersistentFlags().Lookup("meta-folder-base"))
 
-	defaultCacheDir, err := fileio.GetPackwizCache()
+	defaultCacheDir, err := fileio.GetPackwizCache(viper.GetString("cache.directory"))
 	if err != nil {
 		shared.Exitln(err)
 	}
