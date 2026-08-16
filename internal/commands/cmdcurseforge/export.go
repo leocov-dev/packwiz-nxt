@@ -116,7 +116,7 @@ var exportCmd = &cobra.Command{
 
 			shared.ListManualDownloads(session)
 
-			for dl := range session.StartDownloads() {
+			for dl := range session.StartDownloads(cmd.Context()) {
 				_ = shared.AddToZip(dl, exp, "overrides")
 			}
 

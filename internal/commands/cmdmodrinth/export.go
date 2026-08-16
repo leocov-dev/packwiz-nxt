@@ -72,7 +72,7 @@ var exportCmd = &cobra.Command{
 		shared.ListManualDownloads(session)
 
 		manifestFiles := make([]sources.ModrinthPackFile, 0)
-		for dl := range session.StartDownloads() {
+		for dl := range session.StartDownloads(cmd.Context()) {
 			if canBeIncludedDirectly(dl.Mod, restrictDomains) {
 				if dl.Error != nil {
 					fmt.Printf("Download of %s (%s) failed: %v\n", dl.Mod.Name, dl.Mod.FileName, dl.Error)

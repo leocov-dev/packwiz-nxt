@@ -1,6 +1,7 @@
 package fileio
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"golang.org/x/exp/slices"
 )
@@ -17,7 +19,7 @@ const DownloadCacheImportFolder = "import"
 
 type DownloadSession interface {
 	GetManualDownloads() []core.ManualDownload
-	StartDownloads() chan CompletedDownload
+	StartDownloads(ctx context.Context) chan CompletedDownload
 	SaveIndex() error
 }
 
@@ -34,6 +36,9 @@ type CompletedDownload struct {
 }
 
 type downloadSessionInternal struct {
+	// cacheIndexMu guards cacheIndex, which is mutated concurrently by the
+	// StartDownloads goroutine and read by SaveIndex.
+	cacheIndexMu         sync.Mutex
 	cacheIndex           CacheIndex
 	cacheFolder          string
 	hashesToObtain       []string
@@ -54,48 +59,80 @@ func (d *downloadSessionInternal) GetManualDownloads() []core.ManualDownload {
 	return d.manualDownloads
 }
 
-func (d *downloadSessionInternal) StartDownloads() chan CompletedDownload {
+// StartDownloads begins downloading all pending files in a background goroutine and
+// returns a channel of completed downloads. The provided context can be used to cancel
+// the operation early; if the caller stops draining the returned channel, cancelling ctx
+// ensures the background goroutine doesn't block forever trying to send.
+//
+// Note: cancellation only stops the channel send / further work from being started; the
+// underlying HTTP request made via core.GetWithUA is not itself cancellable, since
+// GetWithUA doesn't accept a context. Adding that would require changing GetWithUA's
+// signature across all its callers, which is out of scope here.
+func (d *downloadSessionInternal) StartDownloads(ctx context.Context) chan CompletedDownload {
 	downloads := make(chan CompletedDownload)
 	go func() {
+		defer close(downloads)
+		send := func(dl CompletedDownload) bool {
+			select {
+			case downloads <- dl:
+				return true
+			case <-ctx.Done():
+				return false
+			}
+		}
+
 		for _, found := range d.foundManualDownloads {
-			downloads <- found
+			if !send(found) {
+				return
+			}
 		}
 		for _, task := range d.downloadTasks {
 			warnings := make([]error, 0)
 
 			// Get handle for mod
+			d.cacheIndexMu.Lock()
 			cacheHandle := d.cacheIndex.GetHandleFromHash(task.hashFormat, task.hash)
+			d.cacheIndexMu.Unlock()
 			if cacheHandle != nil {
-				download, err := reuseExistingFile(cacheHandle, d.hashesToObtain, task.mod)
+				download, err := reuseExistingFile(cacheHandle, d.hashesToObtain, task.mod, &d.cacheIndexMu)
 				if err != nil {
 					// Remove handle and try again
+					d.cacheIndexMu.Lock()
 					cacheHandle.Remove()
+					d.cacheIndexMu.Unlock()
 					cacheHandle = nil
 					warnings = append(warnings, fmt.Errorf("redownloading cached file: %w", err))
 				} else {
-					downloads <- download
+					if !send(download) {
+						return
+					}
 					continue
 				}
 			}
 
-			download, err := downloadNewFile(&task, d.cacheFolder, d.hashesToObtain, &d.cacheIndex)
+			download, err := downloadNewFile(&task, d.cacheFolder, d.hashesToObtain, &d.cacheIndex, &d.cacheIndexMu)
 			if err != nil {
-				downloads <- CompletedDownload{
+				if !send(CompletedDownload{
 					Error: err,
 					Mod:   task.mod,
+				}) {
+					return
 				}
 			} else {
 				download.Warnings = warnings
-				downloads <- download
+				if !send(download) {
+					return
+				}
 			}
 		}
-		close(downloads)
 	}()
 	return downloads
 }
 
 func (d *downloadSessionInternal) SaveIndex() error {
+	d.cacheIndexMu.Lock()
 	data, err := json.Marshal(d.cacheIndex)
+	d.cacheIndexMu.Unlock()
 	if err != nil {
 		return fmt.Errorf("failed to serialise index: %w", err)
 	}
@@ -106,7 +143,7 @@ func (d *downloadSessionInternal) SaveIndex() error {
 	return nil
 }
 
-func reuseExistingFile(cacheHandle *CacheIndexHandle, hashesToObtain []string, mod *core.Mod) (CompletedDownload, error) {
+func reuseExistingFile(cacheHandle *CacheIndexHandle, hashesToObtain []string, mod *core.Mod, cacheIndexMu *sync.Mutex) (CompletedDownload, error) {
 	// Already stored; try using it!
 	file, err := cacheHandle.Open()
 	if err == nil {
@@ -123,7 +160,9 @@ func reuseExistingFile(cacheHandle *CacheIndexHandle, hashesToObtain []string, m
 				_ = file.Close()
 				return CompletedDownload{}, fmt.Errorf("failed to seek file %s in cache: %w", cacheHandle.Path(), err)
 			}
+			cacheIndexMu.Lock()
 			warnings = cacheHandle.UpdateIndex()
+			cacheIndexMu.Unlock()
 		}
 
 		return CompletedDownload{
@@ -137,12 +176,21 @@ func reuseExistingFile(cacheHandle *CacheIndexHandle, hashesToObtain []string, m
 	}
 }
 
-func downloadNewFile(task *downloadTask, cacheFolder string, hashesToObtain []string, index *CacheIndex) (CompletedDownload, error) {
+func downloadNewFile(task *downloadTask, cacheFolder string, hashesToObtain []string, index *CacheIndex, cacheIndexMu *sync.Mutex) (CompletedDownload, error) {
 	// Create temp file to download to
 	tempFile, err := os.CreateTemp(filepath.Join(cacheFolder, "temp"), "download-tmp")
 	if err != nil {
 		return CompletedDownload{}, fmt.Errorf("failed to create temporary file for download: %w", err)
 	}
+	// Ensure the temp file is always closed and removed unless we reach a successful
+	// return (where ownership of the file has been transferred, e.g. via CreateFromTemp).
+	success := false
+	defer func() {
+		if !success {
+			_ = tempFile.Close()
+			_ = os.Remove(tempFile.Name())
+		}
+	}()
 
 	hashesToObtain, hashes := getHashListsForDownload(hashesToObtain, task.hashFormat, task.hash)
 	if len(hashesToObtain) > 0 {
@@ -172,9 +220,11 @@ func downloadNewFile(task *downloadTask, cacheFolder string, hashesToObtain []st
 	}
 
 	// Create handle with calculated hashes
+	cacheIndexMu.Lock()
 	cacheHandle, alreadyExists := index.NewHandleFromHashes(hashes)
 	// Update index stored hashes
 	warnings := cacheHandle.UpdateIndex()
+	cacheIndexMu.Unlock()
 
 	var file *os.File
 	if alreadyExists {
@@ -195,6 +245,7 @@ func downloadNewFile(task *downloadTask, cacheFolder string, hashesToObtain []st
 		}
 	}
 
+	success = true
 	return CompletedDownload{
 		File:     file,
 		Mod:      task.mod,
@@ -377,6 +428,7 @@ func (c *CacheIndex) rehashFile(cacheHash string, hashFormat string) (string, er
 	if err != nil {
 		return "", err
 	}
+	defer file.Close()
 	validateHasher, err := core.GetHashImpl(cacheHashFormat)
 	if err != nil {
 		return "", fmt.Errorf("failed to get hasher for rehash: %w", err)

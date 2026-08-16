@@ -39,7 +39,7 @@ var rehashCmd = &cobra.Command{
 
 		shared.ListManualDownloads(session)
 
-		for dl := range session.StartDownloads() {
+		for dl := range session.StartDownloads(cmd.Context()) {
 			if dl.Error != nil {
 				fmt.Printf("Error retrieving %s: %v\n", dl.Mod.Name, dl.Error)
 			} else {
