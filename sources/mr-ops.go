@@ -67,7 +67,7 @@ func ModrinthFindMissingDependencies(
 	}
 
 	if len(depProjectIDPendingQueue)+len(depVersionIDPendingQueue) > 0 {
-		fmt.Println("Finding dependencies...")
+		mrLogger.Infof("Finding dependencies...\n")
 
 		// prepareNext folds in the two bits of provider-specific bookkeeping that happen at
 		// the top of each resolution cycle: resolving any queued version IDs into project

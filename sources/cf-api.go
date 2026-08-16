@@ -18,12 +18,18 @@ const cfApiServer = "api.curseforge.com"
 
 type cfApiClient struct {
 	httpClient *http.Client
+	logger     core.Logger
 }
 
-var cfDefaultClient = cfApiClient{&http.Client{}}
+var cfDefaultClient = cfApiClient{&http.Client{Timeout: core.DefaultHTTPTimeout}, core.PrintLogger{}}
 
 func GetCurseforgeClient() *cfApiClient {
 	return &cfDefaultClient
+}
+
+// SetLogger overrides the client's logger, used to report non-fatal warnings/progress.
+func (c *cfApiClient) SetLogger(l core.Logger) {
+	c.logger = l
 }
 
 func (c *cfApiClient) makeGet(endpoint string) (*http.Response, error) {
@@ -46,7 +52,7 @@ func (c *cfApiClient) makeGet(endpoint string) (*http.Response, error) {
 		return nil, err
 	}
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("invalid response status: %v", resp.Status)
 	}
 	return resp, nil
@@ -73,7 +79,7 @@ func (c *cfApiClient) makePost(endpoint string, body io.Reader) (*http.Response,
 		return nil, err
 	}
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("invalid response status: %v", resp.Status)
 	}
 	return resp, nil
@@ -81,7 +87,6 @@ func (c *cfApiClient) makePost(endpoint string, body io.Reader) (*http.Response,
 
 type fileType uint8
 
-// noinspection GoUnusedConst
 const (
 	fileTypeRelease fileType = iota + 1
 	fileTypeBeta
@@ -90,7 +95,6 @@ const (
 
 type dependencyType uint8
 
-// noinspection GoUnusedConst
 const (
 	dependencyTypeEmbedded dependencyType = iota + 1
 	dependencyTypeOptional
@@ -102,7 +106,6 @@ const (
 
 type ModloaderType uint8
 
-// noinspection GoUnusedConst
 const (
 	// ModloaderTypeAny should not be passed to the API - it does not work
 	ModloaderTypeAny ModloaderType = iota
@@ -136,7 +139,6 @@ var ModloaderIds = [...]string{
 
 type hashAlgo uint8
 
-// noinspection GoUnusedConst
 const (
 	hashAlgoSHA1 hashAlgo = iota + 1
 	hashAlgoMD5
@@ -371,7 +373,6 @@ func (c *cfApiClient) GetSearch(searchTerm string, slug string, classID uint32, 
 
 type gameStatus uint8
 
-// noinspection GoUnusedConst
 const (
 	gameStatusDraft gameStatus = iota + 1
 	gameStatusTest
@@ -383,7 +384,6 @@ const (
 
 type gameApiStatus uint8
 
-// noinspection GoUnusedConst
 const (
 	gameApiStatusPrivate gameApiStatus = iota + 1
 	GameApiStatusPublic

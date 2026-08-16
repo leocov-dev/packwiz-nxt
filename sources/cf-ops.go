@@ -30,7 +30,7 @@ func CurseforgeFindMissingDependencies(
 	}
 
 	if len(depIDPendingQueue) > 0 {
-		fmt.Println("Finding dependencies...")
+		GetCurseforgeClient().logger.Infof("Finding dependencies...\n")
 
 		installedIDList, err := buildInstalledIdList(pack)
 		if err != nil {

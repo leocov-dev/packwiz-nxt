@@ -139,7 +139,7 @@ func installRelease(
 	}
 
 	// Install the file
-	fmt.Printf("Installing %s from release %s\n", file.Name, release.TagName)
+	GetGithubClient().logger.Infof("Installing %s from release %s\n", file.Name, release.TagName)
 
 	updateMap := make(core.ModUpdate)
 

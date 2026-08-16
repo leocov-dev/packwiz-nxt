@@ -13,9 +13,21 @@ const ghApiServer = "api.github.com"
 
 type ghApiClient struct {
 	httpClient *http.Client
+	logger     core.Logger
 }
 
-var ghDefaultClient = ghApiClient{&http.Client{}}
+var ghDefaultClient = ghApiClient{&http.Client{Timeout: core.DefaultHTTPTimeout}, core.PrintLogger{}}
+
+// GetGithubClient returns the default GitHub API client, mirroring
+// GetCurseforgeClient/GetModrinthClient.
+func GetGithubClient() *ghApiClient {
+	return &ghDefaultClient
+}
+
+// SetLogger overrides the client's logger, used to report non-fatal warnings/progress.
+func (c *ghApiClient) SetLogger(l core.Logger) {
+	c.logger = l
+}
 
 func (c *ghApiClient) makeGet(url string) (*http.Response, error) {
 	ghApiToken := config.GetGhApiKey()
@@ -50,13 +62,13 @@ func (c *ghApiClient) makeGet(url string) (*http.Response, error) {
 	if resp.StatusCode == 403 && ratelimit == 0 {
 		return nil, fmt.Errorf("GitHub API ratelimit exceeded; time of reset: %v", resp.Header.Get("x-ratelimit-reset"))
 	}
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("invalid response status: %v", resp.Status)
 	}
 
 	if ratelimit < 10 {
-		fmt.Printf("Warning: GitHub API allows %v more requests before ratelimiting\n", ratelimit)
-		fmt.Println("Specifying a token is recommended; see documentation")
+		c.logger.Warnf("Warning: GitHub API allows %v more requests before ratelimiting\n", ratelimit)
+		c.logger.Warnf("Specifying a token is recommended; see documentation\n")
 	}
 
 	return resp, nil

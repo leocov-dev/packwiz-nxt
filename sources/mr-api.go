@@ -15,7 +15,17 @@ import (
 	"github.com/leocov-dev/packwiz-nxt/core"
 )
 
-var mrDefaultClient = modrinthApi.NewClient(&http.Client{})
+var mrDefaultClient = modrinthApi.NewClient(&http.Client{Timeout: core.DefaultHTTPTimeout})
+
+// mrLogger reports non-fatal warnings/progress for the Modrinth provider. The
+// third-party Modrinth client doesn't support an injectable logger field directly,
+// so this is tracked separately and defaults to matching the CLI's historical output.
+var mrLogger core.Logger = core.PrintLogger{}
+
+// SetModrinthLogger overrides the logger used for Modrinth warnings/progress messages.
+func SetModrinthLogger(l core.Logger) {
+	mrLogger = l
+}
 
 func init() {
 	mrDefaultClient.UserAgent = core.UserAgent
@@ -190,11 +200,6 @@ func mrGetProjectTypeFolder(projectType string, fileLoaders []string, packLoader
 
 		// Datapack loader is "datapack"
 		if slices.Contains(fileLoaders, "datapack") {
-			//if viper.GetString("datapack-folder") != "" {
-			//	return viper.GetString("datapack-folder"), nil
-			//} else {
-			//	return "", errors.New("set the datapack-folder option to use datapacks")
-			//}
 			return "", errors.New("datapacks are not supported yet")
 		}
 		// Default to "mods" for mod type
@@ -427,7 +432,7 @@ func ModrinthGetLatestVersion(projectID string, name string, pack core.Pack, opt
 	flexverLatest := mrFindLatestVersion(result, gameVersions, true)
 	releaseDateLatest := mrFindLatestVersion(result, gameVersions, false)
 	if flexverLatest != releaseDateLatest && releaseDateLatest.VersionNumber != nil && flexverLatest.VersionNumber != nil {
-		fmt.Printf("Warning: Modrinth versions for %s inconsistent between latest version number and newest release date (%s vs %s)\n", name, *flexverLatest.VersionNumber, *releaseDateLatest.VersionNumber)
+		mrLogger.Warnf("Warning: Modrinth versions for %s inconsistent between latest version number and newest release date (%s vs %s)\n", name, *flexverLatest.VersionNumber, *releaseDateLatest.VersionNumber)
 	}
 
 	if releaseDateLatest.ID == nil {
