@@ -5,7 +5,22 @@ import "fmt"
 // named update source to mod list
 type UpdateSourceMap map[string][]*Mod
 
-func BuildUpdateMap(mods []*Mod) UpdateSourceMap {
+// resolveRegistry returns reg if non-nil, otherwise falls back to DefaultRegistry.
+// This lets callers pass nil to preserve the CLI's historical behavior of using
+// the process-wide default registry.
+func resolveRegistry(reg *Registry) *Registry {
+	if reg == nil {
+		return DefaultRegistry
+	}
+	return reg
+}
+
+// BuildUpdateMap groups mods by their configured update source, keeping only
+// sources for which an Updater is registered in reg (or DefaultRegistry, if
+// reg is nil).
+func BuildUpdateMap(reg *Registry, mods []*Mod) UpdateSourceMap {
+	reg = resolveRegistry(reg)
+
 	filesWithUpdater := make(UpdateSourceMap)
 	fmt.Println("Reading metadata files...")
 
@@ -14,7 +29,7 @@ func BuildUpdateMap(mods []*Mod) UpdateSourceMap {
 		for k := range modData.Update {
 			slice, ok := filesWithUpdater[k]
 			if !ok {
-				_, ok = GetUpdater(k)
+				_, ok = reg.GetUpdater(k)
 				if !ok {
 					continue
 				}
@@ -53,13 +68,20 @@ func (ud UpdateDataList) Append(source string, mod *Mod, cachedState interface{}
 	ud[source] = data
 }
 
-func GetUpdatableMods(pack Pack) (UpdateDataList, error) {
+// GetUpdatableMods checks all of pack's mods for available updates, using the
+// Updaters registered in reg (or DefaultRegistry, if reg is nil).
+func GetUpdatableMods(reg *Registry, pack Pack) (UpdateDataList, error) {
+	reg = resolveRegistry(reg)
+
 	updatable := make(UpdateDataList)
 
-	updateMap := BuildUpdateMap(pack.GetModsList())
+	updateMap := BuildUpdateMap(reg, pack.GetModsList())
 
 	for source, mods := range updateMap {
-		updater, _ := GetUpdater(source)
+		updater, ok := reg.GetUpdater(source)
+		if !ok {
+			return nil, fmt.Errorf("no updater registered for source: %s", source)
+		}
 		checks, err := updater.CheckUpdate(mods, pack)
 		if err != nil {
 			return nil, err
@@ -86,7 +108,11 @@ func GetUpdatableMods(pack Pack) (UpdateDataList, error) {
 	return updatable, nil
 }
 
-func UpdateSingleMod(pack Pack, mod *Mod) error {
+// UpdateSingleMod checks for and applies an update to a single mod, using the
+// Updaters registered in reg (or DefaultRegistry, if reg is nil).
+func UpdateSingleMod(reg *Registry, pack Pack, mod *Mod) error {
+	reg = resolveRegistry(reg)
+
 	updater, err := mod.GetUpdater()
 	if err != nil {
 		return err
@@ -107,12 +133,16 @@ func UpdateSingleMod(pack Pack, mod *Mod) error {
 		updateData := make(UpdateDataList)
 		updateData.Append(updater.GetName(), mod, check.CachedState)
 
-		return updateMods(updateData)
+		return updateMods(reg, updateData)
 	}
 }
 
-func UpdateAllMods(pack Pack) error {
-	updateData, err := GetUpdatableMods(pack)
+// UpdateAllMods checks for and applies updates to all of pack's mods, using
+// the Updaters registered in reg (or DefaultRegistry, if reg is nil).
+func UpdateAllMods(reg *Registry, pack Pack) error {
+	reg = resolveRegistry(reg)
+
+	updateData, err := GetUpdatableMods(reg, pack)
 	if err != nil {
 		return err
 	}
@@ -122,12 +152,17 @@ func UpdateAllMods(pack Pack) error {
 		return nil
 	}
 
-	return updateMods(updateData)
+	return updateMods(reg, updateData)
 }
 
-func updateMods(updateData UpdateDataList) error {
+func updateMods(reg *Registry, updateData UpdateDataList) error {
+	reg = resolveRegistry(reg)
+
 	for source, data := range updateData {
-		updater, _ := GetUpdater(source)
+		updater, ok := reg.GetUpdater(source)
+		if !ok {
+			return fmt.Errorf("no updater registered for source: %s", source)
+		}
 
 		if err := updater.DoUpdate(data.Mods, data.CachedState); err != nil {
 			return err

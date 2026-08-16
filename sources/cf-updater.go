@@ -17,7 +17,7 @@ import (
 
 func init() {
 	core.AddUpdater(CfUpdater{})
-	core.MetaDownloaders["curseforge"] = CfDownloader{}
+	core.AddMetaDownloader("curseforge", CfDownloader{})
 }
 
 var snapshotVersionRegex = regexp.MustCompile(`(?:Snapshot )?(\d+)w0?(0|[1-9]\d*)([a-z])`)
