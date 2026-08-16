@@ -13,8 +13,6 @@ type CfInstallableDep struct {
 	FileInfo CfModFileInfo
 }
 
-const maxCycles = 20
-
 func CurseforgeFindMissingDependencies(
 	pack core.Pack,
 	fileInfoData CfModFileInfo,
@@ -39,37 +37,38 @@ func CurseforgeFindMissingDependencies(
 			return nil, err
 		}
 
-		cycles := 0
-
-		for len(depIDPendingQueue) > 0 && cycles < maxCycles {
-			// Remove installed IDs from dep queue
-			i := 0
-			for _, id := range depIDPendingQueue {
-				contains := slices.Contains(installedIDList, id)
-
+		// prepareNext dedupes a batch of candidate dependency IDs against IDs that are
+		// already installed in the pack, or already collected as a dependency this run.
+		prepareNext := func(newIDs []uint32) ([]uint32, error) {
+			var out []uint32
+			for _, id := range newIDs {
+				if slices.Contains(installedIDList, id) {
+					continue
+				}
+				installed := false
 				for _, data := range depsInstallable {
 					if id == data.ID {
-						contains = true
+						installed = true
 						break
 					}
 				}
-				if !contains {
-					depIDPendingQueue[i] = id
-					i++
+				if !installed {
+					out = append(out, id)
 				}
 			}
-			depIDPendingQueue = depIDPendingQueue[:i]
+			return out, nil
+		}
 
-			if len(depIDPendingQueue) == 0 {
-				break
-			}
-
-			depInfoData, err := GetCurseforgeClient().GetModInfoMultiple(depIDPendingQueue)
+		// fetchAndExpand batch-fetches mod info for the pending IDs, resolves the latest
+		// compatible file for each, and returns the required-dependency IDs discovered
+		// along the way (after applying the Quilt dependency overrides).
+		fetchAndExpand := func(pending []uint32) ([]uint32, error) {
+			depInfoData, err := GetCurseforgeClient().GetModInfoMultiple(pending)
 			if err != nil {
 				return nil, err
 			}
-			depIDPendingQueue = depIDPendingQueue[:0]
 
+			var next []uint32
 			for _, currData := range depInfoData {
 				depFileInfo, err := GetLatestFile(currData, mcVersions, 0, pack.GetCompatibleLoaders())
 				if err != nil {
@@ -78,7 +77,7 @@ func CurseforgeFindMissingDependencies(
 
 				for _, dep := range depFileInfo.Dependencies {
 					if dep.Type == DependencyTypeRequired {
-						depIDPendingQueue = append(depIDPendingQueue, MapDepOverride(dep.ModID, isQuilt, primaryMCVersion))
+						next = append(next, MapDepOverride(dep.ModID, isQuilt, primaryMCVersion))
 					}
 				}
 
@@ -91,11 +90,11 @@ func CurseforgeFindMissingDependencies(
 				)
 			}
 
-			cycles++
+			return next, nil
 		}
 
-		if cycles >= maxCycles {
-			return nil, errors.New("dependencies recurse too deeply! Try increasing maxCycles")
+		if err := runDependencyResolution(depIDPendingQueue, DefaultMaxDependencyCycles, prepareNext, fetchAndExpand); err != nil {
+			return nil, err
 		}
 	}
 

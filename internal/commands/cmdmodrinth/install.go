@@ -81,7 +81,7 @@ var installCmd = &cobra.Command{
 			if parsedVersionID := sources.ParseAsModrinthVersionID(args[0]); parsedVersionID != "" {
 				versionID = parsedVersionID
 			}
-			if parsedFilename := sources.ParseAsParseAsFilename(args[0]); parsedFilename != "" {
+			if parsedFilename := sources.ParseAsModrinthFilename(args[0]); parsedFilename != "" {
 				optionalFilenameMatch = parsedFilename
 			}
 		}

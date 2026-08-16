@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
-	"github.com/unascribed/FlexVer/go/flexver"
 
 	"github.com/leocov-dev/packwiz-nxt/core"
 )
@@ -218,6 +217,33 @@ func CfFilterFileInfoLoaderIndex(packLoaders []string, fileInfoData CfModFileInf
 	}
 }
 
+// cfIsBetterCandidate reports whether a candidate file (at mcVerIdx/loaderIdx/candidateID) is
+// preferred over the current best (bestMcVer/bestLoaderType/currentBestID), using the shared
+// "compare by Minecraft version, then loader preference, then ID" priority chain used by both
+// scans in CfFindLatestFile below.
+func cfIsBetterCandidate(mcVerIdx int, loaderIdx ModloaderType, loaderValid bool, candidateID uint32, bestMcVer int, bestLoaderType ModloaderType, currentBestID uint32) bool {
+	if mcVerIdx < 0 || !loaderValid {
+		return false
+	}
+
+	compare := compareChain(
+		// Compare first by Minecraft version (prefer higher indexes of mcVersions)
+		func() int32 { return int32(mcVerIdx - bestMcVer) },
+		func() int32 {
+			// Treat unmarked versions as neutral (i.e. same as others)
+			if bestLoaderType == ModloaderTypeAny || loaderIdx == ModloaderTypeAny {
+				return 0
+			}
+			// Prefer higher loader indexes
+			return int32(loaderIdx) - int32(bestLoaderType)
+		},
+		// Other comparisons are equal, compare by ID instead
+		func() int32 { return int32(int64(candidateID) - int64(currentBestID)) },
+	)
+
+	return compare > 0
+}
+
 // CfFindLatestFile looks at mod info, and finds the latest file ID (and potentially the file info for it - may be null)
 func CfFindLatestFile(modInfoData CfModInfo, mcVersions []string, packLoaders []string) (fileID uint32, fileInfoData *CfModFileInfo, fileName string) {
 	cfMcVersions := GetCurseforgeVersions(mcVersions)
@@ -229,25 +255,7 @@ func CfFindLatestFile(modInfoData CfModInfo, mcVersions []string, packLoaders []
 		mcVerIdx := core.HighestSliceIndex(mcVersions, v.GameVersions)
 		loaderIdx, loaderValid := CfFilterFileInfoLoaderIndex(packLoaders, v)
 
-		if mcVerIdx < 0 || !loaderValid {
-			continue
-		}
-		// Compare first by Minecraft version (prefer higher indexes of mcVersions)
-		compare := int32(mcVerIdx - bestMcVer)
-		if compare == 0 {
-			// Treat unmarked versions as neutral (i.e. same as others)
-			if bestLoaderType == ModloaderTypeAny || loaderIdx == ModloaderTypeAny {
-				compare = 0
-			} else {
-				// Prefer higher loader indexes
-				compare = int32(loaderIdx) - int32(bestLoaderType)
-			}
-		}
-		if compare == 0 {
-			// Other comparisons are equal, compare by ID instead
-			compare = int32(int64(v.ID) - int64(fileID))
-		}
-		if compare > 0 {
+		if cfIsBetterCandidate(mcVerIdx, loaderIdx, loaderValid, v.ID, bestMcVer, bestLoaderType, fileID) {
 			fileID = v.ID
 			fileInfoDataCopy := v // Fix for loop variable reference (which gets reassigned on every iteration!)
 			fileInfoData = &fileInfoDataCopy
@@ -261,25 +269,7 @@ func CfFindLatestFile(modInfoData CfModInfo, mcVersions []string, packLoaders []
 		mcVerIdx := slices.Index(cfMcVersions, v.GameVersion)
 		loaderIdx, loaderValid := CfFilterLoaderTypeIndex(packLoaders, v.Modloader)
 
-		if mcVerIdx < 0 || !loaderValid {
-			continue
-		}
-		// Compare first by Minecraft version (prefer higher indexes of mcVersions)
-		compare := int32(mcVerIdx - bestMcVer)
-		if compare == 0 {
-			// Treat unmarked versions as neutral (i.e. same as others)
-			if bestLoaderType == ModloaderTypeAny || loaderIdx == ModloaderTypeAny {
-				compare = 0
-			} else {
-				// Prefer higher loader indexes
-				compare = int32(loaderIdx) - int32(bestLoaderType)
-			}
-		}
-		if compare == 0 {
-			// Other comparisons are equal, compare by ID instead
-			compare = int32(int64(v.ID) - int64(fileID))
-		}
-		if compare > 0 {
+		if cfIsBetterCandidate(mcVerIdx, loaderIdx, loaderValid, v.ID, bestMcVer, bestLoaderType, fileID) {
 			fileID = v.ID
 			fileInfoData = nil // (no file info in GameVersionLatestFiles)
 			fileName = v.Name
@@ -323,6 +313,8 @@ func (u CfUpdater) CheckUpdate(mods []*core.Mod, pack core.Pack) ([]core.UpdateC
 	results := make([]core.UpdateCheck, len(mods))
 	modIDs := make([]uint32, len(mods))
 	modInfos := make([]CfModInfo, len(mods))
+	projects := make([]CfUpdateData, len(mods))
+	decodeFailed := make([]bool, len(mods))
 
 	mcVersions, err := pack.GetSupportedMCVersions()
 	if err != nil {
@@ -334,8 +326,10 @@ func (u CfUpdater) CheckUpdate(mods []*core.Mod, pack core.Pack) ([]core.UpdateC
 		err = m.DecodeNamedModSourceData("curseforge", &project)
 		if err != nil {
 			results[i] = core.UpdateCheck{Error: errors.New("failed to parse update metadata")}
+			decodeFailed[i] = true
 			continue
 		}
+		projects[i] = project
 		modIDs[i] = project.ProjectID
 	}
 
@@ -355,12 +349,10 @@ func (u CfUpdater) CheckUpdate(mods []*core.Mod, pack core.Pack) ([]core.UpdateC
 	packLoaders := pack.GetCompatibleLoaders()
 
 	for i, m := range mods {
-		var project CfUpdateData
-		err = m.DecodeNamedModSourceData("curseforge", &project)
-		if err != nil {
-			results[i] = core.UpdateCheck{Error: errors.New("failed to parse update metadata")}
+		if decodeFailed[i] {
 			continue
 		}
+		project := projects[i]
 
 		fileID, fileInfoData, fileName := CfFindLatestFile(modInfos[i], mcVersions, packLoaders)
 		if fileID != project.FileID && fileID != 0 {
@@ -535,17 +527,19 @@ func (m *CfDownloadMetadata) DownloadFile() (io.ReadCloser, error) {
 	return resp.Body, nil
 }
 
-// MapDepOverride transforms manual dependency overrides (which will likely be removed when packwiz is able to determine provided mods)
+// MapDepOverride transforms manual dependency overrides (which will likely be removed when
+// packwiz is able to determine provided mods). It is a thin lookup against the shared
+// depOverrideRules table (sources/depoverride.go); the version-gating logic lives there.
 func MapDepOverride(depID uint32, isQuilt bool, mcVersion string) uint32 {
-	if isQuilt && depID == 306612 {
-		// Transform FAPI dependencies to QFAPI/QSL dependencies when using Quilt
-		return 634179
+	if !isQuilt {
+		return depID
 	}
-	if isQuilt && depID == 308769 {
-		// Transform FLK dependencies to QKL dependencies when using Quilt >=1.19.2 non-snapshot
-		if flexver.Less("1.19.1", mcVersion) && flexver.Less(mcVersion, "2.0.0") {
-			return 720410
-		}
+	rule, ok := findCfDepOverrideRule(depID)
+	if !ok {
+		return depID
 	}
-	return depID
+	if rule.versionGate != nil && !rule.versionGate(mcVersion) {
+		return depID
+	}
+	return rule.cfQuiltID
 }
