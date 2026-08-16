@@ -21,44 +21,25 @@ was explicitly deferred, per plan). Status by section:
   is mutex-guarded. `core.DefaultRegistry` remains a process-wide default for
   CLI-behavior compatibility — full per-instance isolation is opt-in, not yet
   the default posture everywhere (see `rewrite-progress.md` gap #7).
-- **#2 (printing instead of returning data)** — ⚠️ Partially fixed. `core/packtoml.go`'s
-  `ValidatePack`, `fileio/indexwriter.go`'s `InitIndexFile`, and
-  `fileio/indexloader.go`'s `RefreshIndexFiles` no longer print/render UI
-  directly. `sources/*.go`'s scattered `fmt.Println`/`fmt.Printf` calls
-  (cf-ops.go, gh-api.go, gh-ops.go, mr-api.go, mr-ops.go) and `core/update.go`'s
-  status prints were **not** addressed — the planned shared `Logger`
-  abstraction was not introduced. Deferred.
+- **#2 (printing instead of returning data)** — ✅ Fixed (second pass, below).
 - **#3 (hidden viper/global-config coupling)** — ✅ Fixed. `core.ValidatePack`,
   `fileio.GetPackwizCache`, `fileio.RefreshIndexFiles` all take explicit
   parameters now instead of reading global `viper` state.
-- **#4 (no context.Context/timeouts in network code)** — ⚠️ Partially fixed.
-  `fileio.DownloadSession.StartDownloads` now takes a `context.Context` and
-  is cancellable. The underlying HTTP clients (`core.GetWithUA`,
-  `sources/*-api.go`'s `cfDefaultClient`/`ghDefaultClient`/`mrDefaultClient`)
-  still have no timeout and don't accept a context. Deferred.
+- **#4 (no context.Context/timeouts in network code)** — ✅ Fixed, pragmatically
+  (second pass, below).
 - **#5 (cross-provider duplication in `sources/`)** — ✅ Fixed. Dependency-BFS
   skeleton, loader-preference comparator shape, and dependency-override table
   unified across CurseForge/Modrinth (`sources/depresolve.go`,
   `sources/compare.go`, `sources/depoverride.go`). GitHub's intra-package
   asset-matching duplication also fixed.
-- **#6 (inconsistent file-organization convention across providers)** — ❌
-  Not addressed — `gh-interfaces.go` is still misnamed/still a grab-bag, and
-  the three providers' api/ops/updater split conventions still differ.
-  Deferred (this was a larger normalization task, not in scope for the fix
-  pass's batching).
+- **#6 (inconsistent file-organization convention across providers)** — ✅ Fixed
+  (second pass, below).
 - **#7 (GitHub LSP violation)** — ✅ Fixed. `DoUpdate` now uses the exact
   asset `CheckUpdate` resolved via `ghCachedStateStore`, instead of
   re-deriving it with a weaker heuristic.
 - **#8 (duplicated marshal/write boilerplate)** — ✅ Fixed. `core.marshalWithHash`
   and `fileio.writeMarshalled` consolidate both.
-- **#9 (domain/wire-format duplication in `core`)** — ❌ Not addressed.
-  `Pack`/`PackToml` still duplicate `GetMCVersion`/`GetSupportedMCVersions`/
-  `GetAcceptableGameVersions`/`GetCompatibleLoaders` logic almost verbatim
-  (both got the same *panic* fix independently — see `core/pack.go`'s
-  `GetAcceptableGameVersions` and `core/packtoml.go`'s sibling — which is
-  itself evidence the duplication is a live maintenance hazard, not just a
-  style nit). Deferred — this is a larger refactor than the fix pass's per-file
-  batching was scoped for.
+- **#9 (domain/wire-format duplication in `core`)** — ✅ Fixed (second pass, below).
 
 Per-file/per-package findings below are **not** individually annotated with
 fixed/deferred status — the summary above covers what changed. Notable
@@ -74,10 +55,66 @@ out of `cmdcurseforge/{detect,import,export}.go`, `cmdmodrinth/export.go`,
 `cmdurl/install.go`, `cmdgithub/install.go`, and `cmdmigrate/minecraft.go`
 (the last no longer calls another command's cobra `Run` field directly).
 
-Deferred work (not in this pass): the `serve` command gap, all Low-severity
-findings, test coverage (still ~3.6%, see `rewrite-progress.md`), and a
-documented public library API. See `rewrite-progress.md`'s Suggested Next
-Milestones for the prioritized follow-up list.
+## Second Fix Pass Status (as of commit `208b514`)
+
+A six-batch follow-up closed out everything the first pass deferred, except
+the `serve` command gap (explicitly excluded — not a cleanup-batch item), test
+coverage, and a library-usage doc (both intentionally out of scope for this
+pass; see `rewrite-progress.md`'s Suggested Next Milestones).
+
+- **#2 (printing instead of returning data)** — ✅ Fixed. New `core.Logger`
+  interface (`Warnf`/`Infof`), defaulting to `core.PrintLogger` (stdout,
+  preserving prior output). Wired into `core.Registry`, `cfApiClient`,
+  `ghApiClient`, and a package-level `mrLogger` for the third-party Modrinth
+  client. All progress/warning prints in `sources/{cf-ops,gh-api,gh-ops,mr-api,
+  mr-ops}.go` and `core/update.go` now go through it. `GetForgeRecommended`
+  also changed from a bare `string` return (swallowing 3 distinct failure
+  modes into `""`) to `(string, error)`.
+- **#4 (no context.Context/timeouts)** — ✅ Fixed, pragmatically. All three
+  provider default clients plus `core.GetWithUA`'s client now carry
+  `core.DefaultHTTPTimeout` (30s). `core.GetWithUAContext(ctx, ...)` was added
+  and wired into `fileio/download.go`'s `downloadNewFile`, the one place a
+  `context.Context` was already available but not plumbed through. Did **not**
+  cascade `context.Context` through `cmd/` — no command handler holds one
+  today, and doing so was judged disproportionate to a cleanup pass.
+- **#6 (file-organization convention)** — ✅ Fixed for the one real offender.
+  `sources/gh-interfaces.go` (zero actual interfaces, a grab-bag of model
+  structs + misplaced ops/updater logic) renamed to `gh-models.go`; `fetchRepo`
+  moved to `gh-ops.go`, `ghUpdateData.ToMap()` moved to `gh-updater.go`. Also
+  added `GetGithubClient()` for symmetry with CF/MR. The three providers'
+  broader api/ops/updater conventions still aren't identical (CF has
+  detect/import, MR has export/pack) but that reflects genuinely different
+  provider capabilities, not an unaddressed inconsistency.
+- **#9 (domain/wire-format duplication)** — ✅ Fixed. New `core/packcommon.go`
+  holds `Pack`/`PackToml`'s previously-duplicated `GetMCVersion`/
+  `GetSupportedMCVersions`/`GetAcceptableGameVersions`/
+  `SetAcceptableGameVersions`/`GetCompatibleLoaders` logic as shared free
+  functions; both types now delegate. `PackToml`'s versions (defensive copy,
+  handles raw-TOML `[]interface{}`) were the more-correct ones and are now the
+  sole implementation. `Mod.GetUpdater()`/`ModToml.GetUpdater()` were also
+  byte-identical copies, both hardwired to `DefaultRegistry` independently of
+  the `*Registry` `core/update.go` threads through — a new `updaterFor()`
+  helper backs both now (still targets `DefaultRegistry` only; documented as
+  a known limitation rather than silently fixed halfway).
+
+Also fixed along the way: `selectPreferredHash` (`fileio/download.go`) wasn't
+`break`ing on match, silently keeping the *last* matching hash format instead
+of the first; unescaped `mod.Name` in `cmdcurseforge/export.go`'s
+`createModList` (now `html/template`, was raw string concatenation — an
+XSS-shaped correctness issue, not just style); most remaining Low-severity
+items (`interface{}`→`any`, `PreferredHashList` copy accessor, misnamed
+`resolve.go`→`extensions.go`, descriptive regex names in `nameutil.go`,
+`DefaultHashFormat` constant replacing scattered `"sha256"` literals,
+`os.ModePerm`→`0755`, stray informal comments, `--config` flag's missing
+`viper.BindPFlag`, duplicated "pick primary file" loops in `mr-updater.go`).
+
+**Intentionally still deferred**: renaming `mrUpdateData`'s `mod-id`/`version`
+TOML fields to `project-id`/`version-id` (matching `CfUpdateData`) — a
+breaking on-disk pack-format change needing a migration path, not a
+cleanup-batch item. Test coverage (still ~3.6%) and a documented public
+library API remain open per `rewrite-progress.md`'s Suggested Next
+Milestones. The `serve` command gap is out of scope by explicit decision, not
+an oversight.
 
 ## Executive Summary
 
