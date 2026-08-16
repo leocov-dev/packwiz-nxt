@@ -29,8 +29,6 @@ type ModToml struct {
 	hash       string
 	slug       string
 	metaFolder string
-	alias      string
-	preserve   bool
 }
 
 const (
@@ -103,8 +101,9 @@ func (m *ModToml) SetMetaPath(metaFile string) string {
 	dotIndex := strings.Index(filename, ".")
 	if dotIndex == -1 {
 		m.SetSlug(filename)
+	} else {
+		m.SetSlug(filename[:dotIndex])
 	}
-	m.SetSlug(filename[:dotIndex])
 
 	return m.metaFile
 }

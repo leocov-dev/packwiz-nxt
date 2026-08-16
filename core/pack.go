@@ -93,51 +93,6 @@ func (p *Pack) GetModsList() []*Mod {
 	return mods
 }
 
-func (p *Pack) UpdateAll() error {
-
-	namedUpdaterMap := make(map[string][]*Mod)
-
-	for _, mod := range p.Mods {
-		updater, err := mod.GetUpdater()
-		if err != nil {
-			return err
-		}
-
-		namedUpdaterMap[updater.GetName()] = append(namedUpdaterMap[updater.GetName()], mod)
-	}
-
-	return nil
-}
-
-func (p *Pack) Update(modSlug string) error {
-	mod, ok := p.Mods[modSlug]
-	if !ok {
-		return fmt.Errorf("mod %s not found", modSlug)
-	}
-
-	updater, err := mod.GetUpdater()
-	if err != nil {
-		return err
-	}
-
-	check, err := updater.CheckUpdate([]*Mod{mod}, *p)
-	if err != nil {
-		return err
-	}
-	if len(check) != 1 {
-		return fmt.Errorf("expected 1 updater, got %d", len(check))
-	}
-
-	if check[0].UpdateAvailable {
-		err = updater.DoUpdate([]*Mod{mod}, []interface{}{check[0].CachedState})
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func (p *Pack) ToPackMeta() (PackToml, error) {
 	indexToml, err := p.getIndex()
 	if err != nil {
@@ -255,17 +210,25 @@ func (p *Pack) GetSupportedMCVersions() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	allVersions := append(p.GetAcceptableGameVersions(), mcVersion)
+	acceptableVersions, err := p.GetAcceptableGameVersions()
+	if err != nil {
+		return nil, err
+	}
+	allVersions := append(acceptableVersions, mcVersion)
 	SortAndDedupeVersions(allVersions)
 	return allVersions, nil
 }
 
-func (p *Pack) GetAcceptableGameVersions() []string {
-	acceptableVersions, ok := p.Options["acceptable-game-versions"]
+func (p *Pack) GetAcceptableGameVersions() ([]string, error) {
+	rawVersions, ok := p.Options["acceptable-game-versions"]
 	if !ok {
-		return []string{}
+		return []string{}, nil
 	}
-	return acceptableVersions.([]string)
+	acceptableVersions, ok := rawVersions.([]string)
+	if !ok {
+		return nil, fmt.Errorf("acceptable-game-versions option is not a []string")
+	}
+	return acceptableVersions, nil
 }
 
 func (p *Pack) SetAcceptableGameVersions(versions []string) {
