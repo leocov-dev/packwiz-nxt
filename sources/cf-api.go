@@ -179,6 +179,7 @@ func (c *cfApiClient) GetModInfo(modID uint32) (CfModInfo, error) {
 	if err != nil {
 		return CfModInfo{}, fmt.Errorf("failed to request project data for ID %d: %w", modID, err)
 	}
+	defer resp.Body.Close()
 
 	err = json.NewDecoder(resp.Body).Decode(&infoRes)
 	if err != nil && err != io.EOF {
@@ -210,6 +211,7 @@ func (c *cfApiClient) GetModInfoMultiple(modIDs []uint32) ([]CfModInfo, error) {
 	if err != nil {
 		return []CfModInfo{}, fmt.Errorf("failed to request project data: %w", err)
 	}
+	defer resp.Body.Close()
 
 	err = json.NewDecoder(resp.Body).Decode(&infoRes)
 	if err != nil && err != io.EOF {
@@ -281,6 +283,7 @@ func (c *cfApiClient) GetFileInfo(modID uint32, fileID uint32) (CfModFileInfo, e
 	if err != nil {
 		return CfModFileInfo{}, fmt.Errorf("failed to request file data for project ID %d, file ID %d: %w", modID, fileID, err)
 	}
+	defer resp.Body.Close()
 
 	err = json.NewDecoder(resp.Body).Decode(&infoRes)
 	if err != nil && err != io.EOF {
@@ -312,6 +315,7 @@ func (c *cfApiClient) GetFileInfoMultiple(fileIDs []uint32) ([]CfModFileInfo, er
 	if err != nil {
 		return []CfModFileInfo{}, fmt.Errorf("failed to request file data: %w", err)
 	}
+	defer resp.Body.Close()
 
 	err = json.NewDecoder(resp.Body).Decode(&infoRes)
 	if err != nil && err != io.EOF {
@@ -355,6 +359,7 @@ func (c *cfApiClient) GetSearch(searchTerm string, slug string, classID uint32, 
 	if err != nil {
 		return []CfModInfo{}, fmt.Errorf("failed to retrieve search results: %w", err)
 	}
+	defer resp.Body.Close()
 
 	err = json.NewDecoder(resp.Body).Decode(&infoRes)
 	if err != nil && err != io.EOF {
@@ -401,6 +406,7 @@ func (c *cfApiClient) GetGames() ([]cfGame, error) {
 	if err != nil {
 		return []cfGame{}, fmt.Errorf("failed to retrieve game list: %w", err)
 	}
+	defer resp.Body.Close()
 
 	err = json.NewDecoder(resp.Body).Decode(&infoRes)
 	if err != nil && err != io.EOF {
@@ -426,6 +432,7 @@ func (c *cfApiClient) GetCategories() ([]cfCategory, error) {
 	if err != nil {
 		return []cfCategory{}, fmt.Errorf("failed to retrieve category list: %w", err)
 	}
+	defer resp.Body.Close()
 
 	err = json.NewDecoder(resp.Body).Decode(&infoRes)
 	if err != nil && err != io.EOF {
@@ -467,6 +474,7 @@ func (c *cfApiClient) GetFingerprintInfo(hashes []uint32) (addonFingerprintRespo
 	if err != nil {
 		return addonFingerprintResponse{}, fmt.Errorf("failed to retrieve fingerprint results: %w", err)
 	}
+	defer resp.Body.Close()
 
 	err = json.NewDecoder(resp.Body).Decode(&infoRes)
 	if err != nil && err != io.EOF {

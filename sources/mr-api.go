@@ -303,7 +303,7 @@ func ParseAsModrinthVersionID(input string) string {
 	return ""
 }
 
-func ParseAsParseAsFilename(input string) string {
+func ParseAsModrinthFilename(input string) string {
 	for _, r := range mrUrlRegexes {
 		matches := r.FindStringSubmatch(input)
 		if matches != nil {
@@ -351,7 +351,7 @@ func mrCompareLoaderLists(a []string, b []string) int32 {
 			continue
 		}
 		idx := slices.Index(mrLoaderPreferenceList, v)
-		if idx < minIdxA {
+		if idx != -1 && idx < minIdxA {
 			return 1 // B has more preferable loaders
 		}
 		if idx != -1 && idx < minIdxB {
@@ -370,25 +370,25 @@ func mrFindLatestVersion(versions []*modrinthApi.Version, gameVersions []string,
 	for _, v := range versions[1:] {
 		gameVersionIdx := core.HighestSliceIndex(gameVersions, v.GameVersions)
 
-		var compare int32
-		if useFlexVer {
-			// Use FlexVer to compare versions
-			compare = flexver.Compare(*v.VersionNumber, *latestValidVersion.VersionNumber)
-		}
-
-		if compare == 0 {
+		compare := compareChain(
+			func() int32 {
+				if !useFlexVer {
+					return 0
+				}
+				// Use FlexVer to compare versions
+				return flexver.Compare(*v.VersionNumber, *latestValidVersion.VersionNumber)
+			},
 			// Prefer later specified game versions (main version specified last)
-			compare = int32(gameVersionIdx - bestGameVersion)
-		}
-		if compare == 0 {
-			compare = mrCompareLoaderLists(latestValidVersion.Loaders, v.Loaders)
-		}
-		if compare == 0 {
+			func() int32 { return int32(gameVersionIdx - bestGameVersion) },
+			func() int32 { return mrCompareLoaderLists(latestValidVersion.Loaders, v.Loaders) },
 			// Other comparisons are equal, compare date instead
-			if v.DatePublished.After(*latestValidVersion.DatePublished) {
-				compare = 1
-			}
-		}
+			func() int32 {
+				if v.DatePublished.After(*latestValidVersion.DatePublished) {
+					return 1
+				}
+				return 0
+			},
+		)
 		if compare > 0 {
 			latestValidVersion = v
 			bestGameVersion = gameVersionIdx
@@ -526,17 +526,19 @@ func ResolveModrinthVersion(project *modrinthApi.Project, version string) (*modr
 	return nil, fmt.Errorf("unable to find version %s", version)
 }
 
-// mrMapDepOverride transforms manual dependency overrides (which will likely be removed when packwiz is able to determine provided mods)
+// mrMapDepOverride transforms manual dependency overrides (which will likely be removed when
+// packwiz is able to determine provided mods). It is a thin lookup against the shared
+// depOverrideRules table (sources/depoverride.go); the version-gating logic lives there.
 func mrMapDepOverride(depID string, isQuilt bool, mcVersion string) string {
-	if isQuilt && (depID == "P7dR8mSH" || depID == "fabric-api") {
-		// Transform FAPI dependencies to QFAPI/QSL dependencies when using Quilt
-		return "qvIfYCYJ"
+	if !isQuilt {
+		return depID
 	}
-	if isQuilt && (depID == "Ha28R6CL" || depID == "fabric-language-kotlin") {
-		// Transform FLK dependencies to QKL dependencies when using Quilt >=1.19.2 non-snapshot
-		if flexver.Less("1.19.1", mcVersion) && flexver.Less(mcVersion, "2.0.0") {
-			return "lwVhp9o5"
-		}
+	rule, ok := findMrDepOverrideRule(depID)
+	if !ok {
+		return depID
 	}
-	return depID
+	if rule.versionGate != nil && !rule.versionGate(mcVersion) {
+		return depID
+	}
+	return rule.mrQuiltID
 }

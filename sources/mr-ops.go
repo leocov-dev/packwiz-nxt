@@ -30,8 +30,6 @@ func ModrinthNewMod(
 	return mod, nil
 }
 
-const mrMaxCycles = 20
-
 type ModrinthDepMetadataStore struct {
 	ProjectInfo *modrinthApi.Project
 	VersionInfo *modrinthApi.Version
@@ -71,25 +69,28 @@ func ModrinthFindMissingDependencies(
 	if len(depProjectIDPendingQueue)+len(depVersionIDPendingQueue) > 0 {
 		fmt.Println("Finding dependencies...")
 
-		cycles := 0
-		for len(depProjectIDPendingQueue)+len(depVersionIDPendingQueue) > 0 && cycles < mrMaxCycles {
-			// Look up version IDs
+		// prepareNext folds in the two bits of provider-specific bookkeeping that happen at
+		// the top of each resolution cycle: resolving any queued version IDs into project
+		// IDs (Modrinth dependencies may be expressed as either), then deduping the merged
+		// project ID batch against IDs already installed in the pack or already collected as
+		// a dependency this run.
+		prepareNext := func(newProjectIDs []string) ([]string, error) {
+			pending := append([]string{}, newProjectIDs...)
+
 			if len(depVersionIDPendingQueue) > 0 {
 				depVersions, err := GetModrinthClient().Versions.GetMultiple(depVersionIDPendingQueue)
-				if err == nil {
-					for _, v := range depVersions {
-						// Add project ID to queue
-						depProjectIDPendingQueue = append(depProjectIDPendingQueue, mrMapDepOverride(*v.ProjectID, isQuilt, mcVersion))
-					}
-				} else {
-					fmt.Printf("Error retrieving dependency data: %s\n", err.Error())
+				if err != nil {
+					return nil, fmt.Errorf("error retrieving dependency data: %w", err)
+				}
+				for _, v := range depVersions {
+					pending = append(pending, mrMapDepOverride(*v.ProjectID, isQuilt, mcVersion))
 				}
 				depVersionIDPendingQueue = depVersionIDPendingQueue[:0]
 			}
 
 			// Remove installed project IDs from dep queue
 			i := 0
-			for _, id := range depProjectIDPendingQueue {
+			for _, id := range pending {
 				contains := slices.Contains(installedProjects, id)
 				for _, dep := range depMetadata {
 					if *dep.ProjectInfo.ID == id {
@@ -98,25 +99,30 @@ func ModrinthFindMissingDependencies(
 					}
 				}
 				if !contains {
-					depProjectIDPendingQueue[i] = id
+					pending[i] = id
 					i++
 				}
 			}
-			depProjectIDPendingQueue = depProjectIDPendingQueue[:i]
+			pending = pending[:i]
 
 			// Clean up duplicates from dep queue (from deps on both QFAPI + FAPI)
-			slices.Sort(depProjectIDPendingQueue)
-			depProjectIDPendingQueue = slices.Compact(depProjectIDPendingQueue)
+			slices.Sort(pending)
+			pending = slices.Compact(pending)
 
-			if len(depProjectIDPendingQueue) == 0 {
-				break
-			}
-			depProjects, err := GetModrinthClient().Projects.GetMultiple(depProjectIDPendingQueue)
+			return pending, nil
+		}
+
+		// fetchAndExpand batch-fetches project data for the pending project IDs, resolves
+		// the latest compatible version of each, and returns the further dependency project
+		// IDs discovered along the way (any dependency version IDs are queued directly via
+		// depVersionIDPendingQueue, to be resolved by prepareNext on the next cycle).
+		fetchAndExpand := func(pending []string) ([]string, error) {
+			depProjects, err := GetModrinthClient().Projects.GetMultiple(pending)
 			if err != nil {
-				fmt.Printf("Error retrieving dependency data: %s\n", err.Error())
+				return nil, fmt.Errorf("error retrieving dependency data: %w", err)
 			}
-			depProjectIDPendingQueue = depProjectIDPendingQueue[:0]
 
+			var next []string
 			for _, project := range depProjects {
 				if project.ID == nil {
 					return nil, errors.New("failed to get dependency data: invalid response")
@@ -124,15 +130,14 @@ func ModrinthFindMissingDependencies(
 				// Get latest version - could reuse version lookup data but it's not as easy (particularly since the version won't necessarily be the latest)
 				latestVersion, err := ModrinthGetLatestVersion(*project.ID, *project.Title, pack, optionalDatapackFolder)
 				if err != nil {
-					fmt.Printf("Failed to get latest version of dependency %v: %v\n", *project.Title, err)
-					continue
+					return nil, fmt.Errorf("failed to get latest version of dependency %v: %w", *project.Title, err)
 				}
 
 				for _, dep := range version.Dependencies {
 					// TODO: recommend optional dependencies?
 					if dep.DependencyType != nil && *dep.DependencyType == "required" {
 						if dep.ProjectID != nil {
-							depProjectIDPendingQueue = append(depProjectIDPendingQueue, mrMapDepOverride(*dep.ProjectID, isQuilt, mcVersion))
+							next = append(next, mrMapDepOverride(*dep.ProjectID, isQuilt, mcVersion))
 						}
 						if dep.VersionID != nil {
 							depVersionIDPendingQueue = append(depVersionIDPendingQueue, *dep.VersionID)
@@ -140,13 +145,7 @@ func ModrinthFindMissingDependencies(
 					}
 				}
 
-				var file = latestVersion.Files[0]
-				// Prefer the primary file
-				for _, v := range latestVersion.Files {
-					if *v.Primary {
-						file = v
-					}
-				}
+				file := GetModrinthVersionPrimaryFile(latestVersion, "")
 
 				depMetadata = append(depMetadata, ModrinthDepMetadataStore{
 					ProjectInfo: project,
@@ -155,10 +154,11 @@ func ModrinthFindMissingDependencies(
 				})
 			}
 
-			cycles++
+			return next, nil
 		}
-		if cycles >= mrMaxCycles {
-			return nil, errors.New("dependencies recurse too deeply, try increasing mrMaxCycles")
+
+		if err := runDependencyResolution(depProjectIDPendingQueue, DefaultMaxDependencyCycles, prepareNext, fetchAndExpand); err != nil {
+			return nil, err
 		}
 	}
 
