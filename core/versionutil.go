@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -307,15 +308,7 @@ func fetchNeoforgeVersions() (VersionMap, error) {
 
 	moreVersions, err := fetchMavenMap(
 		"https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml",
-		func(version string) (string, string) {
-			parts := strings.Split(version, ".")
-
-			if len(parts) < 2 {
-				return "", ""
-			}
-
-			return "1." + parts[0] + "." + parts[1], version
-		},
+		neoforgeMavenVersionToKey,
 	)
 	if err != nil {
 		return nil, err
@@ -333,6 +326,45 @@ func fetchNeoforgeVersions() (VersionMap, error) {
 	}
 
 	return versions, nil
+}
+
+// neoforgeNewSchemeCutoff is the NeoForge major-version boundary between the old and new
+// Minecraft versioning schemes. NeoForge majors up to this value encode a Minecraft version
+// of the old "1.MAJOR.MINOR" form (e.g. NeoForge "21.10.43-beta" -> MC "1.21.10"); majors
+// above it encode the new "YEAR.MAJOR(.PATCH)" form Mojang moved to at MC 26.1 (e.g. NeoForge
+// "26.1.0.0-alpha.9+snapshot-6" -> MC "26.1-snapshot-6").
+const neoforgeNewSchemeCutoff = 25
+
+// neoforgeMavenVersionToKey derives the Minecraft version a NeoForge maven version is for,
+// handling both the old and new NeoForge/Minecraft versioning schemes (see
+// neoforgeNewSchemeCutoff). Returns ("", "") if version doesn't parse as either scheme.
+func neoforgeMavenVersionToKey(version string) (string, string) {
+	parts := strings.Split(version, ".")
+	if len(parts) < 2 {
+		return "", ""
+	}
+
+	major, err := strconv.Atoi(parts[0])
+	if err != nil || major <= neoforgeNewSchemeCutoff {
+		// Old scheme: NeoForge "MAJOR.MINOR.PATCH(-suffix)" <-> MC "1.MAJOR.MINOR"
+		return "1." + parts[0] + "." + parts[1], version
+	}
+
+	// New scheme: NeoForge "YEAR.MAJOR.PATCH.BUILD(-prerelease)(+mcSuffix)" <-> MC
+	// "YEAR.MAJOR(.PATCH)(-mcSuffix)". The "+mcSuffix" (e.g. "snapshot-6") must be kept, since
+	// it's the only thing distinguishing different Minecraft snapshot builds within one
+	// YEAR.MAJOR - dropping it would incorrectly merge their NeoForge versions into one bucket.
+	if len(parts) < 3 {
+		return "", ""
+	}
+	key := parts[0] + "." + parts[1]
+	if patch := parts[2]; patch != "0" {
+		key += "." + patch
+	}
+	if idx := strings.Index(version, "+"); idx >= 0 {
+		key += "-" + version[idx+1:]
+	}
+	return key, version
 }
 
 // ----

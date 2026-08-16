@@ -191,31 +191,33 @@ func downloadNewFile(ctx context.Context, task *downloadTask, cacheFolder string
 		}
 	}()
 
+	// Always fetch the file's bytes, even if hashesToObtain ends up empty (e.g. the mod's
+	// existing hash format already matches cacheHashFormat) - CurseForge/Modrinth export
+	// need the real file contents, and skipping the fetch here previously left a zero-byte
+	// file moved into the cache as if it were the real download.
 	hashesToObtain, hashes := getHashListsForDownload(hashesToObtain, task.hashFormat, task.hash)
-	if len(hashesToObtain) > 0 {
-		var data io.ReadCloser
-		if task.url != "" {
-			resp, err := core.GetWithUAContext(ctx, task.url, "application/octet-stream")
-			if err != nil {
-				return CompletedDownload{}, fmt.Errorf("failed to download %s: %w", task.url, err)
-			}
-			if resp.StatusCode != 200 {
-				_ = resp.Body.Close()
-				return CompletedDownload{}, fmt.Errorf("failed to download %s: invalid status code %v", task.url, resp.StatusCode)
-			}
-			data = resp.Body
-		} else {
-			data, err = task.metaDownloaderData.DownloadFile()
-			if err != nil {
-				return CompletedDownload{}, err
-			}
-		}
-
-		err = teeHashes(hashesToObtain, hashes, tempFile, data)
-		_ = data.Close()
+	var data io.ReadCloser
+	if task.url != "" {
+		resp, err := core.GetWithUAContext(ctx, task.url, "application/octet-stream")
 		if err != nil {
-			return CompletedDownload{}, fmt.Errorf("failed to download: %w", err)
+			return CompletedDownload{}, fmt.Errorf("failed to download %s: %w", task.url, err)
 		}
+		if resp.StatusCode != 200 {
+			_ = resp.Body.Close()
+			return CompletedDownload{}, fmt.Errorf("failed to download %s: invalid status code %v", task.url, resp.StatusCode)
+		}
+		data = resp.Body
+	} else {
+		data, err = task.metaDownloaderData.DownloadFile()
+		if err != nil {
+			return CompletedDownload{}, err
+		}
+	}
+
+	err = teeHashes(hashesToObtain, hashes, tempFile, data)
+	_ = data.Close()
+	if err != nil {
+		return CompletedDownload{}, fmt.Errorf("failed to download: %w", err)
 	}
 
 	// Create handle with calculated hashes
@@ -342,6 +344,11 @@ func teeHashes(hashesToObtain []string, hashes map[string]string,
 
 const cacheHashFormat = core.DefaultHashFormat
 
+// cacheLatestVersion is the current CacheIndex schema/content version. Bumped to 2 to
+// mark the fix for the zero-byte-cache-entry bug in downloadNewFile; see
+// purgeZeroByteEntries for the accompanying migration.
+const cacheLatestVersion = 2
+
 // CacheIndex tracks previously-downloaded files in the local cache, keyed by hash,
 // so subsequent downloads can be satisfied from disk instead of the network.
 type CacheIndex struct {
@@ -349,6 +356,29 @@ type CacheIndex struct {
 	Hashes      map[string][]string
 	cachePath   string
 	nextHashIdx int
+}
+
+// purgeZeroByteEntries drops cache entries whose backing file is missing or empty,
+// self-healing indexes written by the pre-cacheLatestVersion downloadNewFile, which
+// could record a hash for a file it never actually downloaded.
+func (c *CacheIndex) purgeZeroByteEntries() {
+	cacheHashes := c.Hashes[cacheHashFormat]
+	var toRemove []int
+	for i, hash := range cacheHashes {
+		if hash == "" {
+			continue
+		}
+		stat, err := os.Stat(filepath.Join(c.cachePath, hash[:2], hash[2:]))
+		if err != nil || stat.Size() == 0 {
+			toRemove = append(toRemove, i)
+		}
+	}
+	if len(toRemove) == 0 {
+		return
+	}
+	for hashFormat, v := range c.Hashes {
+		c.Hashes[hashFormat] = removeIndices(v, toRemove)
+	}
 }
 
 type CacheIndexHandle struct {
@@ -641,7 +671,7 @@ func removeEmpty(hashList []string) ([]string, []int) {
 // already cached with one of hashesToObtain.
 func CreateDownloadSession(mods []*core.Mod, hashesToObtain []string) (DownloadSession, error) {
 	// Load cache index
-	cacheIndex := CacheIndex{Version: 1, Hashes: make(map[string][]string)}
+	cacheIndex := CacheIndex{Version: cacheLatestVersion, Hashes: make(map[string][]string)}
 	cachePath, err := GetPackwizCache(viper.GetString("cache.directory"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to load cache: %w", err)
@@ -664,7 +694,7 @@ func CreateDownloadSession(mods []*core.Mod, hashesToObtain []string) (DownloadS
 		if err != nil {
 			return nil, fmt.Errorf("failed to read cache index file: %w", err)
 		}
-		if cacheIndex.Version > 1 {
+		if cacheIndex.Version > cacheLatestVersion {
 			return nil, fmt.Errorf("cache index is too new (version %v)", cacheIndex.Version)
 		}
 	}
@@ -675,6 +705,15 @@ func CreateDownloadSession(mods []*core.Mod, hashesToObtain []string) (DownloadS
 		cacheIndex.Hashes[cacheHashFormat] = make([]string, 0)
 	}
 	cacheIndex.cachePath = cachePath
+
+	if cacheIndex.Version < cacheLatestVersion {
+		// Version 1 could leave zero-byte files in the cache (see downloadNewFile's
+		// history) when the mod's existing hash format already matched cacheHashFormat -
+		// the download was skipped entirely but the empty file was still cached as if it
+		// were the real one. Purge those before they're served back to a caller as valid.
+		cacheIndex.purgeZeroByteEntries()
+		cacheIndex.Version = cacheLatestVersion
+	}
 
 	// Clean up empty entries in index
 	var removedEntries []int

@@ -62,6 +62,7 @@ var installCmd = &cobra.Command{
 		modMeta := core.ModToml{
 			Name:     args[0],
 			FileName: filename,
+			Side:     core.UniversalSide,
 			Download: core.ModDownload{
 				URL:        args[1],
 				HashFormat: "sha256",

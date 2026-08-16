@@ -213,7 +213,9 @@ func createModrinthMod(
 
 	side := mrGetSide(project)
 	if side == core.EmptySide {
-		return nil, errors.New("version doesn't have a side that's supported. Server: " + *project.ServerSide + " Client: " + *project.ClientSide)
+		mrLogger.Warnf("Warning: project doesn't have a side that's supported; assuming universal. Server: %s Client: %s\n",
+			*project.ServerSide, *project.ClientSide)
+		side = core.UniversalSide
 	}
 
 	algorithm, hash := mrGetBestHash(file)
