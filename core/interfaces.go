@@ -88,6 +88,19 @@ func GetUpdater(name string) (Updater, bool) {
 	return DefaultRegistry.GetUpdater(name)
 }
 
+// updaterFor finds the Updater registered on reg for one of update's keys, or false if
+// none is registered. It backs Mod.GetUpdater and ModToml.GetUpdater, which both target
+// DefaultRegistry - see their doc comments for why a non-default Registry isn't
+// currently reachable there.
+func updaterFor(update ModUpdate, reg *Registry) (Updater, bool) {
+	for k := range update {
+		if updater, ok := reg.GetUpdater(k); ok {
+			return updater, true
+		}
+	}
+	return nil, false
+}
+
 // AddMetaDownloader registers a MetaDownloader on DefaultRegistry, keyed by source name.
 func AddMetaDownloader(source string, downloader MetaDownloader) {
 	DefaultRegistry.AddMetaDownloader(source, downloader)

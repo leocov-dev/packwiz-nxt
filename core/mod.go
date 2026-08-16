@@ -117,14 +117,15 @@ func (m *Mod) ToModMeta() ModToml {
 	return modToml
 }
 
+// GetUpdater finds the Updater registered on DefaultRegistry for one of this mod's
+// update sources. It always targets DefaultRegistry - there's currently no way to
+// point it at a different Registry instance.
 func (m *Mod) GetUpdater() (Updater, error) {
-	for k := range m.Update {
-		updater, ok := GetUpdater(k)
-		if ok {
-			return updater, nil
-		}
+	updater, ok := updaterFor(m.Update, DefaultRegistry)
+	if !ok {
+		return nil, fmt.Errorf("no updater found for mod: %s", m.Name)
 	}
-	return nil, fmt.Errorf("no updater found for mod: %s", m.Name)
+	return updater, nil
 }
 
 func (m *Mod) DecodeNamedModSourceData(name string, target interface{}) error {

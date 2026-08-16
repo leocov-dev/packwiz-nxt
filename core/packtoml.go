@@ -104,26 +104,12 @@ func (pack *PackToml) RefreshIndexHash(index IndexFS) {
 
 // GetMCVersion gets the version of Minecraft this pack uses, if it has been correctly specified
 func (pack *PackToml) GetMCVersion() (string, error) {
-	mcVersion, ok := pack.Versions["minecraft"]
-	if !ok {
-		return "", errors.New("no minecraft version specified in modpack")
-	}
-	return mcVersion, nil
+	return mcVersionFrom(pack.Versions)
 }
 
 // GetSupportedMCVersions gets the versions of Minecraft this pack allows in downloaded mods, ordered by preference (highest = most desirable)
 func (pack *PackToml) GetSupportedMCVersions() ([]string, error) {
-	mcVersion, err := pack.GetMCVersion()
-	if err != nil {
-		return nil, err
-	}
-	acceptableVersions, err := pack.GetAcceptableGameVersions()
-	if err != nil {
-		return nil, err
-	}
-	allVersions := append(append([]string(nil), acceptableVersions...), mcVersion)
-	SortAndDedupeVersions(allVersions)
-	return allVersions, nil
+	return supportedMCVersionsFrom(pack.Versions, pack.Options)
 }
 
 // GetAcceptableGameVersions returns the pack's "acceptable-game-versions" option as a []string.
@@ -131,30 +117,11 @@ func (pack *PackToml) GetSupportedMCVersions() ([]string, error) {
 // programmatically) or []interface{} (if decoded from a TOML file), so both are handled here
 // instead of panicking on an unchecked type assertion.
 func (pack *PackToml) GetAcceptableGameVersions() ([]string, error) {
-	acceptableVersionsRaw, ok := pack.Options["acceptable-game-versions"]
-	if !ok {
-		return []string{}, nil
-	}
-	if versions, ok := acceptableVersionsRaw.([]string); ok {
-		return versions, nil
-	}
-	if versionsAny, ok := acceptableVersionsRaw.([]interface{}); ok {
-		versions := make([]string, 0, len(versionsAny))
-		for _, v := range versionsAny {
-			s, ok := v.(string)
-			if !ok {
-				return nil, fmt.Errorf("acceptable-game-versions contains a non-string value: %v", v)
-			}
-			versions = append(versions, s)
-		}
-		return versions, nil
-	}
-	return nil, fmt.Errorf("acceptable-game-versions has an unexpected type: %T", acceptableVersionsRaw)
+	return acceptableGameVersionsFrom(pack.Options)
 }
 
 func (pack *PackToml) SetAcceptableGameVersions(versions []string) {
-	SortAndDedupeVersions(versions)
-	pack.Options["acceptable-game-versions"] = versions
+	setAcceptableGameVersions(pack.Options, versions)
 }
 
 // AddAcceptableVersion adds a single version to the pack's acceptable Minecraft versions list.
@@ -197,19 +164,7 @@ func (pack *PackToml) GetPackName() string {
 }
 
 func (pack *PackToml) GetCompatibleLoaders() (loaders []string) {
-	if _, hasQuilt := pack.Versions["quilt"]; hasQuilt {
-		loaders = append(loaders, "quilt")
-		loaders = append(loaders, "fabric") // Backwards-compatible; for now (could be configurable later)
-	} else if _, hasFabric := pack.Versions["fabric"]; hasFabric {
-		loaders = append(loaders, "fabric")
-	}
-	if _, hasNeoForge := pack.Versions["neoforge"]; hasNeoForge {
-		loaders = append(loaders, "neoforge")
-		loaders = append(loaders, "forge") // Backwards-compatible; for now (could be configurable later)
-	} else if _, hasForge := pack.Versions["forge"]; hasForge {
-		loaders = append(loaders, "forge")
-	}
-	return
+	return compatibleLoadersFrom(pack.Versions)
 }
 
 func (pack *PackToml) GetLoaders() (loaders []string) {
