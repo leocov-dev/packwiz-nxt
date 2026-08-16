@@ -8,20 +8,8 @@ func NewModWriter() ModWriter {
 }
 
 func (m ModWriter) Write(writable Writable) (string, string, error) {
-	metaFile := writable.GetFilePath()
-
-	f, err := CreateFile(metaFile)
+	result, err := writeMarshalled(writable)
 	if err != nil {
-		return "", "", err
-	}
-	defer f.Close()
-
-	result, err := writable.Marshal()
-	if err != nil {
-		return "", "", err
-	}
-
-	if _, err := f.Write(result.Value); err != nil {
 		return "", "", err
 	}
 
