@@ -59,13 +59,6 @@ func CompareVersions(version1, version2 string) int {
 	return 0 // Versions are equal
 }
 
-func SortAscending(versions []string) []string {
-	sort.Slice(versions, func(i, j int) bool {
-		return CompareVersions(versions[i], versions[j]) == -1
-	})
-	return versions
-}
-
 func SortDescending(versions []string) []string {
 	sort.Slice(versions, func(i, j int) bool {
 		return CompareVersions(versions[i], versions[j]) == 1
