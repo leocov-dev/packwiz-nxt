@@ -74,39 +74,5 @@ func writeMod(pack core.PackToml, modMeta core.ModToml, path string) error {
 	// TODO: Should this be improved?
 	// Current strategy is to go ahead and do stuff without asking, with the assumption that you are using
 	// VCS anyway.
-	modWriter := fileio.NewModWriter()
-	format, hash, err := modWriter.Write(&modMeta)
-	if err != nil {
-		return err
-	}
-
-	index, err := fileio.LoadPackIndexFile(&pack)
-	if err != nil {
-		return err
-	}
-
-	err = index.UpdateFileHashGiven(path, format, hash, true)
-	if err != nil {
-		return err
-	}
-
-	repr, err := index.ToWritable()
-	if err != nil {
-		return err
-	}
-	writer := fileio.NewIndexWriter()
-	err = writer.Write(&repr)
-	if err != nil {
-		return err
-	}
-
-	pack.RefreshIndexHash(index)
-
-	packWriter := fileio.NewPackWriter()
-	err = packWriter.Write(&pack)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return fileio.WriteModAndUpdateIndex(&pack, &modMeta, path)
 }

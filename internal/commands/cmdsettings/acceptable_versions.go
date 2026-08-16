@@ -6,7 +6,6 @@ import (
 	"github.com/leocov-dev/packwiz-nxt/internal/shared"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"golang.org/x/exp/slices"
 	"os"
 	"strings"
 )
@@ -25,77 +24,44 @@ var acceptableVersionsCommand = &cobra.Command{
 			}
 			shared.Exitf("Error loading pack: %s\n", err)
 		}
-		var currentVersions []string
 		// Check if they have no options whatsoever
 		if modpack.Options == nil {
 			// Initialize the options
 			modpack.Options = make(map[string]interface{})
 		}
-		// Check if the acceptable-game-versions is nil, which would mean their pack.toml doesn't have it set yet
-		acceptableGameVersions := modpack.GetAcceptableGameVersions()
-		if acceptableGameVersions != nil {
-			// Convert the interface{} to a string slice
-			for _, v := range acceptableGameVersions {
-				currentVersions = append(currentVersions, v)
-			}
-		}
-		// Check our flags to see if we're adding or removing
-		if flagAdd {
+
+		// Compute which mutation to apply, and the corresponding success message prefix
+		var msgPrefix string
+		switch {
+		case flagAdd:
 			acceptableVersion := args[0]
-			// Check if the version is already in the list
-			if slices.Contains(currentVersions, acceptableVersion) {
+			if err := modpack.AddAcceptableVersion(acceptableVersion); err != nil {
 				shared.Exitf("Version %s is already in your acceptable versions list!\n", acceptableVersion)
 			}
-			// Add the version to the list and re-sort it
-			currentVersions = append(currentVersions, acceptableVersion)
-			// Set the new list
-			modpack.SetAcceptableGameVersions(currentVersions)
-			// Save the pack
-			packWriter := fileio.NewPackWriter()
-			err = packWriter.Write(&modpack)
-			if err != nil {
-				shared.Exitf("Error writing pack: %s\n", err)
-			}
-			// Print success message
-			prettyList := strings.Join(currentVersions, ", ")
-			prettyList += ", " + modpack.Versions["minecraft"]
-			fmt.Printf("Added %s to acceptable versions list, now %s\n", acceptableVersion, prettyList)
-		} else if flagRemove {
+			msgPrefix = fmt.Sprintf("Added %s to acceptable versions list, now", acceptableVersion)
+		case flagRemove:
 			acceptableVersion := args[0]
-			// Check if the version is in the list
-			if !slices.Contains(currentVersions, acceptableVersion) {
+			if err := modpack.RemoveAcceptableVersion(acceptableVersion); err != nil {
 				shared.Exitf("Version %s is not in your acceptable versions list!\n", acceptableVersion)
 			}
-			// Remove the version from the list
-			i := slices.Index(currentVersions, acceptableVersion)
-			currentVersions = slices.Delete(currentVersions, i, i+1)
-			// Set the new list
-			modpack.SetAcceptableGameVersions(currentVersions)
-			// Save the pack
-			packWriter := fileio.NewPackWriter()
-			err = packWriter.Write(&modpack)
-			if err != nil {
-				shared.Exitf("Error writing pack: %s\n", err)
-			}
-			// Print success message
-			prettyList := strings.Join(currentVersions, ", ")
-			prettyList += ", " + modpack.Versions["minecraft"]
-			fmt.Printf("Removed %s from acceptable versions list, now %s\n", acceptableVersion, prettyList)
-		} else {
+			msgPrefix = fmt.Sprintf("Removed %s from acceptable versions list, now", acceptableVersion)
+		default:
 			// Overwriting
-			acceptableVersions := args[0]
-			acceptableVersionsList := strings.Split(acceptableVersions, ",")
+			acceptableVersionsList := strings.Split(args[0], ",")
 			modpack.SetAcceptableGameVersions(acceptableVersionsList)
-			packWriter := fileio.NewPackWriter()
-			err = packWriter.Write(&modpack)
-			if err != nil {
-				shared.Exitf("Error writing pack: %s\n", err)
-			}
-			// Print success message
-			prettyList := strings.Join(acceptableVersionsList, ", ")
-			prettyList += ", " + modpack.Versions["minecraft"]
-			fmt.Printf("Set acceptable versions to %s\n", prettyList)
+			msgPrefix = "Set acceptable versions to"
 		}
+
+		// Save the pack
+		packWriter := fileio.NewPackWriter()
+		if err := packWriter.Write(&modpack); err != nil {
+			shared.Exitf("Error writing pack: %s\n", err)
+		}
+
+		// Print success message
+		prettyList := strings.Join(modpack.GetAcceptableGameVersions(), ", ")
+		prettyList += ", " + modpack.Versions["minecraft"]
+		fmt.Printf("%s %s\n", msgPrefix, prettyList)
 	},
 }
 

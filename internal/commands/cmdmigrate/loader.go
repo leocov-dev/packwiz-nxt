@@ -24,6 +24,11 @@ var loaderCommand = &cobra.Command{
 			}
 			shared.Exitf("Error loading pack: %s\n", err)
 		}
+		if args[0] == "latest" {
+			updateLoaderToLatest(modpack)
+			return
+		}
+
 		var currentLoaders = modpack.GetLoaders()
 		// Do some sanity checks on the current loader slice
 		if len(currentLoaders) == 0 {
@@ -37,23 +42,7 @@ var loaderCommand = &cobra.Command{
 			shared.Exitf("Error getting Minecraft version: %s\n", err)
 		}
 
-		packWriter := fileio.NewPackWriter()
-		if args[0] == "latest" {
-			fmt.Println("Updating to latest loader version")
-			// We'll be updating to the latest loader version
-			for _, loader := range currentLoaders {
-				_, latest, gottenLoader := getVersionsForLoader(loader, mcVersion)
-				if !updatePackToVersion(latest, modpack, gottenLoader) {
-					continue
-				}
-				// Write the pack to disk
-				err = packWriter.Write(&modpack)
-				if err != nil {
-					fmt.Printf("Error writing pack.toml: %s\n", err)
-					continue
-				}
-			}
-		} else if args[0] == "recommended" {
+		if args[0] == "recommended" {
 			// TODO: Figure out a way to get the recommended version, this is Forge only
 			// Ensure we're on Forge
 			if !slices.Contains(currentLoaders, "forge") {
@@ -105,6 +94,41 @@ var loaderCommand = &cobra.Command{
 
 func init() {
 	migrateCmd.AddCommand(loaderCommand)
+}
+
+// updateLoaderToLatest updates the pack's currently configured loader (there must be exactly one)
+// to the latest version available for the pack's Minecraft version, writing the pack to disk after
+// each successful update. This is the logic behind `packwiz migrate loader latest`, extracted so it
+// can also be called directly (e.g. from `packwiz migrate minecraft`) without going through cobra's
+// Run closure.
+func updateLoaderToLatest(modpack core.PackToml) {
+	currentLoaders := modpack.GetLoaders()
+	// Do some sanity checks on the current loader slice
+	if len(currentLoaders) == 0 {
+		shared.Exitln("No loader is currently set in your pack.toml!")
+	} else if len(currentLoaders) > 1 {
+		shared.Exitln("You have multiple loaders set in your pack.toml, this is not supported!")
+	}
+	// Get the Minecraft version for the pack
+	mcVersion, err := modpack.GetMCVersion()
+	if err != nil {
+		shared.Exitf("Error getting Minecraft version: %s\n", err)
+	}
+
+	fmt.Println("Updating to latest loader version")
+	// We'll be updating to the latest loader version
+	packWriter := fileio.NewPackWriter()
+	for _, loader := range currentLoaders {
+		_, latest, gottenLoader := getVersionsForLoader(loader, mcVersion)
+		if !updatePackToVersion(latest, modpack, gottenLoader) {
+			continue
+		}
+		// Write the pack to disk
+		if err := packWriter.Write(&modpack); err != nil {
+			fmt.Printf("Error writing pack.toml: %s\n", err)
+			continue
+		}
+	}
 }
 
 func getVersionsForLoader(loader, mcVersion string) ([]string, string, core.ModLoaderComponent) {
