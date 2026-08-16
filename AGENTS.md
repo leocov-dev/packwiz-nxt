@@ -7,6 +7,12 @@ protect that property. See `.plan/code-review.md` for the concrete findings
 this file is distilled from, and `.plan/rewrite-progress.md` for the
 feature-parity backlog.
 
+## 0. Out of scope
+
+- **No `serve` command.** The original packwiz has a `serve` command; this is a
+  deliberate exclusion in packwiz-nxt, not an oversight or a TODO. Don't add
+  it, stub it, or reference it as planned/future work.
+
 ## 1. Library-first design
 
 - **No global mutable state.** Don't add new package-level `var` maps/slices
