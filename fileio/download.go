@@ -62,12 +62,8 @@ func (d *downloadSessionInternal) GetManualDownloads() []core.ManualDownload {
 // StartDownloads begins downloading all pending files in a background goroutine and
 // returns a channel of completed downloads. The provided context can be used to cancel
 // the operation early; if the caller stops draining the returned channel, cancelling ctx
-// ensures the background goroutine doesn't block forever trying to send.
-//
-// Note: cancellation only stops the channel send / further work from being started; the
-// underlying HTTP request made via core.GetWithUA is not itself cancellable, since
-// GetWithUA doesn't accept a context. Adding that would require changing GetWithUA's
-// signature across all its callers, which is out of scope here.
+// ensures the background goroutine doesn't block forever trying to send. The underlying
+// HTTP requests (via core.GetWithUAContext) are cancelled along with ctx too.
 func (d *downloadSessionInternal) StartDownloads(ctx context.Context) chan CompletedDownload {
 	downloads := make(chan CompletedDownload)
 	go func() {
@@ -110,7 +106,7 @@ func (d *downloadSessionInternal) StartDownloads(ctx context.Context) chan Compl
 				}
 			}
 
-			download, err := downloadNewFile(&task, d.cacheFolder, d.hashesToObtain, &d.cacheIndex, &d.cacheIndexMu)
+			download, err := downloadNewFile(ctx, &task, d.cacheFolder, d.hashesToObtain, &d.cacheIndex, &d.cacheIndexMu)
 			if err != nil {
 				if !send(CompletedDownload{
 					Error: err,
@@ -176,7 +172,7 @@ func reuseExistingFile(cacheHandle *CacheIndexHandle, hashesToObtain []string, m
 	}
 }
 
-func downloadNewFile(task *downloadTask, cacheFolder string, hashesToObtain []string, index *CacheIndex, cacheIndexMu *sync.Mutex) (CompletedDownload, error) {
+func downloadNewFile(ctx context.Context, task *downloadTask, cacheFolder string, hashesToObtain []string, index *CacheIndex, cacheIndexMu *sync.Mutex) (CompletedDownload, error) {
 	// Create temp file to download to
 	tempFile, err := os.CreateTemp(filepath.Join(cacheFolder, "temp"), "download-tmp")
 	if err != nil {
@@ -196,7 +192,7 @@ func downloadNewFile(task *downloadTask, cacheFolder string, hashesToObtain []st
 	if len(hashesToObtain) > 0 {
 		var data io.ReadCloser
 		if task.url != "" {
-			resp, err := core.GetWithUA(task.url, "application/octet-stream")
+			resp, err := core.GetWithUAContext(ctx, task.url, "application/octet-stream")
 			if err != nil {
 				return CompletedDownload{}, fmt.Errorf("failed to download %s: %w", task.url, err)
 			}

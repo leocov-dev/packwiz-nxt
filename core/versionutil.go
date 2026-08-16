@@ -85,30 +85,31 @@ type ForgeRecommended struct {
 	Versions map[string]string `json:"promos"`
 }
 
-// GetForgeRecommended gets the recommended version of Forge for the given Minecraft version
-func GetForgeRecommended(mcVersion string) string {
+// GetForgeRecommended gets the recommended version of Forge for the given Minecraft version.
+// Returns an error if the version list couldn't be fetched or parsed, and a zero-value
+// ("", nil) result if the list was fetched successfully but has no entry for mcVersion.
+func GetForgeRecommended(mcVersion string) (string, error) {
 	res, err := GetWithUA("https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json", "application/json")
 	if err != nil {
-		return ""
+		return "", fmt.Errorf("failed to fetch Forge version list: %w", err)
 	}
 	dec := json.NewDecoder(res.Body)
 	out := ForgeRecommended{}
 	err = dec.Decode(&out)
 	if err != nil {
-		fmt.Println(err)
-		return ""
+		return "", fmt.Errorf("failed to parse Forge version list: %w", err)
 	}
 	// Get mcVersion-recommended, if it doesn't exist then get mcVersion-latest
-	// If neither exist, return empty string
+	// If neither exist, return an empty string with no error (no recommendation exists)
 	recommendedString := fmt.Sprintf("%s-recommended", mcVersion)
 	if out.Versions[recommendedString] != "" {
-		return out.Versions[recommendedString]
+		return out.Versions[recommendedString], nil
 	}
 	latestString := fmt.Sprintf("%s-latest", mcVersion)
 	if out.Versions[latestString] != "" {
-		return out.Versions[latestString]
+		return out.Versions[latestString], nil
 	}
-	return ""
+	return "", nil
 }
 
 func SortAndDedupeVersions(versions []string) {

@@ -22,7 +22,7 @@ func BuildUpdateMap(reg *Registry, mods []*Mod) UpdateSourceMap {
 	reg = resolveRegistry(reg)
 
 	filesWithUpdater := make(UpdateSourceMap)
-	fmt.Println("Reading metadata files...")
+	reg.logger.Infof("Reading metadata files...\n")
 
 	for _, modData := range mods {
 		updaterFound := false
@@ -39,7 +39,7 @@ func BuildUpdateMap(reg *Registry, mods []*Mod) UpdateSourceMap {
 			filesWithUpdater[k] = append(slice, modData)
 		}
 		if !updaterFound {
-			fmt.Printf("A supported update system for \"%s\" cannot be found.\n", modData.Name)
+			reg.logger.Warnf("A supported update system for \"%s\" cannot be found.\n", modData.Name)
 		}
 	}
 
@@ -96,7 +96,7 @@ func GetUpdatableMods(reg *Registry, pack Pack) (UpdateDataList, error) {
 
 			if check.UpdateAvailable {
 				if mod.Pin {
-					fmt.Printf("skipping pinned mod: %s\n", mod.Slug)
+					reg.logger.Infof("skipping pinned mod: %s\n", mod.Slug)
 					continue
 				}
 
@@ -127,7 +127,7 @@ func UpdateSingleMod(reg *Registry, pack Pack, mod *Mod) error {
 	check := checks[0]
 
 	if !check.UpdateAvailable {
-		fmt.Printf("mod: %s is alreay up to date\n", mod.Name)
+		reg.logger.Infof("mod: %s is already up to date\n", mod.Name)
 		return nil
 	} else {
 		updateData := make(UpdateDataList)
@@ -148,7 +148,7 @@ func UpdateAllMods(reg *Registry, pack Pack) error {
 	}
 
 	if len(updateData) == 0 {
-		fmt.Println("all mods already up to date")
+		reg.logger.Infof("all mods already up to date\n")
 		return nil
 	}
 

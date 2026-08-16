@@ -14,6 +14,7 @@ type Registry struct {
 	mu              sync.RWMutex
 	updaters        map[string]Updater
 	metaDownloaders map[string]MetaDownloader
+	logger          Logger
 }
 
 // NewRegistry creates an empty, ready-to-use Registry.
@@ -21,7 +22,23 @@ func NewRegistry() *Registry {
 	return &Registry{
 		updaters:        make(map[string]Updater),
 		metaDownloaders: make(map[string]MetaDownloader),
+		logger:          PrintLogger{},
 	}
+}
+
+// SetLogger overrides the Registry's logger, used to report non-fatal
+// warnings/progress during update resolution. Defaults to PrintLogger.
+func (r *Registry) SetLogger(l Logger) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.logger = l
+}
+
+// Logger returns the Registry's current logger.
+func (r *Registry) Logger() Logger {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.logger
 }
 
 // AddUpdater registers an Updater, keyed by its GetName() value.

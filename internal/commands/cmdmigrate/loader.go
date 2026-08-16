@@ -49,12 +49,15 @@ var loaderCommand = &cobra.Command{
 				shared.Exitln("The recommended loader version is only available on Forge!")
 			}
 			// We'll be updating to the recommended loader version
-			recommendedVer := core.GetForgeRecommended(mcVersion)
+			recommendedVer, err := core.GetForgeRecommended(mcVersion)
+			if err != nil {
+				shared.Exitf("Error getting recommended Forge version: %s\n", err)
+			}
 			if recommendedVer == "" {
 				shared.Exitln("Error getting recommended Forge version!")
 			}
 			if ok := updatePackToVersion(recommendedVer, modpack, core.ModLoaders["forge"]); !ok {
-				os.Exit(1)
+				shared.Exitln()
 			}
 			// Write the pack to disk
 			packWriter := fileio.NewPackWriter()
@@ -79,7 +82,7 @@ var loaderCommand = &cobra.Command{
 				// We're on Fabric or quilt
 				validateVersion(versions, args[0], loader)
 				if ok := updatePackToVersion(args[0], modpack, loader); !ok {
-					os.Exit(1)
+					shared.Exitln()
 				}
 			}
 			// Write the pack to disk
