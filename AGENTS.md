@@ -3,9 +3,8 @@
 Guidance for anyone (human or agent) writing Go code in this module. `packwiz-nxt`
 is a **library first, CLI second**: `core/`, `fileio/`, and `sources/` must be
 safely embeddable by a caller that is not `cmd/`. Every rule below exists to
-protect that property. See `.plan/code-review.md` for the concrete findings
-this file is distilled from, and `.plan/rewrite-progress.md` for the
-feature-parity backlog.
+protect that property. See `.plan/rewrite-progress.md` for the feature-parity
+backlog.
 
 ## 0. Out of scope
 

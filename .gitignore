@@ -29,3 +29,5 @@ bin/
 .coverage/
 !.coverage/.keep
 .claude/
+
+.env

@@ -6,8 +6,8 @@ packwiz usable as a **library**, without forcing filesystem writes, while
 keeping the original CLI mostly intact.
 
 Last reviewed: 2026-08-16 (commit `068de40`, after a full code-review fix
-pass — see [`code-review.md`](code-review.md) for the findings and status of
-each).
+pass; the review doc itself was deleted once its findings were confirmed
+fixed).
 
 ## Snapshot
 
@@ -104,9 +104,8 @@ Legend: ✅ present/ported · ⚠️ present but worth a closer look · ❌ miss
 ## Gaps / Open Items
 
 1. **`serve` command is missing entirely.** Biggest functional gap vs. the
-   original CLI. Still not started. Needs a decision: port as-is, or design
-   it as a library-friendly HTTP handler now that `fileio`/`core` are split
-   (this could actually be a good validation case for the new architecture).
+   original CLI, but now a settled decision rather than an open question:
+   `AGENTS.md` §0 documents this as a deliberate exclusion, not a TODO.
 2. ~~`core.MetaDownloaders` wasn't migrated to the `Add`/`Get` registry
    pattern~~ — **fixed**: both are now unified behind `core.Registry`.
 3. **Test coverage is still very thin** (3.6%, see Snapshot above). Only
@@ -121,12 +120,12 @@ Legend: ✅ present/ported · ⚠️ present but worth a closer look · ❌ miss
    logic. Given the whole point of the rewrite is to expose a stable library
    API, `fileio` (load/write) and `sources` (provider ops/updaters) remain
    the highest-value places to add coverage before calling this stable.
-4. **No documented/stable public library API yet.** `fileio.LoadAll` /
-   `fileio.WriteAll` / `core.FromPackAndModsMeta` exist and look like the
-   intended entry points, but there's no example, doc comment set, or
-   `AGENTS.md`/library usage doc describing "how to use packwiz-nxt as a
-   dependency" — only the CLI is exercised (`cmd/`, `main.go`). Worth writing
-   once the API stabilizes.
+4. **No documented/stable public library API yet.** `AGENTS.md` now exists
+   and codifies the library-first *rules* (no global state, no printing, no
+   viper leakage) contributors must follow, but it's contributor guidance,
+   not a "how to use packwiz-nxt as a dependency" doc — there's still no
+   worked example of calling `fileio.LoadAll`/`WriteAll`/
+   `core.FromPackAndModsMeta` from outside `cmd/`. Gap narrowed, not closed.
 5. Inherited (non-regression) TODOs worth tracking if picking up loose ends
    from upstream: CurseForge HTTP-source import (`import.go:39`), Forge
    "recommended version" resolution edge case (`cmdmigrate/loader.go:57`),
@@ -148,15 +147,12 @@ Legend: ✅ present/ported · ⚠️ present but worth a closer look · ❌ miss
 
 ## Suggested Next Milestones
 
-1. Decide the fate of `serve` (port vs. redesign) and implement it.
-2. Add unit tests for `fileio` (load/write round-trip) and `sources`
+1. Add unit tests for `fileio` (load/write round-trip) and `sources`
    (updater `ParseUpdate`/`CheckUpdate` logic, mockable via HTTP test
    servers) — these are the packages a library consumer will actually call
-   into, and now include several newly-extracted functions from the
-   code-review pass with zero coverage.
-3. Write a minimal "using packwiz-nxt as a library" example/doc once (1) and
-   (2) make the API trustworthy, and land it as `packwiz-nxt/AGENTS.md` or a
-   `library/` example per this project's README-vs-AGENTS split convention.
-4. Work through the remaining Low-severity findings in `code-review.md`
-   (deferred in this pass) — mostly doc comments, naming consistency, and
-   magic-number extraction.
+   into, and include several newly-extracted functions from the code-review
+   fix pass with zero coverage.
+2. Write a minimal "using packwiz-nxt as a library" example/doc once (1)
+   makes the API trustworthy — `AGENTS.md` covers the rules but not a
+   worked example; land the example as a `library/` sample or an addition
+   to `AGENTS.md` per this project's README-vs-AGENTS split convention.
