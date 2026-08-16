@@ -7,7 +7,6 @@ import (
 	"github.com/leocov-dev/packwiz-nxt/internal/shared"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"io"
 	"net/url"
 	"path"
 	"path/filepath"
@@ -58,11 +57,6 @@ var installCmd = &cobra.Command{
 			shared.Exitln("Failed to retrieve SHA256 hash for file", err)
 		}
 
-		index, err := fileio.LoadPackIndexFile(&pack)
-		if err != nil {
-			shared.Exitln(err)
-		}
-
 		filename := path.Base(dl.Path)
 		modMeta := core.ModToml{
 			Name:     args[0],
@@ -88,55 +82,45 @@ var installCmd = &cobra.Command{
 		destPath := modMeta.SetMetaPath(filepath.Join(viper.GetString("meta-folder-base"), folder,
 			destPathName+core.MetaExtension))
 
-		modWriter := fileio.NewModWriter()
-		format, hash, err := modWriter.Write(&modMeta)
-		if err != nil {
-			shared.Exitln(err)
-		}
-
-		err = index.UpdateFileHashGiven(destPath, format, hash, true)
-		if err != nil {
-			shared.Exitln(err)
-		}
-
-		repr := index.ToWritable()
-		writer := fileio.NewIndexWriter()
-		err = writer.Write(&repr)
-		if err != nil {
-			shared.Exitln(err)
-		}
-
-		pack.RefreshIndexHash(index)
-
-		packWriter := fileio.NewPackWriter()
-		err = packWriter.Write(&pack)
+		err = fileio.WriteModAndUpdateIndex(&pack, &modMeta, destPath)
 		if err != nil {
 			shared.Exitln(err)
 		}
 		fmt.Printf("Successfully added %s (%s) from: %s\n", args[0], destPath, args[1])
 	}}
 
+// getHash retrieves the SHA256 hash of the file at the given URL by downloading it through the
+// shared fileio download/cache machinery (the same DownloadSession used by the other providers),
+// rather than hand-rolling an HTTP fetch-and-hash.
 func getHash(url string) (string, error) {
-	mainHasher, err := core.GetHashImpl("sha256")
-	if err != nil {
-		return "", err
-	}
-	resp, err := core.GetWithUA(url, "application/octet-stream")
-	if err != nil {
-		return "", err
+	dlMod := &core.Mod{
+		Download: core.ModDownload{
+			URL:  url,
+			Mode: core.ModeURL,
+		},
 	}
 
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return "", fmt.Errorf("failed to download: unexpected response status: %v", resp.Status)
-	}
-
-	_, err = io.Copy(mainHasher, resp.Body)
+	session, err := fileio.CreateDownloadSession([]*core.Mod{dlMod}, []string{"sha256"})
 	if err != nil {
 		return "", err
 	}
 
-	return mainHasher.String(), nil
+	var hash string
+	for dl := range session.StartDownloads() {
+		if dl.File != nil {
+			_ = dl.File.Close()
+		}
+		if dl.Error != nil {
+			return "", dl.Error
+		}
+		hash = dl.Hashes["sha256"]
+	}
+
+	if err := session.SaveIndex(); err != nil {
+		return "", err
+	}
+
+	return hash, nil
 }
 
 func init() {

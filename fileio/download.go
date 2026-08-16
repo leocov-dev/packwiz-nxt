@@ -2,7 +2,6 @@ package fileio
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/leocov-dev/packwiz-nxt/core"
 	"io"
@@ -213,11 +212,15 @@ func selectPreferredHash(hashes map[string]string) (currHashFormat string, currH
 	return
 }
 
-// getHashListsForDownload creates a hashes map with the given validate hash+format,
+// getHashListsForDownload creates a hashes map with the given validate hash+format (if any is
+// known - validateHashFormat may be empty when there is no expected hash to validate against yet,
+// e.g. when establishing the hash of a file for the first time),
 // ensures cacheHashFormat is in hashesToObtain (cloned+returned) and validateHashFormat isn't
 func getHashListsForDownload(hashesToObtain []string, validateHashFormat string, validateHash string) ([]string, map[string]string) {
 	hashes := make(map[string]string)
-	hashes[validateHashFormat] = validateHash
+	if validateHashFormat != "" {
+		hashes[validateHashFormat] = validateHash
+	}
 
 	var cl []string
 	if cacheHashFormat != validateHashFormat {
@@ -233,16 +236,20 @@ func getHashListsForDownload(hashesToObtain []string, validateHashFormat string,
 
 func teeHashes(hashesToObtain []string, hashes map[string]string,
 	dst io.Writer, src io.Reader) error {
-	// Select the best hash from the hashes map to validate against
+	// Select the best hash from the hashes map to validate against, if any is known. When no
+	// expected hash is known (e.g. establishing the hash of a file for the first time, such as
+	// when adding a plain URL download), there is nothing to validate against - the computed
+	// hashes are simply trusted and recorded.
 	validateHashFormat, validateHash := selectPreferredHash(hashes)
-	if validateHashFormat == "" {
-		return errors.New("failed to find preferred hash for file")
-	}
 
 	// Create writers for all the hashers
-	mainHasher, err := core.GetHashImpl(validateHashFormat)
-	if err != nil {
-		return fmt.Errorf("failed to get hash format %s", validateHashFormat)
+	var mainHasher core.HashStringer
+	var err error
+	if validateHashFormat != "" {
+		mainHasher, err = core.GetHashImpl(validateHashFormat)
+		if err != nil {
+			return fmt.Errorf("failed to get hash format %s", validateHashFormat)
+		}
 	}
 	hashers := make(map[string]core.HashStringer, len(hashesToObtain))
 	allWriters := make([]io.Writer, len(hashesToObtain))
@@ -253,7 +260,10 @@ func teeHashes(hashesToObtain []string, hashes map[string]string,
 		}
 		allWriters[i] = hashers[v]
 	}
-	allWriters = append(allWriters, mainHasher, dst)
+	if mainHasher != nil {
+		allWriters = append(allWriters, mainHasher)
+	}
+	allWriters = append(allWriters, dst)
 
 	// Copy source to all writers (all hashers and dst)
 	w := io.MultiWriter(allWriters...)
@@ -262,13 +272,14 @@ func teeHashes(hashesToObtain []string, hashes map[string]string,
 		return fmt.Errorf("failed to read file: %w", err)
 	}
 
-	calculatedHash := mainHasher.String()
-
 	// Check if the hash of the downloaded file matches the expected hash
-	if strings.ToLower(calculatedHash) != strings.ToLower(validateHash) {
-		return fmt.Errorf(
-			"%s hash of downloaded file does not match with expected hash!\n download hash: %s\n expected hash: %s\n",
-			validateHashFormat, calculatedHash, validateHash)
+	if mainHasher != nil {
+		calculatedHash := mainHasher.String()
+		if strings.ToLower(calculatedHash) != strings.ToLower(validateHash) {
+			return fmt.Errorf(
+				"%s hash of downloaded file does not match with expected hash!\n download hash: %s\n expected hash: %s\n",
+				validateHashFormat, calculatedHash, validateHash)
+		}
 	}
 
 	for hashFormat, v := range hashers {

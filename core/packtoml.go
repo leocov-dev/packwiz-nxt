@@ -6,6 +6,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/slices"
 	"path/filepath"
 	"strings"
 )
@@ -136,6 +137,29 @@ func (pack *PackToml) GetAcceptableGameVersions() []string {
 func (pack *PackToml) SetAcceptableGameVersions(versions []string) {
 	SortAndDedupeVersions(versions)
 	pack.Options["acceptable-game-versions"] = versions
+}
+
+// AddAcceptableVersion adds a single version to the pack's acceptable Minecraft versions list.
+// It returns an error if the version is already present in the list.
+func (pack *PackToml) AddAcceptableVersion(version string) error {
+	currentVersions := pack.GetAcceptableGameVersions()
+	if slices.Contains(currentVersions, version) {
+		return fmt.Errorf("version %s is already in the acceptable versions list", version)
+	}
+	pack.SetAcceptableGameVersions(append(currentVersions, version))
+	return nil
+}
+
+// RemoveAcceptableVersion removes a single version from the pack's acceptable Minecraft versions list.
+// It returns an error if the version is not present in the list.
+func (pack *PackToml) RemoveAcceptableVersion(version string) error {
+	currentVersions := pack.GetAcceptableGameVersions()
+	i := slices.Index(currentVersions, version)
+	if i == -1 {
+		return fmt.Errorf("version %s is not in the acceptable versions list", version)
+	}
+	pack.SetAcceptableGameVersions(slices.Delete(currentVersions, i, i+1))
+	return nil
 }
 
 func (pack *PackToml) GetPackName() string {

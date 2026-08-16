@@ -11,8 +11,8 @@ import (
 	"github.com/leocov-dev/packwiz-nxt/internal/shared"
 )
 
-// UpdateCmd represents the update command
-var UpdateCmd = &cobra.Command{
+// updateCmd represents the update command
+var updateCmd = &cobra.Command{
 	Use:     "update [name]",
 	Short:   "Update an external file (or all external files) in the modpack",
 	Aliases: []string{"upgrade"},
@@ -73,8 +73,8 @@ var UpdateCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(UpdateCmd)
+	rootCmd.AddCommand(updateCmd)
 
-	UpdateCmd.Flags().BoolP("all", "a", false, "Update all external files")
-	_ = viper.BindPFlag("update.all", UpdateCmd.Flags().Lookup("all"))
+	updateCmd.Flags().BoolP("all", "a", false, "Update all external files")
+	_ = viper.BindPFlag("update.all", updateCmd.Flags().Lookup("all"))
 }

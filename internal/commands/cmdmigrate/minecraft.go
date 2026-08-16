@@ -2,7 +2,6 @@ package cmdmigrate
 
 import (
 	"fmt"
-	packCmd "github.com/leocov-dev/packwiz-nxt/cmd"
 	"github.com/leocov-dev/packwiz-nxt/core"
 	"github.com/leocov-dev/packwiz-nxt/fileio"
 	"github.com/leocov-dev/packwiz-nxt/internal/shared"
@@ -54,14 +53,29 @@ var minecraftCommand = &cobra.Command{
 		fmt.Printf("Successfully updated Minecraft version to %s\n", wantedMCVersion)
 		// Prompt the user if they want to update the loader too while they're at it.
 		if shared.PromptYesNo("Would you like to update your loader version to the latest version for this Minecraft version? [Y/n] ") {
-			// We'll run the loader command to update to latest
-			loaderCommand.Run(loaderCommand, []string{"latest"})
+			// Update the loader directly, rather than going through the loader command's Run
+			updateLoaderToLatest(modpack)
 		}
 		// Prompt the user to update their mods too.
 		if shared.PromptYesNo("Would you like to update your mods to the latest versions for this Minecraft version? [Y/n] ") {
-			// Run the update command
-			viper.Set("update.all", true)
-			packCmd.UpdateCmd.Run(packCmd.UpdateCmd, []string{})
+			// Update all mods directly, rather than going through the update command's Run
+			packFile, packDir, err := shared.GetPackPaths()
+			if err != nil {
+				shared.Exitln(err)
+			}
+			fmt.Println("Loading modpack...")
+			fullPack, err := fileio.LoadAll(packFile)
+			if err != nil {
+				shared.Exitln(err)
+			}
+			fmt.Println("Checking for updates...")
+			if err := core.UpdateAllMods(*fullPack); err != nil {
+				shared.Exitln(err)
+			}
+			if err := fileio.WriteAll(*fullPack, packDir); err != nil {
+				shared.Exitln(err)
+			}
+			fmt.Println("Files updated!")
 		}
 	},
 }
