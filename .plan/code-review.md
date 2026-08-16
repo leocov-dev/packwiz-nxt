@@ -10,6 +10,75 @@ Reviewed: 2026-08-16, commit `8bf430e`. Cross-reference:
 [`../../vendor/PACKWIZ-MAP.md`](../../vendor/PACKWIZ-MAP.md) for the original
 packwiz's architecture.
 
+## Fix Pass Status (as of commit `068de40`)
+
+A six-batch sub-agent fix pass addressed the High + Medium severity findings
+below (Low severity — doc comments, naming nits, magic-number extraction —
+was explicitly deferred, per plan). Status by section:
+
+- **Cross-Cutting Themes #1 (global mutable state)** — ✅ Fixed. `core.Registry`
+  (mutex-guarded) now unifies `Updaters`/`MetaDownloaders`; `core.defaultLoaderCache`
+  is mutex-guarded. `core.DefaultRegistry` remains a process-wide default for
+  CLI-behavior compatibility — full per-instance isolation is opt-in, not yet
+  the default posture everywhere (see `rewrite-progress.md` gap #7).
+- **#2 (printing instead of returning data)** — ⚠️ Partially fixed. `core/packtoml.go`'s
+  `ValidatePack`, `fileio/indexwriter.go`'s `InitIndexFile`, and
+  `fileio/indexloader.go`'s `RefreshIndexFiles` no longer print/render UI
+  directly. `sources/*.go`'s scattered `fmt.Println`/`fmt.Printf` calls
+  (cf-ops.go, gh-api.go, gh-ops.go, mr-api.go, mr-ops.go) and `core/update.go`'s
+  status prints were **not** addressed — the planned shared `Logger`
+  abstraction was not introduced. Deferred.
+- **#3 (hidden viper/global-config coupling)** — ✅ Fixed. `core.ValidatePack`,
+  `fileio.GetPackwizCache`, `fileio.RefreshIndexFiles` all take explicit
+  parameters now instead of reading global `viper` state.
+- **#4 (no context.Context/timeouts in network code)** — ⚠️ Partially fixed.
+  `fileio.DownloadSession.StartDownloads` now takes a `context.Context` and
+  is cancellable. The underlying HTTP clients (`core.GetWithUA`,
+  `sources/*-api.go`'s `cfDefaultClient`/`ghDefaultClient`/`mrDefaultClient`)
+  still have no timeout and don't accept a context. Deferred.
+- **#5 (cross-provider duplication in `sources/`)** — ✅ Fixed. Dependency-BFS
+  skeleton, loader-preference comparator shape, and dependency-override table
+  unified across CurseForge/Modrinth (`sources/depresolve.go`,
+  `sources/compare.go`, `sources/depoverride.go`). GitHub's intra-package
+  asset-matching duplication also fixed.
+- **#6 (inconsistent file-organization convention across providers)** — ❌
+  Not addressed — `gh-interfaces.go` is still misnamed/still a grab-bag, and
+  the three providers' api/ops/updater split conventions still differ.
+  Deferred (this was a larger normalization task, not in scope for the fix
+  pass's batching).
+- **#7 (GitHub LSP violation)** — ✅ Fixed. `DoUpdate` now uses the exact
+  asset `CheckUpdate` resolved via `ghCachedStateStore`, instead of
+  re-deriving it with a weaker heuristic.
+- **#8 (duplicated marshal/write boilerplate)** — ✅ Fixed. `core.marshalWithHash`
+  and `fileio.writeMarshalled` consolidate both.
+- **#9 (domain/wire-format duplication in `core`)** — ❌ Not addressed.
+  `Pack`/`PackToml` still duplicate `GetMCVersion`/`GetSupportedMCVersions`/
+  `GetAcceptableGameVersions`/`GetCompatibleLoaders` logic almost verbatim
+  (both got the same *panic* fix independently — see `core/pack.go`'s
+  `GetAcceptableGameVersions` and `core/packtoml.go`'s sibling — which is
+  itself evidence the duplication is a live maintenance hazard, not just a
+  style nit). Deferred — this is a larger refactor than the fix pass's per-file
+  batching was scoped for.
+
+Per-file/per-package findings below are **not** individually annotated with
+fixed/deferred status — the summary above covers what changed. Notable
+concrete bugs fixed beyond the cross-cutting list: `fileio/download.go`'s
+file-handle/temp-file leaks and unsynchronized `cacheIndex` access;
+`fileio/packexporter.go` (dead/broken, removed); `core.Pack.UpdateAll`/`.Update`/
+`SortAscending` (dead code, removed); `core/indexfiles.go`'s panics (now
+errors); `cmd/list.go`'s nil-slice bug (mods weren't printed without
+`--side`); `cmd/update.go`'s always-empty success message; a second,
+independently-discovered instance of the `GetAcceptableGameVersions` panic
+on `PackToml` (Batch A only fixed `Pack`'s copy); business logic extracted
+out of `cmdcurseforge/{detect,import,export}.go`, `cmdmodrinth/export.go`,
+`cmdurl/install.go`, `cmdgithub/install.go`, and `cmdmigrate/minecraft.go`
+(the last no longer calls another command's cobra `Run` field directly).
+
+Deferred work (not in this pass): the `serve` command gap, all Low-severity
+findings, test coverage (still ~3.6%, see `rewrite-progress.md`), and a
+documented public library API. See `rewrite-progress.md`'s Suggested Next
+Milestones for the prioritized follow-up list.
+
 ## Executive Summary
 
 The rewrite has a real, mostly-working domain/wire-format split and a genuine
