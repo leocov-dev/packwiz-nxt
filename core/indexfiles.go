@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"golang.org/x/exp/slices"
 	"path"
 )
@@ -13,8 +14,8 @@ type IndexPathHolder interface {
 	updateHash(hash string, format string)
 	markFound()
 	markMetaFile()
-	MarkedFound() bool
-	IsMetaFile() bool
+	MarkedFound() (bool, error)
+	IsMetaFile() (bool, error)
 }
 
 // IndexFile is a file in the index
@@ -42,12 +43,12 @@ func (i *IndexFile) markMetaFile() {
 	i.MetaFile = true
 }
 
-func (i *IndexFile) MarkedFound() bool {
-	return i.fileFound
+func (i *IndexFile) MarkedFound() (bool, error) {
+	return i.fileFound, nil
 }
 
-func (i *IndexFile) IsMetaFile() bool {
-	return i.MetaFile
+func (i *IndexFile) IsMetaFile() (bool, error) {
+	return i.MetaFile, nil
 }
 
 type indexFileMultipleAlias map[string]IndexFile
@@ -74,18 +75,18 @@ func (i *indexFileMultipleAlias) markMetaFile() {
 	}
 }
 
-func (i *indexFileMultipleAlias) MarkedFound() bool {
+func (i *indexFileMultipleAlias) MarkedFound() (bool, error) {
 	for _, v := range *i {
 		return v.MarkedFound()
 	}
-	panic("No entries in indexFileMultipleAlias")
+	return false, fmt.Errorf("no entries in indexFileMultipleAlias")
 }
 
-func (i *indexFileMultipleAlias) IsMetaFile() bool {
+func (i *indexFileMultipleAlias) IsMetaFile() (bool, error) {
 	for _, v := range *i {
-		return v.MetaFile
+		return v.MetaFile, nil
 	}
-	panic("No entries in indexFileMultipleAlias")
+	return false, fmt.Errorf("no entries in indexFileMultipleAlias")
 }
 
 // updateFileEntry updates the hash of a file and marks as found; adding it if it doesn't exist
@@ -123,7 +124,7 @@ type IndexFilesTomlRepresentation []IndexFile
 
 // toMemoryRep converts the TOML representation of IndexFiles to that used in memory
 // These silly converter functions are necessary because the TOML libraries don't support custom non-primitive serializers
-func (rep IndexFilesTomlRepresentation) toMemoryRep() IndexFiles {
+func (rep IndexFilesTomlRepresentation) toMemoryRep() (IndexFiles, error) {
 	out := make(IndexFiles)
 
 	// Add entries to map
@@ -152,19 +153,19 @@ func (rep IndexFilesTomlRepresentation) toMemoryRep() IndexFiles {
 				// Add to alias map
 				(*existingMap)[v.Alias] = v
 			} else {
-				panic("Unknown type in IndexFiles")
+				return nil, fmt.Errorf("unknown type in IndexFiles")
 			}
 		} else {
 			out[v.File] = &v
 		}
 	}
 
-	return out
+	return out, nil
 }
 
 // toTomlRep converts the in-memory representation of IndexFiles to that used in TOML
 // These silly converter functions are necessary because the TOML libraries don't support custom non-primitive serializers
-func (f *IndexFiles) toTomlRep() IndexFilesTomlRepresentation {
+func (f *IndexFiles) toTomlRep() (IndexFilesTomlRepresentation, error) {
 	// Turn internal representation into TOML representation
 	rep := make(IndexFilesTomlRepresentation, 0, len(*f))
 	for _, v := range *f {
@@ -175,7 +176,7 @@ func (f *IndexFiles) toTomlRep() IndexFilesTomlRepresentation {
 				rep = append(rep, alias)
 			}
 		} else {
-			panic("Unknown type in IndexFiles")
+			return nil, fmt.Errorf("unknown type in IndexFiles")
 		}
 	}
 
@@ -197,5 +198,5 @@ func (f *IndexFiles) toTomlRep() IndexFilesTomlRepresentation {
 		}
 	})
 
-	return rep
+	return rep, nil
 }

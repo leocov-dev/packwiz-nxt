@@ -18,12 +18,16 @@ type IndexFS struct {
 	hash       string
 }
 
-func NewIndexFromTomlRepr(rep IndexTomlRepresentation) IndexFS {
+func NewIndexFromTomlRepr(rep IndexTomlRepresentation) (IndexFS, error) {
+	files, err := rep.Files.toMemoryRep()
+	if err != nil {
+		return IndexFS{}, err
+	}
 	return IndexFS{
 		DefaultModHashFormat: rep.DefaultModHashFormat,
-		Files:                rep.Files.toMemoryRep(),
+		Files:                files,
 		packRoot:             filepath.Dir(rep.GetFilePath()),
-	}
+	}, nil
 }
 
 func (in *IndexFS) GetFilePath() string {
@@ -81,39 +85,51 @@ func (in *IndexFS) RelIndexPath(p string) (string, error) {
 	return filepath.ToSlash(rel), nil
 }
 
-func (in *IndexFS) ToWritable() IndexTomlRepresentation {
+func (in *IndexFS) ToWritable() (IndexTomlRepresentation, error) {
+	filesRep, err := in.Files.toTomlRep()
+	if err != nil {
+		return IndexTomlRepresentation{}, err
+	}
 	return IndexTomlRepresentation{
 		DefaultModHashFormat: in.DefaultModHashFormat,
-		Files:                in.Files.toTomlRep(),
+		Files:                filesRep,
 		filePath:             in.GetFilePath(),
 		hashFormat:           in.GetHashFormat(),
 		hash:                 in.GetHash(),
-	}
+	}, nil
 }
 
 // FindMod finds a mod in the index and returns its path and whether it has been found
-func (in *IndexFS) FindMod(modName string) (string, bool) {
+func (in *IndexFS) FindMod(modName string) (string, bool, error) {
 	for p, v := range in.Files {
-		if v.IsMetaFile() {
+		isMetaFile, err := v.IsMetaFile()
+		if err != nil {
+			return "", false, err
+		}
+		if isMetaFile {
 			_, fileName := path.Split(p)
 			fileTrimmed := strings.TrimSuffix(strings.TrimSuffix(fileName, MetaExtension), MetaExtensionOld)
 			if fileTrimmed == modName {
-				return in.ResolveIndexPath(p), true
+				return in.ResolveIndexPath(p), true, nil
 			}
 		}
 	}
-	return "", false
+	return "", false, nil
 }
 
 // GetAllMods finds paths to every metadata file (ModToml) in the index
-func (in *IndexFS) GetAllMods() []string {
+func (in *IndexFS) GetAllMods() ([]string, error) {
 	var list []string
 	for p, v := range in.Files {
-		if v.IsMetaFile() {
+		isMetaFile, err := v.IsMetaFile()
+		if err != nil {
+			return nil, err
+		}
+		if isMetaFile {
 			list = append(list, in.ResolveIndexPath(p))
 		}
 	}
-	return list
+	return list, nil
 }
 
 // IndexTomlRepresentation is the TOML representation of IndexFS (Files must be converted)

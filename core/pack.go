@@ -203,7 +203,10 @@ func (p *Pack) AsIndexMeta() (IndexFS, error) {
 		return IndexFS{}, err
 	}
 
-	index := NewIndexFromTomlRepr(repr)
+	index, err := NewIndexFromTomlRepr(repr)
+	if err != nil {
+		return IndexFS{}, err
+	}
 	return index, nil
 }
 

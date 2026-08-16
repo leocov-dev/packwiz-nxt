@@ -66,7 +66,12 @@ func AddNonMetafileOverrides(index *core.IndexFS, exp *zip.Writer) {
 	// TODO: what to do about index files that are not metafile mods,
 	//  currently we are not handling them correctly
 	for p, v := range index.Files {
-		if !v.IsMetaFile() {
+		isMetaFile, err := v.IsMetaFile()
+		if err != nil {
+			fmt.Printf("Error checking file: %s\n", err.Error())
+			continue
+		}
+		if !isMetaFile {
 			file, err := exp.Create(path.Join("overrides", p))
 			if err != nil {
 				fmt.Printf("Error creating file: %s\n", err.Error())

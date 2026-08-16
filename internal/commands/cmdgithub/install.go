@@ -90,7 +90,10 @@ func writeMod(pack core.PackToml, modMeta core.ModToml, path string) error {
 		return err
 	}
 
-	repr := index.ToWritable()
+	repr, err := index.ToWritable()
+	if err != nil {
+		return err
+	}
 	writer := fileio.NewIndexWriter()
 	err = writer.Write(&repr)
 	if err != nil {

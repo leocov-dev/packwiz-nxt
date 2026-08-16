@@ -31,12 +31,18 @@ func LoadIndex(indexFile string) (core.IndexFS, error) {
 	}
 	rep.SetFilePath(indexFile)
 
-	index := core.NewIndexFromTomlRepr(rep)
+	index, err := core.NewIndexFromTomlRepr(rep)
+	if err != nil {
+		return core.IndexFS{}, err
+	}
 	return index, nil
 }
 
 func LoadAllMods(index *core.IndexFS) ([]*core.ModToml, error) {
-	modPaths := index.GetAllMods()
+	modPaths, err := index.GetAllMods()
+	if err != nil {
+		return nil, err
+	}
 	mods := make([]*core.ModToml, len(modPaths))
 	for i, v := range modPaths {
 		modData, err := LoadMod(v)
@@ -135,7 +141,11 @@ func RefreshIndexFiles(index *core.IndexFS) error {
 
 	// Check all the files exist, remove them if they don't
 	for p, file := range index.Files {
-		if !file.MarkedFound() {
+		found, err := file.MarkedFound()
+		if err != nil {
+			return err
+		}
+		if !found {
 			delete(index.Files, p)
 		}
 	}

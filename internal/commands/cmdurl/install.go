@@ -99,7 +99,10 @@ var installCmd = &cobra.Command{
 			shared.Exitln(err)
 		}
 
-		repr := index.ToWritable()
+		repr, err := index.ToWritable()
+		if err != nil {
+			shared.Exitln(err)
+		}
 		writer := fileio.NewIndexWriter()
 		err = writer.Write(&repr)
 		if err != nil {
