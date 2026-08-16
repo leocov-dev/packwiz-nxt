@@ -30,7 +30,7 @@ var listCmd = &cobra.Command{
 			shared.Exitln(err)
 		}
 
-		var mods []*core.Mod
+		mods := pack.GetModsList()
 
 		// Filter mods by side
 		if viper.IsSet("list.side") {
@@ -40,7 +40,7 @@ var listCmd = &cobra.Command{
 			}
 
 			i := 0
-			for _, mod := range pack.Mods {
+			for _, mod := range mods {
 				if mod.Side == side || mod.Side == core.EmptySide || mod.Side == core.UniversalSide || side == core.UniversalSide {
 					mods[i] = mod
 					i++
