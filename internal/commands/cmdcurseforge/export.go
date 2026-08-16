@@ -4,7 +4,6 @@ import (
 	"archive/zip"
 	"bufio"
 	"fmt"
-	"os"
 	"strconv"
 
 	"github.com/spf13/cobra"
@@ -75,18 +74,6 @@ var exportCmd = &cobra.Command{
 			fileName = pack.GetExportName() + ".zip"
 		}
 
-		expFile, err := os.Create(fileName)
-		if err != nil {
-			shared.Exitf("Failed to create zip: %s\n", err.Error())
-		}
-		exp := zip.NewWriter(expFile)
-
-		// Add an overrides folder even if there are no files to go in it
-		_, err = exp.Create("overrides/")
-		if err != nil {
-			shared.Exitf("Failed to add overrides folder: %s\n", err.Error())
-		}
-
 		cfFileRefs := make([]packinterop.AddonFileReference, 0, len(mods))
 		nonCfMods := make([]*core.Mod, 0)
 		for _, mod := range mods {
@@ -104,58 +91,51 @@ var exportCmd = &cobra.Command{
 			}
 		}
 
-		// Download external files and save directly into the zip
-		if len(nonCfMods) > 0 {
-			fmt.Printf("Retrieving %v external files to store in the modpack zip...\n", len(nonCfMods))
-			shared.PrintDisclaimer(true)
+		err = shared.WithZipWriter(fileName, func(exp *zip.Writer) error {
+			// Add an overrides folder even if there are no files to go in it
+			if _, err := exp.Create("overrides/"); err != nil {
+				return fmt.Errorf("Failed to add overrides folder: %w", err)
+			}
 
-			session, err := fileio.CreateDownloadSession(nonCfMods, []string{})
+			// Download external files and save directly into the zip
+			if len(nonCfMods) > 0 {
+				fmt.Printf("Retrieving %v external files to store in the modpack zip...\n", len(nonCfMods))
+				shared.PrintDisclaimer(true)
+
+				session, err := fileio.CreateDownloadSession(nonCfMods, []string{})
+				if err != nil {
+					shared.Exitf("Error retrieving external files: %v\n", err)
+				}
+
+				shared.ListManualDownloads(session)
+
+				for dl := range session.StartDownloads(cmd.Context()) {
+					_ = shared.AddToZip(dl, exp, "overrides")
+				}
+
+				err = session.SaveIndex()
+				if err != nil {
+					shared.Exitf("Error saving cache index: %v\n", err)
+				}
+			}
+
+			manifestFile, err := exp.Create("manifest.json")
 			if err != nil {
-				shared.Exitf("Error retrieving external files: %v\n", err)
+				return fmt.Errorf("Error creating manifest: %w", err)
 			}
 
-			shared.ListManualDownloads(session)
-
-			for dl := range session.StartDownloads(cmd.Context()) {
-				_ = shared.AddToZip(dl, exp, "overrides")
+			if err := packinterop.WriteManifestFromPack(*pack, cfFileRefs, exportData.ProjectID, manifestFile); err != nil {
+				return fmt.Errorf("Error writing manifest: %w", err)
 			}
 
-			err = session.SaveIndex()
-			if err != nil {
-				shared.Exitf("Error saving cache index: %v\n", err)
+			if err := createModList(exp, mods); err != nil {
+				return fmt.Errorf("Error creating mod list: %w", err)
 			}
-		}
 
-		manifestFile, err := exp.Create("manifest.json")
+			return nil
+		})
 		if err != nil {
-			_ = exp.Close()
-			_ = expFile.Close()
-			shared.Exitln("Error creating manifest: " + err.Error())
-		}
-
-		err = packinterop.WriteManifestFromPack(*pack, cfFileRefs, exportData.ProjectID, manifestFile)
-		if err != nil {
-			_ = exp.Close()
-			_ = expFile.Close()
-			shared.Exitln("Error writing manifest: " + err.Error())
-		}
-
-		err = createModList(exp, mods)
-		if err != nil {
-			_ = exp.Close()
-			_ = expFile.Close()
-			shared.Exitln("Error creating mod list: " + err.Error())
-		}
-
-		//shared.AddNonMetafileOverrides(&index, exp)
-
-		err = exp.Close()
-		if err != nil {
-			shared.Exitln("Error writing export file: " + err.Error())
-		}
-		err = expFile.Close()
-		if err != nil {
-			shared.Exitln("Error writing export file: " + err.Error())
+			shared.Exitln(err)
 		}
 
 		fmt.Println("Modpack exported to " + fileName)
