@@ -261,7 +261,8 @@ func SearchCurseforgeInternal(
 				return nil
 			}
 
-			// Why is variable shadowing a thing!!!!
+			// Must assign into the outer modInfoData with "=", not ":=" - the latter would
+			// shadow it with a new variable scoped to this closure.
 			var ok bool
 			modInfoData, ok = menuRes[0].Value.(sources.CfModInfo)
 			if !ok {

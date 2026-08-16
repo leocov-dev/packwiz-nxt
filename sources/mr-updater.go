@@ -71,13 +71,7 @@ func (u mrUpdater) CheckUpdate(mods []*core.Mod, pack core.Pack) ([]core.UpdateC
 			continue
 		}
 
-		newFilename := newVersion.Files[0].Filename
-		// Prefer the primary file
-		for _, v := range newVersion.Files {
-			if *v.Primary {
-				newFilename = v.Filename
-			}
-		}
+		newFilename := GetModrinthVersionPrimaryFile(newVersion, "").Filename
 
 		results[i] = core.UpdateCheck{
 			UpdateAvailable: true,
@@ -94,13 +88,7 @@ func (u mrUpdater) DoUpdate(mods []*core.Mod, cachedState []interface{}) error {
 		modState := cachedState[i].(mrCachedStateStore)
 		var version = modState.Version
 
-		var file = version.Files[0]
-		// Prefer the primary file
-		for _, v := range version.Files {
-			if *v.Primary {
-				file = v
-			}
-		}
+		file := GetModrinthVersionPrimaryFile(version, "")
 
 		algorithm, hash := mrGetBestHash(file)
 		if algorithm == "" {

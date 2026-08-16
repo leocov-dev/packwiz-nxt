@@ -27,7 +27,7 @@ func ListManualDownloads(session fileio.DownloadSession) {
 
 		fmt.Printf("Once you have done so, place these files in %s and re-run this command.\n",
 			filepath.Join(cacheDir, fileio.DownloadCacheImportFolder))
-		os.Exit(1)
+		Exitln()
 	}
 }
 

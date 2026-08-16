@@ -84,7 +84,8 @@ func init() {
 	initCmd.Flags().String("modloader", "", "The mod loader to use (omit to define interactively)")
 	_ = viper.BindPFlag("init.modloader", initCmd.Flags().Lookup("modloader"))
 
-	// ok this is epic
+	// Register a pair of "<loader>-version"/"<loader>-latest" flags for every loader in
+	// core.ModLoaders, rather than hardcoding one pair per loader.
 	for _, loader := range core.ModLoaders {
 		initCmd.Flags().String(loader.Name+"-version", "", "The "+loader.FriendlyName+" version to use (omit to define interactively)")
 		_ = viper.BindPFlag("init."+loader.Name+"-version", initCmd.Flags().Lookup(loader.Name+"-version"))

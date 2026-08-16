@@ -71,6 +71,7 @@ func init() {
 	}
 	file = filepath.Join(file, ".packwiz.toml")
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "The config file to use (default \""+file+"\")")
+	_ = viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config"))
 
 	var nonInteractive bool
 	rootCmd.PersistentFlags().BoolVarP(&nonInteractive, "yes", "y", false, "Accept all prompts with the default or \"yes\" option (non-interactive mode) - may pick unwanted options in search results")
