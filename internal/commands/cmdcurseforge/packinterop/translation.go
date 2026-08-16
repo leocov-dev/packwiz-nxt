@@ -3,30 +3,36 @@ package packinterop
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"github.com/leocov-dev/packwiz-nxt/core"
-	"github.com/leocov-dev/packwiz-nxt/internal/shared"
 	"io"
 )
 
-func ReadMetadata(s ImportPackSource) ImportPackMetadata {
+// ReadMetadata parses the pack metadata file provided by s (either a
+// manifest.json/CurseForge export, or a minecraftinstance.json/Twitch
+// install) into an ImportPackMetadata. It returns an error rather than
+// terminating the process, so this package remains usable from contexts
+// other than this CLI command (e.g. a GUI, tests, or other library
+// consumers).
+func ReadMetadata(s ImportPackSource) (ImportPackMetadata, error) {
 	var packImport ImportPackMetadata
 	metaFile := s.GetPackFile()
 	rdr, err := metaFile.Open()
 	if err != nil {
-		shared.Exitf("Error reading file: %s\n", err)
+		return nil, fmt.Errorf("Error reading file: %w", err)
 	}
 
 	// Read the whole file (as we are going to parse it multiple times)
 	fileData, err := io.ReadAll(rdr)
 	if err != nil {
-		shared.Exitf("Error reading file: %s\n", err)
+		return nil, fmt.Errorf("Error reading file: %w", err)
 	}
 
 	// Determine what format the file is
 	var jsonFile map[string]interface{}
 	err = json.Unmarshal(fileData, &jsonFile)
 	if err != nil {
-		shared.Exitf("Error parsing JSON: %s\n", err)
+		return nil, fmt.Errorf("Error parsing JSON: %w", err)
 	}
 
 	isManifest := false
@@ -37,7 +43,7 @@ func ReadMetadata(s ImportPackSource) ImportPackMetadata {
 		packMeta := cursePackMeta{importSrc: s}
 		err = json.Unmarshal(fileData, &packMeta)
 		if err != nil {
-			shared.Exitf("Error parsing JSON: %s\n", err)
+			return nil, fmt.Errorf("Error parsing JSON: %w", err)
 		}
 		packImport = packMeta
 	} else {
@@ -46,12 +52,12 @@ func ReadMetadata(s ImportPackSource) ImportPackMetadata {
 		packMeta := twitchInstalledPackMeta{importSrc: s}
 		err = json.Unmarshal(fileData, &packMeta)
 		if err != nil {
-			shared.Exitf("Error parsing JSON: %s\n", err)
+			return nil, fmt.Errorf("Error parsing JSON: %w", err)
 		}
 		packImport = packMeta
 	}
 
-	return packImport
+	return packImport, nil
 }
 
 // AddonFileReference is a struct to reference a single file on CurseForge
