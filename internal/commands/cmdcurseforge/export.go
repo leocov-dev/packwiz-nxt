@@ -4,7 +4,7 @@ import (
 	"archive/zip"
 	"bufio"
 	"fmt"
-	"strconv"
+	"html/template"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -15,6 +15,9 @@ import (
 	"github.com/leocov-dev/packwiz-nxt/internal/shared"
 	"github.com/leocov-dev/packwiz-nxt/sources"
 )
+
+var modListPlainItemTemplate = template.Must(template.New("plainItem").Parse("<li>{{.Name}}</li>\r\n"))
+var modListLinkItemTemplate = template.Must(template.New("linkItem").Parse("<li><a href=\"https://www.curseforge.com/projects/{{.ProjectID}}\">{{.Name}}</a></li>\r\n"))
 
 func init() {
 	curseforgeCmd.AddCommand(exportCmd)
@@ -160,14 +163,15 @@ func createModList(zw *zip.Writer, mods []*core.Mod) error {
 		if err != nil {
 			// TODO: read homepage URL or something similar?
 			// TODO: how to handle mods that don't have metadata???
-			_, err = w.WriteString("<li>" + mod.Name + "</li>\r\n")
-			if err != nil {
+			if err = modListPlainItemTemplate.Execute(w, mod); err != nil {
 				return err
 			}
 			continue
 		}
-		_, err = w.WriteString("<li><a href=\"https://www.curseforge.com/projects/" + strconv.FormatUint(uint64(project.ProjectID), 10) + "\">" + mod.Name + "</a></li>\r\n")
-		if err != nil {
+		if err = modListLinkItemTemplate.Execute(w, struct {
+			Name      string
+			ProjectID uint32
+		}{mod.Name, project.ProjectID}); err != nil {
 			return err
 		}
 	}

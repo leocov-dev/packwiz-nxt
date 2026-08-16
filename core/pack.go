@@ -214,21 +214,35 @@ func (p *Pack) GetSupportedMCVersions() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	allVersions := append(acceptableVersions, mcVersion)
+	allVersions := append(append([]string(nil), acceptableVersions...), mcVersion)
 	SortAndDedupeVersions(allVersions)
 	return allVersions, nil
 }
 
+// GetAcceptableGameVersions returns the pack's "acceptable-game-versions" option as a []string.
+// TOML-decoded options stored as interface{} may come back as either []string (if set
+// programmatically) or []interface{} (if decoded from a TOML file), so both are handled here
+// instead of panicking on an unchecked type assertion.
 func (p *Pack) GetAcceptableGameVersions() ([]string, error) {
-	rawVersions, ok := p.Options["acceptable-game-versions"]
+	acceptableVersionsRaw, ok := p.Options["acceptable-game-versions"]
 	if !ok {
 		return []string{}, nil
 	}
-	acceptableVersions, ok := rawVersions.([]string)
-	if !ok {
-		return nil, fmt.Errorf("acceptable-game-versions option is not a []string")
+	if versions, ok := acceptableVersionsRaw.([]string); ok {
+		return versions, nil
 	}
-	return acceptableVersions, nil
+	if versionsAny, ok := acceptableVersionsRaw.([]interface{}); ok {
+		versions := make([]string, 0, len(versionsAny))
+		for _, v := range versionsAny {
+			s, ok := v.(string)
+			if !ok {
+				return nil, fmt.Errorf("acceptable-game-versions contains a non-string value: %v", v)
+			}
+			versions = append(versions, s)
+		}
+		return versions, nil
+	}
+	return nil, fmt.Errorf("acceptable-game-versions has an unexpected type: %T", acceptableVersionsRaw)
 }
 
 func (p *Pack) SetAcceptableGameVersions(versions []string) {

@@ -259,6 +259,7 @@ func selectPreferredHash(hashes map[string]string) (currHashFormat string, currH
 		if hash, ok := hashes[hashFormat]; ok {
 			currHashFormat = hashFormat
 			currHash = hash
+			break
 		}
 	}
 	return
