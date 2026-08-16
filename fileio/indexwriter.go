@@ -13,24 +13,8 @@ func NewIndexWriter() IndexWriter {
 }
 
 func (m IndexWriter) Write(writable Writable) error {
-	metaFile := writable.GetFilePath()
-
-	f, err := CreateFile(metaFile)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	result, err := writable.Marshal()
-	if err != nil {
-		return err
-	}
-
-	if _, err := f.Write(result.Value); err != nil {
-		return err
-	}
-
-	return nil
+	_, err := writeMarshalled(writable)
+	return err
 }
 
 // InitIndexFile creates the index file for pack if it does not already exist.

@@ -3,7 +3,6 @@ package core
 import (
 	"errors"
 	"fmt"
-	"github.com/pelletier/go-toml/v2"
 	"path/filepath"
 	"strings"
 )
@@ -159,27 +158,10 @@ func (m *ModToml) GetHashFormat() string {
 }
 
 func (m *ModToml) Marshal() (MarshalResult, error) {
-	result := MarshalResult{
-		HashFormat: m.GetHashFormat(),
-	}
-
-	var err error
-
-	result.Value, err = toml.Marshal(m)
+	result, err := marshalWithHash(m, m.GetHashFormat())
 	if err != nil {
 		return result, err
 	}
-
-	stringer, err := GetHashImpl(result.HashFormat)
-	if err != nil {
-		return result, err
-	}
-
-	if _, err := stringer.Write(result.Value); err != nil {
-		return result, err
-	}
-
-	result.Hash = stringer.String()
 
 	m.UpdateHash(result.HashFormat, result.Hash)
 
