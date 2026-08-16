@@ -57,6 +57,8 @@ var UpdateCmd = &cobra.Command{
 				shared.Exitln(err)
 			}
 
+			singleUpdatedName = mod.Name
+
 		}
 
 		err = fileio.WriteAll(*pack, packDir)

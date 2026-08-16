@@ -96,23 +96,19 @@ func getLatestRelease(slug string, branch string) (Release, error) {
 	return releases[0], nil
 }
 
-func installRelease(
-	repo Repo,
-	release Release,
-	regex string,
-	modType string,
-) (*core.Mod, error) {
-	expr := regexp2.MustCompile(regex, 0)
-
-	var file Asset
-
-	if len(release.Assets) == 0 {
-		return nil, errors.New("release doesn't have any assets attached")
+// selectReleaseAsset finds the single asset in assets whose name matches regex.
+// It returns an error if no assets are present, if none match the regex, or if
+// more than one asset matches the regex.
+func selectReleaseAsset(assets []Asset, regex string) (Asset, error) {
+	if len(assets) == 0 {
+		return Asset{}, errors.New("release doesn't have any assets attached")
 	}
+
+	expr := regexp2.MustCompile(regex, 0)
 
 	var files []Asset
 
-	for _, v := range release.Assets {
+	for _, v := range assets {
 		bl, _ := expr.MatchString(v.Name)
 		if bl {
 			files = append(files, v)
@@ -120,22 +116,32 @@ func installRelease(
 	}
 
 	if len(files) == 0 {
-		return nil, errors.New("release doesn't have any assets matching regex")
+		return Asset{}, errors.New("release doesn't have any assets matching regex")
 	}
 
 	if len(files) > 1 {
 		// TODO: also print file names
-		return nil, errors.New("release has more than one asset matching regex")
+		return Asset{}, errors.New("release has more than one asset matching regex")
 	}
 
-	file = files[0]
+	return files[0], nil
+}
+
+func installRelease(
+	repo Repo,
+	release Release,
+	regex string,
+	modType string,
+) (*core.Mod, error) {
+	file, err := selectReleaseAsset(release.Assets, regex)
+	if err != nil {
+		return nil, err
+	}
 
 	// Install the file
 	fmt.Printf("Installing %s from release %s\n", file.Name, release.TagName)
 
 	updateMap := make(core.ModUpdate)
-
-	var err error
 
 	updateMap["github"], err = ghUpdateData{
 		Slug:   repo.FullName,
