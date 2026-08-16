@@ -4,8 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-
-	"github.com/spf13/viper"
 )
 
 func GetPackwizLocalStore() (string, error) {
@@ -55,10 +53,12 @@ func GetPackwizInstallBinFile() (string, error) {
 	return filepath.Join(binPath, exeName), nil
 }
 
-func GetPackwizCache() (string, error) {
-	configuredCache := viper.GetString("cache.directory")
-	if configuredCache != "" {
-		return configuredCache, nil
+// GetPackwizCache returns the directory packwiz should use to cache downloaded
+// mods. If configuredCacheDir is non-empty, it is used as-is; otherwise it
+// falls back to a "cache" subdirectory of the local packwiz cache store.
+func GetPackwizCache(configuredCacheDir string) (string, error) {
+	if configuredCacheDir != "" {
+		return configuredCacheDir, nil
 	}
 	localStore, err := GetPackwizLocalCache()
 	if err != nil {

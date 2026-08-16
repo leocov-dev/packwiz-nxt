@@ -4,15 +4,11 @@ import (
 	"fmt"
 	"github.com/leocov-dev/packwiz-nxt/core"
 	"github.com/pelletier/go-toml/v2"
-	"github.com/spf13/viper"
-	"github.com/vbauerster/mpb/v4"
-	"github.com/vbauerster/mpb/v4/decor"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 // LoadIndex attempts to load the index file from a path
@@ -54,21 +50,34 @@ func LoadAllMods(index *core.IndexFS) ([]*core.ModToml, error) {
 	return mods, nil
 }
 
-// RefreshIndexFiles updates the hashes of all the files in the index, and adds new files to the index
-func RefreshIndexFiles(index *core.IndexFS) error {
+// RefreshIndexFiles updates the hashes of all the files in the index, and adds new files to the index.
+// packFilePath is the path to the pack.toml file being refreshed against, used to exclude it from the
+// file walk. progressFn, if non-nil, is called after each file is processed with the current file
+// count, total file count, and the path just processed, allowing the caller to drive its own
+// progress reporting (e.g. a terminal progress bar).
+func RefreshIndexFiles(index *core.IndexFS, packFilePath string, progressFn func(current, total int, path string)) error {
 	// TODO: If needed, multithreaded hashing
 	// for i := 0; i < runtime.NumCPU(); i++ {}
 
 	// Is case-sensitivity a problem?
-	pathPF, _ := filepath.Abs(viper.GetString("pack-file"))
-	pathIndex, _ := filepath.Abs(index.GetFilePath())
+	pathPF, err := filepath.Abs(packFilePath)
+	if err != nil {
+		return err
+	}
+	pathIndex, err := filepath.Abs(index.GetFilePath())
+	if err != nil {
+		return err
+	}
 
 	packRoot := index.GetPackRoot()
-	pathIgnore, _ := filepath.Abs(filepath.Join(packRoot, ".packwizignore"))
+	pathIgnore, err := filepath.Abs(filepath.Join(packRoot, ".packwizignore"))
+	if err != nil {
+		return err
+	}
 	ignore, ignoreExists := readGitignore(pathIgnore)
 
 	var fileList []string
-	err := filepath.WalkDir(packRoot, func(path string, info os.DirEntry, err error) error {
+	err = filepath.WalkDir(packRoot, func(path string, info os.DirEntry, err error) error {
 		if err != nil {
 			// TODO: Handle errors on individual files properly
 			return err
@@ -88,7 +97,10 @@ func RefreshIndexFiles(index *core.IndexFS) error {
 			return nil
 		}
 		// Exit if the files are the same as the pack/index files
-		absPath, _ := filepath.Abs(path)
+		absPath, err := filepath.Abs(path)
+		if err != nil {
+			return err
+		}
 		if absPath == pathPF || absPath == pathIndex {
 			return nil
 		}
@@ -108,36 +120,17 @@ func RefreshIndexFiles(index *core.IndexFS) error {
 		return err
 	}
 
-	progressContainer := mpb.New()
-	progress := progressContainer.AddBar(int64(len(fileList)),
-		mpb.PrependDecorators(
-			// simple name decorator
-			decor.Name("Refreshing index..."),
-			// decor.DSyncWidth bit enables column width synchronization
-			decor.Percentage(decor.WCSyncSpace),
-		),
-		mpb.AppendDecorators(
-			// replace ETA decorator with a "done" message, OnComplete event
-			decor.OnComplete(
-				// ETA decorator with ewma age of 60
-				decor.EwmaETA(decor.ET_STYLE_GO, 60), "done",
-			),
-		),
-	)
-
-	for _, v := range fileList {
-		start := time.Now()
-
+	total := len(fileList)
+	for i, v := range fileList {
 		err := UpdateIndexFile(index, v)
 		if err != nil {
 			return err
 		}
 
-		progress.Increment(time.Since(start))
+		if progressFn != nil {
+			progressFn(i+1, total, v)
+		}
 	}
-	// Close bar
-	progress.SetTotal(int64(len(fileList)), true) // If len = 0, we have to manually set complete to true
-	progressContainer.Wait()
 
 	// Check all the files exist, remove them if they don't
 	for p, file := range index.Files {

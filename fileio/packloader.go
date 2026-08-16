@@ -1,8 +1,10 @@
 package fileio
 
 import (
+	"fmt"
 	"github.com/leocov-dev/packwiz-nxt/core"
 	"github.com/pelletier/go-toml/v2"
+	"github.com/spf13/viper"
 	"os"
 	"path/filepath"
 )
@@ -20,8 +22,17 @@ func LoadPackFile(packPath string) (core.PackToml, error) {
 
 	modpack.SetFilePath(packPath)
 
-	if err = core.ValidatePack(&modpack); err != nil {
+	options, warnings, err := core.ValidatePack(&modpack)
+	if err != nil {
 		return core.PackToml{}, err
+	}
+	for _, w := range warnings {
+		fmt.Println(w)
+	}
+	if options != nil {
+		if err := viper.MergeConfigMap(options); err != nil {
+			return core.PackToml{}, err
+		}
 	}
 
 	return modpack, nil
