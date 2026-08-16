@@ -36,7 +36,7 @@ var UpdateCmd = &cobra.Command{
 		var singleUpdatedName string
 		if viper.GetBool("update.all") {
 			fmt.Println("Checking for updates...")
-			if err := core.UpdateAllMods(*pack); err != nil {
+			if err := core.UpdateAllMods(core.DefaultRegistry, *pack); err != nil {
 				shared.Exitln(err)
 			}
 		} else {
@@ -53,7 +53,7 @@ var UpdateCmd = &cobra.Command{
 				shared.Exitln("Version is pinned; run the unpin command to allow updating")
 			}
 
-			if err := core.UpdateSingleMod(*pack, mod); err != nil {
+			if err := core.UpdateSingleMod(core.DefaultRegistry, *pack, mod); err != nil {
 				shared.Exitln(err)
 			}
 

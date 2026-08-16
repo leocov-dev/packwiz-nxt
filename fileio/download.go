@@ -713,7 +713,7 @@ func CreateDownloadSession(mods []*core.Mod, hashesToObtain []string) (DownloadS
 	}
 
 	for dlID, mods := range pendingMetadata {
-		downloader, ok := core.MetaDownloaders[dlID]
+		downloader, ok := core.GetMetaDownloader(dlID)
 		if !ok {
 			return nil, fmt.Errorf("unknown download mode %s for %s", mods[0].Download.Mode, mods[0].Name)
 		}

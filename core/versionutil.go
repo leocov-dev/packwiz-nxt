@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 
 	"github.com/unascribed/FlexVer/go/flexver"
 )
@@ -129,7 +130,13 @@ func SortAndDedupeVersions(versions []string) {
 // versions for that minecraft version
 type VersionMap map[string][]string
 
+// LoaderVersionCache caches available mod loader versions per Minecraft
+// version. It is safe for concurrent use by multiple goroutines: all reads
+// (GetVersions, IsEmpty) and writes (RefreshCache) of its fields are guarded
+// by an internal mutex.
 type LoaderVersionCache struct {
+	mu sync.RWMutex
+
 	Fabric     []string
 	Forge      VersionMap
 	Liteloader []string
@@ -144,39 +151,54 @@ func GetLoaderCache() *LoaderVersionCache {
 }
 
 func (l *LoaderVersionCache) IsEmpty() bool {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return l.isEmptyLocked()
+}
+
+// isEmptyLocked is the body of IsEmpty, factored out so it can be called by
+// other methods that already hold l.mu (for reading).
+func (l *LoaderVersionCache) isEmptyLocked() bool {
 	return len(l.Fabric) == 0 || len(l.Forge) == 0 || len(l.Liteloader) == 0 || len(l.Quilt) == 0 || len(l.Neoforge) == 0
 }
 
+// RefreshCache fetches the latest versions for all known loaders and
+// replaces the cache's contents. The network fetches happen without holding
+// the lock; the cache's fields are only locked while being swapped in, so
+// concurrent readers are never blocked on network I/O.
 func (l *LoaderVersionCache) RefreshCache() error {
-	if fabricVersions, err := fetchFabricVersions(); err != nil {
+	fabricVersions, err := fetchFabricVersions()
+	if err != nil {
 		return err
-	} else {
-		l.Fabric = fabricVersions
 	}
 
-	if forgeVersions, err := fetchForgeVersions(); err != nil {
+	forgeVersions, err := fetchForgeVersions()
+	if err != nil {
 		return err
-	} else {
-		l.Forge = forgeVersions
 	}
 
-	if liteloaderVersions, err := fetchLiteloaderVersions(); err != nil {
+	liteloaderVersions, err := fetchLiteloaderVersions()
+	if err != nil {
 		return err
-	} else {
-		l.Liteloader = liteloaderVersions
 	}
 
-	if quiltVersions, err := fetchQuiltVersions(); err != nil {
+	quiltVersions, err := fetchQuiltVersions()
+	if err != nil {
 		return err
-	} else {
-		l.Quilt = quiltVersions
 	}
 
-	if neoforgeVersions, err := fetchNeoforgeVersions(); err != nil {
+	neoforgeVersions, err := fetchNeoforgeVersions()
+	if err != nil {
 		return err
-	} else {
-		l.Neoforge = neoforgeVersions
 	}
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.Fabric = fabricVersions
+	l.Forge = forgeVersions
+	l.Liteloader = liteloaderVersions
+	l.Quilt = quiltVersions
+	l.Neoforge = neoforgeVersions
 
 	return nil
 }
@@ -187,6 +209,9 @@ func (l *LoaderVersionCache) GetVersions(mcVersion string, loader string) ([]str
 			return nil, "", err
 		}
 	}
+
+	l.mu.RLock()
+	defer l.mu.RUnlock()
 
 	var versions []string
 

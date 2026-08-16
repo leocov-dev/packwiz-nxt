@@ -2,18 +2,83 @@ package core
 
 import (
 	"io"
+	"sync"
 )
 
-// updaters stores all the updaters that packwiz can use. Add your own update systems to this map, keyed by the configuration name.
-var updaters = make(map[string]Updater)
-
-func AddUpdater(updater Updater) {
-	updaters[updater.GetName()] = updater
+// Registry holds the set of Updaters and MetaDownloaders that packwiz can use,
+// keyed by their configuration/source name. It is safe for concurrent use by
+// multiple goroutines.
+//
+// A zero-value Registry is not usable; construct one with NewRegistry.
+type Registry struct {
+	mu              sync.RWMutex
+	updaters        map[string]Updater
+	metaDownloaders map[string]MetaDownloader
 }
 
-func GetUpdater(name string) (Updater, bool) {
-	updater, ok := updaters[name]
+// NewRegistry creates an empty, ready-to-use Registry.
+func NewRegistry() *Registry {
+	return &Registry{
+		updaters:        make(map[string]Updater),
+		metaDownloaders: make(map[string]MetaDownloader),
+	}
+}
+
+// AddUpdater registers an Updater, keyed by its GetName() value.
+func (r *Registry) AddUpdater(updater Updater) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.updaters[updater.GetName()] = updater
+}
+
+// GetUpdater looks up an Updater previously registered with AddUpdater.
+func (r *Registry) GetUpdater(name string) (Updater, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	updater, ok := r.updaters[name]
 	return updater, ok
+}
+
+// AddMetaDownloader registers a MetaDownloader, keyed by source name.
+func (r *Registry) AddMetaDownloader(source string, downloader MetaDownloader) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.metaDownloaders[source] = downloader
+}
+
+// GetMetaDownloader looks up a MetaDownloader previously registered with AddMetaDownloader.
+func (r *Registry) GetMetaDownloader(source string) (MetaDownloader, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	downloader, ok := r.metaDownloaders[source]
+	return downloader, ok
+}
+
+// DefaultRegistry is the process-wide Registry used by the packwiz CLI and by
+// package-level helpers (AddUpdater, GetUpdater, AddMetaDownloader,
+// GetMetaDownloader). sources/*-updater.go register themselves here via
+// init(). Library consumers that want isolated/concurrent instances should
+// construct their own Registry with NewRegistry instead of relying on this.
+var DefaultRegistry = NewRegistry()
+
+// AddUpdater registers an Updater on DefaultRegistry, keyed by its GetName() value.
+func AddUpdater(updater Updater) {
+	DefaultRegistry.AddUpdater(updater)
+}
+
+// GetUpdater looks up an Updater on DefaultRegistry.
+func GetUpdater(name string) (Updater, bool) {
+	return DefaultRegistry.GetUpdater(name)
+}
+
+// AddMetaDownloader registers a MetaDownloader on DefaultRegistry, keyed by source name.
+func AddMetaDownloader(source string, downloader MetaDownloader) {
+	DefaultRegistry.AddMetaDownloader(source, downloader)
+}
+
+// GetMetaDownloader looks up a MetaDownloader on DefaultRegistry.
+func GetMetaDownloader(source string) (MetaDownloader, bool) {
+	return DefaultRegistry.GetMetaDownloader(source)
 }
 
 // Updater is used to process updates on mods
@@ -44,9 +109,6 @@ type UpdateCheck struct {
 	// If an error is returned for a mod, or from CheckUpdate, DoUpdate is not called on that mod / at all
 	Error error
 }
-
-// MetaDownloaders stores all the metadata-based installers that packwiz can use. Add your own downloaders to this map, keyed by the source name.
-var MetaDownloaders = make(map[string]MetaDownloader)
 
 // MetaDownloader specifies a downloader for a Mod using a "metadata:source" mode
 // The calling code should handle caching and hash validation.
