@@ -1,41 +1,10 @@
 package sources
 
 import (
-	"encoding/json"
-	"errors"
 	"io"
-
-	"github.com/mitchellh/mapstructure"
 
 	"github.com/leocov-dev/packwiz-nxt/core"
 )
-
-func fetchRepo(slug string) (Repo, error) {
-	var repo Repo
-
-	res, err := ghDefaultClient.getRepo(slug)
-	if err != nil {
-		return repo, err
-	}
-
-	defer res.Body.Close()
-
-	repoBody, err := io.ReadAll(res.Body)
-	if err != nil {
-		return repo, err
-	}
-
-	err = json.Unmarshal(repoBody, &repo)
-	if err != nil {
-		return repo, err
-	}
-
-	if repo.FullName == "" {
-		return repo, errors.New("invalid json while fetching project: " + slug)
-	}
-
-	return repo, nil
-}
 
 type Repo struct {
 	ID       int    `json:"id"`
@@ -56,12 +25,6 @@ type Asset struct {
 	URL                string `json:"url"`
 	BrowserDownloadURL string `json:"browser_download_url"`
 	Name               string `json:"name"`
-}
-
-func (u ghUpdateData) ToMap() (map[string]interface{}, error) {
-	newMap := make(map[string]interface{})
-	err := mapstructure.Decode(u, &newMap)
-	return newMap, err
 }
 
 func (u Asset) getSha256() (string, error) {

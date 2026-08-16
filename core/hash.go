@@ -34,12 +34,25 @@ func GetHashImpl(hashType string) (HashStringer, error) {
 	return nil, fmt.Errorf("hash implementation %s not found", hashType)
 }
 
+// DefaultHashFormat is the hash format used when writing a new index/mod entry and no
+// other format has been specified.
+const DefaultHashFormat = "sha256"
+
+// PreferredHashList is the order hash formats are preferred in when multiple are
+// available for the same file (highest priority first). Mutating this slice directly
+// affects every caller; use PreferredHashListCopy if you need a private copy to modify.
 var PreferredHashList = []string{
 	"murmur2",
 	"md5",
 	"sha1",
 	"sha256",
 	"sha512",
+}
+
+// PreferredHashListCopy returns a copy of PreferredHashList safe to mutate without
+// affecting other callers.
+func PreferredHashListCopy() []string {
+	return append([]string(nil), PreferredHashList...)
 }
 
 type HashStringer interface {

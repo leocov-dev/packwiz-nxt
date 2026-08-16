@@ -8,7 +8,7 @@ import (
 func CreateFile(path string) (*os.File, error) {
 	f, err := os.Create(path)
 	if err != nil {
-		err2 := os.MkdirAll(filepath.Dir(path), os.ModePerm)
+		err2 := os.MkdirAll(filepath.Dir(path), 0755)
 		if err2 == nil {
 			f, err = os.Create(path)
 		}

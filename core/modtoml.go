@@ -155,7 +155,7 @@ func (m *ModToml) AppendUpdateData(key string, value interface{}) {
 }
 
 func (m *ModToml) GetHashFormat() string {
-	return "sha256"
+	return DefaultHashFormat
 }
 
 func (m *ModToml) Marshal() (MarshalResult, error) {

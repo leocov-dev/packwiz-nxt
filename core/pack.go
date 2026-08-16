@@ -166,7 +166,7 @@ func (p *Pack) AsIndexMeta() (IndexFS, error) {
 
 func (p *Pack) getIndexRepr() (IndexTomlRepresentation, error) {
 	repr := IndexTomlRepresentation{
-		DefaultModHashFormat: "sha256",
+		DefaultModHashFormat: DefaultHashFormat,
 		Files:                make(IndexFilesTomlRepresentation, 0),
 	}
 
@@ -189,7 +189,7 @@ func (p *Pack) getIndex() (PackTomlIndex, error) {
 
 	return PackTomlIndex{
 		File:       "index.toml",
-		HashFormat: "sha256",
+		HashFormat: DefaultHashFormat,
 		Hash:       hash,
 	}, nil
 }

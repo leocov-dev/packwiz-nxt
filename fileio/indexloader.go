@@ -23,7 +23,7 @@ func LoadIndex(indexFile string) (core.IndexFS, error) {
 		return core.IndexFS{}, err
 	}
 	if len(rep.DefaultModHashFormat) == 0 {
-		rep.DefaultModHashFormat = "sha256"
+		rep.DefaultModHashFormat = core.DefaultHashFormat
 	}
 	rep.SetFilePath(indexFile)
 
@@ -157,7 +157,7 @@ func UpdateIndexFile(in *core.IndexFS, path string) error {
 	// Hash usage strategy (may change):
 	// Just use SHA256, overwrite existing hash regardless of what it is
 	// May update later to continue using the same hash that was already being used
-	h, err := core.GetHashImpl("sha256")
+	h, err := core.GetHashImpl(core.DefaultHashFormat)
 	if err != nil {
 		_ = f.Close()
 		return err
@@ -178,5 +178,5 @@ func UpdateIndexFile(in *core.IndexFS, path string) error {
 		markAsMetaFile = true
 	}
 
-	return in.UpdateFileHashGiven(path, "sha256", hashString, markAsMetaFile)
+	return in.UpdateFileHashGiven(path, core.DefaultHashFormat, hashString, markAsMetaFile)
 }

@@ -14,6 +14,33 @@ import (
 
 var GithubRegex = regexp.MustCompile(`^https?://(?:www\.)?github\.com/([^/]+/[^/]+)`)
 
+func fetchRepo(slug string) (Repo, error) {
+	var repo Repo
+
+	res, err := ghDefaultClient.getRepo(slug)
+	if err != nil {
+		return repo, err
+	}
+
+	defer res.Body.Close()
+
+	repoBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return repo, err
+	}
+
+	err = json.Unmarshal(repoBody, &repo)
+	if err != nil {
+		return repo, err
+	}
+
+	if repo.FullName == "" {
+		return repo, errors.New("invalid json while fetching project: " + slug)
+	}
+
+	return repo, nil
+}
+
 func GitHubNewMod(slugOrUrl, branch, regex, modType string) (*core.Mod, error) {
 	var slug string
 

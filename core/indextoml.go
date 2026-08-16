@@ -153,8 +153,11 @@ func (it *IndexTomlRepresentation) UpdateHash(format, hash string) {
 	it.hash = hash
 }
 
+// GetHashFormat returns the hash algorithm used to hash the marshalled index file
+// itself. This is a fixed choice, not read from it.hashFormat (which UpdateHash
+// populates only after Marshal has already called this to decide what to hash with).
 func (it *IndexTomlRepresentation) GetHashFormat() string {
-	return "sha256"
+	return DefaultHashFormat
 }
 
 func (it *IndexTomlRepresentation) Marshal() (MarshalResult, error) {

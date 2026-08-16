@@ -57,7 +57,7 @@ func CopyImportOverrides(files []ImportOverrideFile, packDir string, skipPaths [
 		f, err := os.Create(filePath)
 		if err != nil {
 			// Attempt to create the containing directory
-			err2 := os.MkdirAll(filepath.Dir(filePath), os.ModePerm)
+			err2 := os.MkdirAll(filepath.Dir(filePath), 0755)
 			if err2 == nil {
 				f, err = os.Create(filePath)
 			}

@@ -17,6 +17,9 @@ import (
 
 const DownloadCacheImportFolder = "import"
 
+// DownloadSession drives downloading a set of mods to the local cache, created via
+// CreateDownloadSession and populated with the found manual downloads/pending
+// download tasks up front.
 type DownloadSession interface {
 	GetManualDownloads() []core.ManualDownload
 	StartDownloads(ctx context.Context) chan CompletedDownload
@@ -325,8 +328,7 @@ func teeHashes(hashesToObtain []string, hashes map[string]string,
 	if mainHasher != nil {
 		calculatedHash := mainHasher.String()
 		if strings.ToLower(calculatedHash) != strings.ToLower(validateHash) {
-			return fmt.Errorf(
-				"%s hash of downloaded file does not match with expected hash!\n download hash: %s\n expected hash: %s\n",
+			return fmt.Errorf("%s hash of downloaded file does not match expected hash (downloaded: %s, expected: %s)",
 				validateHashFormat, calculatedHash, validateHash)
 		}
 	}
@@ -338,8 +340,10 @@ func teeHashes(hashesToObtain []string, hashes map[string]string,
 	return nil
 }
 
-const cacheHashFormat = "sha256"
+const cacheHashFormat = core.DefaultHashFormat
 
+// CacheIndex tracks previously-downloaded files in the local cache, keyed by hash,
+// so subsequent downloads can be satisfied from disk instead of the network.
 type CacheIndex struct {
 	Version     uint32
 	Hashes      map[string][]string
@@ -454,8 +458,7 @@ func (c *CacheIndex) rehashFile(cacheHash string, hashFormat string) (string, er
 
 	validateHash := validateHasher.String()
 	if cacheHash != validateHash {
-		return "", fmt.Errorf(
-			"%s hash of cached file does not match with expected hash!\n read hash: %s\n expected hash: %s\n",
+		return "", fmt.Errorf("%s hash of cached file does not match expected hash (read: %s, expected: %s)",
 			cacheHashFormat, validateHash, cacheHash)
 	}
 	return rehashHasher.String(), nil
@@ -633,6 +636,9 @@ func removeEmpty(hashList []string) ([]string, []int) {
 	return hashList[:i], indices
 }
 
+// CreateDownloadSession builds a DownloadSession for the given mods, bootstrapping the
+// local cache and planning download tasks/manual downloads for each mod that isn't
+// already cached with one of hashesToObtain.
 func CreateDownloadSession(mods []*core.Mod, hashesToObtain []string) (DownloadSession, error) {
 	// Load cache index
 	cacheIndex := CacheIndex{Version: 1, Hashes: make(map[string][]string)}

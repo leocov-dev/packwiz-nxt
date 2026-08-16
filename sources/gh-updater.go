@@ -19,6 +19,12 @@ type ghUpdateData struct {
 	Regex  string `mapstructure:"regex"`
 }
 
+func (u ghUpdateData) ToMap() (map[string]interface{}, error) {
+	newMap := make(map[string]interface{})
+	err := mapstructure.Decode(u, &newMap)
+	return newMap, err
+}
+
 type ghUpdater struct{}
 
 func (u ghUpdater) GetName() string {
