@@ -15,7 +15,16 @@ import (
 	"github.com/leocov-dev/packwiz-nxt/core"
 )
 
-var mrDefaultClient = modrinthApi.NewClient(&http.Client{Timeout: core.DefaultHTTPTimeout})
+var mrDefaultClient = NewModrinthClient(&http.Client{Timeout: core.DefaultHTTPTimeout})
+
+// NewModrinthClient constructs a Modrinth API client using the given httpClient,
+// allowing tests to inject an httpClient pointed at an httptest.Server in place
+// of the real Modrinth API.
+func NewModrinthClient(httpClient *http.Client) *modrinthApi.Client {
+	client := modrinthApi.NewClient(httpClient)
+	client.UserAgent = core.UserAgent
+	return client
+}
 
 // mrLogger reports non-fatal warnings/progress for the Modrinth provider. The
 // third-party Modrinth client doesn't support an injectable logger field directly,
@@ -25,10 +34,6 @@ var mrLogger core.Logger = core.PrintLogger{}
 // SetModrinthLogger overrides the logger used for Modrinth warnings/progress messages.
 func SetModrinthLogger(l core.Logger) {
 	mrLogger = l
-}
-
-func init() {
-	mrDefaultClient.UserAgent = core.UserAgent
 }
 
 func GetModrinthClient() *modrinthApi.Client {
@@ -495,7 +500,7 @@ func mrGetInstalledProjectIDs(mods []*core.Mod) []string {
 
 	for _, mod := range mods {
 		var updateData mrUpdateData
-		err := mod.DecodeNamedModSourceData("modrinth", updateData)
+		err := mod.DecodeNamedModSourceData("modrinth", &updateData)
 		if err == nil {
 			if len(updateData.ProjectID) > 0 {
 				installedProjects = append(installedProjects, updateData.ProjectID)

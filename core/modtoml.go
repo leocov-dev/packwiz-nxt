@@ -107,11 +107,9 @@ func (m *ModToml) SetMetaPath(metaFile string) string {
 	return m.metaFile
 }
 
-// GetUpdater finds the Updater registered on DefaultRegistry for one of this mod's
-// update sources. It always targets DefaultRegistry - there's currently no way to
-// point it at a different Registry instance.
-func (m *ModToml) GetUpdater() (Updater, error) {
-	updater, ok := updaterFor(m.Update, DefaultRegistry)
+// GetUpdater finds the Updater registered on reg for one of this mod's update sources.
+func (m *ModToml) GetUpdater(reg *Registry) (Updater, error) {
+	updater, ok := updaterFor(m.Update, reg)
 	if !ok {
 		return nil, fmt.Errorf("no updater found for mod: %s", m.Name)
 	}

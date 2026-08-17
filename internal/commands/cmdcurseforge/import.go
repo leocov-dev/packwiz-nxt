@@ -4,8 +4,10 @@ import (
 	"archive/zip"
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
+	"github.com/leocov-dev/packwiz-nxt/core"
 	"github.com/leocov-dev/packwiz-nxt/fileio"
 	"github.com/leocov-dev/packwiz-nxt/internal/commands/cmdcurseforge/packinterop"
 	"github.com/leocov-dev/packwiz-nxt/internal/shared"
@@ -31,7 +33,7 @@ var importCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		inputFile := args[0]
 
-		packImport, err := resolveImportSource(inputFile)
+		packImport, err := resolveImportSource(cmd.Context(), inputFile)
 		if err != nil {
 			shared.Exitln(err)
 		}
@@ -69,13 +71,31 @@ var importCmd = &cobra.Command{
 // resolveImportSource takes the (possibly ambiguous) positional argument
 // passed to `curseforge import` and locates the actual pack metadata source
 // it refers to: a manifest.json/minecraftinstance.json file, a zip
-// containing one of those, a directory containing one of those, or (on
-// Windows) a named Curse/Twitch install. It then parses that source into
-// ImportPackMetadata.
-func resolveImportSource(inputFile string) (packinterop.ImportPackMetadata, error) {
+// containing one of those, a directory containing one of those, a URL to a
+// modpack export zip, or (on Windows) a named Curse/Twitch install. It then
+// parses that source into ImportPackMetadata.
+func resolveImportSource(ctx context.Context, inputFile string) (packinterop.ImportPackMetadata, error) {
 	if strings.HasPrefix(inputFile, "http") {
-		// TODO: implement
-		return nil, errors.New("HTTP not supported (yet)")
+		// A CurseForge modpack export fetched over HTTP is always a zip - no need for
+		// the local-file detection (directory/curse-instance) below, just fetch and
+		// parse it the same way the local-zip branch does.
+		resp, err := core.GetWithUAContext(ctx, inputFile, "application/octet-stream")
+		if err != nil {
+			return nil, fmt.Errorf("Error downloading modpack: %w", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != 200 {
+			return nil, fmt.Errorf("Error downloading modpack: invalid status code %v", resp.StatusCode)
+		}
+		zipData, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("Error downloading modpack: %w", err)
+		}
+		zr, err := zip.NewReader(bytes.NewReader(zipData), int64(len(zipData)))
+		if err != nil {
+			return nil, fmt.Errorf("Error parsing zip: %w", err)
+		}
+		return resolveZipImportSource(zr)
 	}
 
 	// Attempt to read from file
@@ -154,20 +174,28 @@ func resolveImportSource(inputFile string) (packinterop.ImportPackMetadata, erro
 			return nil, fmt.Errorf("Error parsing zip: %w", err)
 		}
 
-		// Search the zip for minecraftinstance.json or manifest.json
-		var metaFile *zip.File
-		for _, v := range zr.File {
-			if v.Name == "minecraftinstance.json" || v.Name == "manifest.json" {
-				metaFile = v
-			}
-		}
-
-		if metaFile == nil {
-			return nil, errors.New("Can't find manifest.json or minecraftinstance.json, is this a valid pack?")
-		}
-
-		return packinterop.ReadMetadata(packinterop.GetZipPackSource(metaFile, zr))
+		return resolveZipImportSource(zr)
 	}
 
 	return packinterop.ReadMetadata(packinterop.GetDiskPackSource(buf, filepath.ToSlash(filepath.Base(inputFile)), filepath.Dir(inputFile)))
+}
+
+// resolveZipImportSource locates minecraftinstance.json/manifest.json inside an already-
+// opened modpack export zip and parses it into ImportPackMetadata. Shared by the local-file
+// zip branch and the HTTP branch of resolveImportSource, both of which only differ in how
+// they obtain the zip.Reader.
+func resolveZipImportSource(zr *zip.Reader) (packinterop.ImportPackMetadata, error) {
+	// Search the zip for minecraftinstance.json or manifest.json
+	var metaFile *zip.File
+	for _, v := range zr.File {
+		if v.Name == "minecraftinstance.json" || v.Name == "manifest.json" {
+			metaFile = v
+		}
+	}
+
+	if metaFile == nil {
+		return nil, errors.New("Can't find manifest.json or minecraftinstance.json, is this a valid pack?")
+	}
+
+	return packinterop.ReadMetadata(packinterop.GetZipPackSource(metaFile, zr))
 }

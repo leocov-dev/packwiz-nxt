@@ -21,7 +21,14 @@ type cfApiClient struct {
 	logger     core.Logger
 }
 
-var cfDefaultClient = cfApiClient{&http.Client{Timeout: core.DefaultHTTPTimeout}, core.PrintLogger{}}
+var cfDefaultClient = *NewCfApiClient(&http.Client{Timeout: core.DefaultHTTPTimeout}, core.PrintLogger{})
+
+// NewCfApiClient constructs a CurseForge API client using the given httpClient,
+// allowing tests to inject an httpClient pointed at an httptest.Server in place
+// of the real CurseForge API.
+func NewCfApiClient(httpClient *http.Client, logger core.Logger) *cfApiClient {
+	return &cfApiClient{httpClient, logger}
+}
 
 func GetCurseforgeClient() *cfApiClient {
 	return &cfDefaultClient

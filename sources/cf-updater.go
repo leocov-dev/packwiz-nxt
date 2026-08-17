@@ -15,8 +15,15 @@ import (
 )
 
 func init() {
-	core.AddUpdater(CfUpdater{})
-	core.AddMetaDownloader("curseforge", CfDownloader{})
+	RegisterCurseforge(core.DefaultRegistry)
+}
+
+// RegisterCurseforge registers the CurseForge Updater/MetaDownloader on reg. Library
+// consumers building an isolated *core.Registry (instead of relying on
+// core.DefaultRegistry) should call this - or sources.RegisterAll - explicitly.
+func RegisterCurseforge(reg *core.Registry) {
+	reg.AddUpdater(CfUpdater{})
+	reg.AddMetaDownloader("curseforge", CfDownloader{})
 }
 
 var snapshotVersionRegex = regexp.MustCompile(`(?:Snapshot )?(\d+)w0?(0|[1-9]\d*)([a-z])`)

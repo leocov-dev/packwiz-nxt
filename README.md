@@ -5,6 +5,10 @@ This repo focuses on changing the codebase so that packwiz can be used as a
 library without needing to write to the file system.
 The original CLI functionality is mostly maintained.
 
+### Using as a library
+See [docs/USAGE.md](docs/USAGE.md) for example code covering the common flows
+(creating/loading a pack, adding mods, downloading files, checking updates).
+
 ### Curseforge
 This fork does not include a Curseforge API key in its source code. 
 You can apply for one [here](https://forms.monday.com/forms/dce5ccb7afda9a1c21dab1a1aa1d84eb?r=use1).

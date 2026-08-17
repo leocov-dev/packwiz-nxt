@@ -8,7 +8,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"sync"
 )
 
 // LoadIndex attempts to load the index file from a path
@@ -56,9 +58,6 @@ func LoadAllMods(index *core.IndexFS) ([]*core.ModToml, error) {
 // count, total file count, and the path just processed, allowing the caller to drive its own
 // progress reporting (e.g. a terminal progress bar).
 func RefreshIndexFiles(index *core.IndexFS, packFilePath string, progressFn func(current, total int, path string)) error {
-	// TODO: If needed, multithreaded hashing
-	// for i := 0; i < runtime.NumCPU(); i++ {}
-
 	// Is case-sensitivity a problem?
 	pathPF, err := filepath.Abs(packFilePath)
 	if err != nil {
@@ -120,16 +119,8 @@ func RefreshIndexFiles(index *core.IndexFS, packFilePath string, progressFn func
 		return err
 	}
 
-	total := len(fileList)
-	for i, v := range fileList {
-		err := UpdateIndexFile(index, v)
-		if err != nil {
-			return err
-		}
-
-		if progressFn != nil {
-			progressFn(i+1, total, v)
-		}
+	if err := hashFilesInto(index, fileList, progressFn); err != nil {
+		return err
 	}
 
 	// Check all the files exist, remove them if they don't
@@ -146,12 +137,22 @@ func RefreshIndexFiles(index *core.IndexFS, packFilePath string, progressFn func
 	return nil
 }
 
+// UpdateIndexFile hashes the file at path and records the result in the index.
 func UpdateIndexFile(in *core.IndexFS, path string) error {
-	var hashString string
-
-	f, err := os.Open(path)
+	hashString, markAsMetaFile, err := hashFile(path)
 	if err != nil {
 		return err
+	}
+	return in.UpdateFileHashGiven(path, core.DefaultHashFormat, hashString, markAsMetaFile)
+}
+
+// hashFile computes path's DefaultHashFormat hash and whether it should be marked as a
+// meta file, doing no index access - safe to call concurrently across multiple files,
+// unlike core.IndexFS.UpdateFileHashGiven, which mutates a plain unsynchronized map.
+func hashFile(path string) (hashString string, markAsMetaFile bool, err error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", false, err
 	}
 
 	// Hash usage strategy (may change):
@@ -160,23 +161,103 @@ func UpdateIndexFile(in *core.IndexFS, path string) error {
 	h, err := core.GetHashImpl(core.DefaultHashFormat)
 	if err != nil {
 		_ = f.Close()
-		return err
+		return "", false, err
 	}
 	if _, err := io.Copy(h, f); err != nil {
 		_ = f.Close()
-		return err
+		return "", false, err
 	}
-	err = f.Close()
-	if err != nil {
-		return err
+	if err := f.Close(); err != nil {
+		return "", false, err
 	}
-	hashString = h.String()
 
-	markAsMetaFile := false
 	// If the file has an extension of pw.toml, set markAsMetaFile to true
-	if strings.HasSuffix(filepath.Base(path), core.MetaExtension) {
-		markAsMetaFile = true
+	markAsMetaFile = strings.HasSuffix(filepath.Base(path), core.MetaExtension)
+
+	return h.String(), markAsMetaFile, nil
+}
+
+// hashFilesInto hashes each of paths using a bounded pool of runtime.NumCPU() worker
+// goroutines (hashing is I/O-bound and safe to parallelize), while index.UpdateFileHashGiven
+// - a plain unsynchronized map mutation - is only ever called from this function's own
+// goroutine as results arrive. progressFn, if non-nil, is called once per file, in
+// whatever order results complete in (no ordering guarantee vs. paths). The first error
+// from any worker stops further dispatch and is returned once in-flight work drains.
+func hashFilesInto(index *core.IndexFS, paths []string, progressFn func(current, total int, path string)) error {
+	total := len(paths)
+	if total == 0 {
+		return nil
 	}
 
-	return in.UpdateFileHashGiven(path, core.DefaultHashFormat, hashString, markAsMetaFile)
+	type result struct {
+		path           string
+		hashString     string
+		markAsMetaFile bool
+		err            error
+	}
+
+	pathCh := make(chan string)
+	resultCh := make(chan result)
+	stop := make(chan struct{})
+	var stopOnce sync.Once
+	cancel := func() { stopOnce.Do(func() { close(stop) }) }
+
+	numWorkers := runtime.NumCPU()
+	if numWorkers > total {
+		numWorkers = total
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(numWorkers)
+	for i := 0; i < numWorkers; i++ {
+		go func() {
+			defer wg.Done()
+			for path := range pathCh {
+				hashString, markAsMetaFile, err := hashFile(path)
+				resultCh <- result{path: path, hashString: hashString, markAsMetaFile: markAsMetaFile, err: err}
+			}
+		}()
+	}
+	go func() {
+		defer close(pathCh)
+		for _, path := range paths {
+			select {
+			case pathCh <- path:
+			case <-stop:
+				return
+			}
+		}
+	}()
+	go func() {
+		wg.Wait()
+		close(resultCh)
+	}()
+
+	var firstErr error
+	current := 0
+	for res := range resultCh {
+		if res.err != nil {
+			if firstErr == nil {
+				firstErr = fmt.Errorf("failed to hash %s: %w", res.path, res.err)
+				cancel()
+			}
+			continue
+		}
+		if firstErr != nil {
+			// Already stopping - avoid doing more index work, but keep draining resultCh
+			// so in-flight workers (dispatched before cancel) don't block forever on send.
+			continue
+		}
+		if err := index.UpdateFileHashGiven(res.path, core.DefaultHashFormat, res.hashString, res.markAsMetaFile); err != nil {
+			firstErr = err
+			cancel()
+			continue
+		}
+		current++
+		if progressFn != nil {
+			progressFn(current, total, res.path)
+		}
+	}
+
+	return firstErr
 }

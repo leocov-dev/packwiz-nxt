@@ -346,7 +346,7 @@ const cacheHashFormat = core.DefaultHashFormat
 
 // cacheLatestVersion is the current CacheIndex schema/content version. Bumped to 2 to
 // mark the fix for the zero-byte-cache-entry bug in downloadNewFile; see
-// purgeZeroByteEntries for the accompanying migration.
+// pruneOrphanedEntries for the accompanying migration.
 const cacheLatestVersion = 2
 
 // CacheIndex tracks previously-downloaded files in the local cache, keyed by hash,
@@ -358,10 +358,11 @@ type CacheIndex struct {
 	nextHashIdx int
 }
 
-// purgeZeroByteEntries drops cache entries whose backing file is missing or empty,
-// self-healing indexes written by the pre-cacheLatestVersion downloadNewFile, which
-// could record a hash for a file it never actually downloaded.
-func (c *CacheIndex) purgeZeroByteEntries() {
+// pruneOrphanedEntries drops cache entries whose backing file is missing or empty -
+// e.g. indexes written by the pre-cacheLatestVersion downloadNewFile, which could record
+// a hash for a file it never actually downloaded, or entries whose backing file was
+// deleted/corrupted out from under the index some other way. Returns the number removed.
+func (c *CacheIndex) pruneOrphanedEntries() int {
 	cacheHashes := c.Hashes[cacheHashFormat]
 	var toRemove []int
 	for i, hash := range cacheHashes {
@@ -374,11 +375,20 @@ func (c *CacheIndex) purgeZeroByteEntries() {
 		}
 	}
 	if len(toRemove) == 0 {
-		return
+		return 0
 	}
 	for hashFormat, v := range c.Hashes {
 		c.Hashes[hashFormat] = removeIndices(v, toRemove)
 	}
+	return len(toRemove)
+}
+
+// PruneOrphaned removes cache entries whose backing file is missing or empty, returning
+// how many were removed. Unlike the automatic v1->v2 migration this backs, it can be
+// called at any time (e.g. from a CLI cache-maintenance command) to self-heal a cache
+// that's since been corrupted by manual deletion or a crash mid-download.
+func (c *CacheIndex) PruneOrphaned() int {
+	return c.pruneOrphanedEntries()
 }
 
 type CacheIndexHandle struct {
@@ -639,17 +649,21 @@ func (h *CacheIndexHandle) Remove() {
 	return
 }
 
+// removeIndices returns hashList with the (ascending, 0-indexed) positions in indices
+// removed. indices must be sorted ascending - callers build it that way by construction
+// (appending as they scan hashList in order).
 func removeIndices(hashList []string, indices []int) []string {
-	i := 0
-	for _, v := range hashList {
-		if len(indices) > 0 && i == indices[0] {
-			indices = indices[1:]
-		} else {
-			hashList[i] = v
-			i++
+	write := 0
+	next := 0
+	for read, v := range hashList {
+		if next < len(indices) && read == indices[next] {
+			next++
+			continue
 		}
+		hashList[write] = v
+		write++
 	}
-	return hashList[:i]
+	return hashList[:write]
 }
 
 func removeEmpty(hashList []string) ([]string, []int) {
@@ -666,36 +680,35 @@ func removeEmpty(hashList []string) ([]string, []int) {
 	return hashList[:i], indices
 }
 
-// CreateDownloadSession builds a DownloadSession for the given mods, bootstrapping the
-// local cache and planning download tasks/manual downloads for each mod that isn't
-// already cached with one of hashesToObtain.
-func CreateDownloadSession(mods []*core.Mod, hashesToObtain []string) (DownloadSession, error) {
-	// Load cache index
+// loadCacheIndex opens (creating if needed) the local download cache, reading and
+// migrating its on-disk index.json as needed. It's the shared preamble behind both
+// CreateDownloadSession and OpenCacheIndex.
+func loadCacheIndex() (CacheIndex, error) {
 	cacheIndex := CacheIndex{Version: cacheLatestVersion, Hashes: make(map[string][]string)}
 	cachePath, err := GetPackwizCache(viper.GetString("cache.directory"))
 	if err != nil {
-		return nil, fmt.Errorf("failed to load cache: %w", err)
+		return CacheIndex{}, fmt.Errorf("failed to load cache: %w", err)
 	}
 	err = os.MkdirAll(cachePath, 0755)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create cache directory: %w", err)
+		return CacheIndex{}, fmt.Errorf("failed to create cache directory: %w", err)
 	}
 	err = os.MkdirAll(filepath.Join(cachePath, "temp"), 0755)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create cache temp directory: %w", err)
+		return CacheIndex{}, fmt.Errorf("failed to create cache temp directory: %w", err)
 	}
 	cacheIndexData, err := os.ReadFile(filepath.Join(cachePath, "index.json"))
 	if err != nil {
 		if !os.IsNotExist(err) {
-			return nil, fmt.Errorf("failed to read cache index file: %w", err)
+			return CacheIndex{}, fmt.Errorf("failed to read cache index file: %w", err)
 		}
 	} else {
 		err = json.Unmarshal(cacheIndexData, &cacheIndex)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read cache index file: %w", err)
+			return CacheIndex{}, fmt.Errorf("failed to read cache index file: %w", err)
 		}
 		if cacheIndex.Version > cacheLatestVersion {
-			return nil, fmt.Errorf("cache index is too new (version %v)", cacheIndex.Version)
+			return CacheIndex{}, fmt.Errorf("cache index is too new (version %v)", cacheIndex.Version)
 		}
 	}
 
@@ -711,7 +724,7 @@ func CreateDownloadSession(mods []*core.Mod, hashesToObtain []string) (DownloadS
 		// history) when the mod's existing hash format already matched cacheHashFormat -
 		// the download was skipped entirely but the empty file was still cached as if it
 		// were the real one. Purge those before they're served back to a caller as valid.
-		cacheIndex.purgeZeroByteEntries()
+		cacheIndex.pruneOrphanedEntries()
 		cacheIndex.Version = cacheLatestVersion
 	}
 
@@ -731,18 +744,58 @@ func CreateDownloadSession(mods []*core.Mod, hashesToObtain []string) (DownloadS
 	// Create import folder
 	err = os.MkdirAll(filepath.Join(cachePath, DownloadCacheImportFolder), 0755)
 	if err != nil {
-		return nil, fmt.Errorf("error creating cache import folder: %w", err)
+		return CacheIndex{}, fmt.Errorf("error creating cache import folder: %w", err)
 	}
 	// Move import files
 	err = cacheIndex.MoveImportFiles()
 	if err != nil {
-		return nil, fmt.Errorf("error updating cache import folder: %w", err)
+		return CacheIndex{}, fmt.Errorf("error updating cache import folder: %w", err)
+	}
+
+	return cacheIndex, nil
+}
+
+// OpenCacheIndex opens the local download cache's index for standalone access (e.g. cache
+// maintenance) without needing a mod list. Call (*CacheIndex).Save to persist any changes.
+func OpenCacheIndex() (*CacheIndex, error) {
+	cacheIndex, err := loadCacheIndex()
+	if err != nil {
+		return nil, err
+	}
+	return &cacheIndex, nil
+}
+
+// Save writes the cache index back to disk at its cachePath.
+func (c *CacheIndex) Save() error {
+	data, err := json.Marshal(c)
+	if err != nil {
+		return fmt.Errorf("failed to serialise index: %w", err)
+	}
+	err = os.WriteFile(filepath.Join(c.cachePath, "index.json"), data, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write index: %w", err)
+	}
+	return nil
+}
+
+// CreateDownloadSession builds a DownloadSession for the given mods, bootstrapping the
+// local cache and planning download tasks/manual downloads for each mod that isn't
+// already cached with one of hashesToObtain. reg resolves each mod's MetaDownloader;
+// pass nil to use core.DefaultRegistry (the CLI's default).
+func CreateDownloadSession(reg *core.Registry, mods []*core.Mod, hashesToObtain []string) (DownloadSession, error) {
+	if reg == nil {
+		reg = core.DefaultRegistry
+	}
+
+	cacheIndex, err := loadCacheIndex()
+	if err != nil {
+		return nil, err
 	}
 
 	// Create session
 	downloadSession := downloadSessionInternal{
 		cacheIndex:     cacheIndex,
-		cacheFolder:    cachePath,
+		cacheFolder:    cacheIndex.cachePath,
 		hashesToObtain: hashesToObtain,
 	}
 
@@ -766,7 +819,7 @@ func CreateDownloadSession(mods []*core.Mod, hashesToObtain []string) (DownloadS
 	}
 
 	for dlID, mods := range pendingMetadata {
-		downloader, ok := core.GetMetaDownloader(dlID)
+		downloader, ok := reg.GetMetaDownloader(dlID)
 		if !ok {
 			return nil, fmt.Errorf("unknown download mode %s for %s", mods[0].Download.Mode, mods[0].Name)
 		}
@@ -804,8 +857,6 @@ func CreateDownloadSession(mods []*core.Mod, hashesToObtain []string) (DownloadS
 			}
 		}
 	}
-
-	// TODO: index housekeeping? i.e. remove deleted files, remove old files (LRU?)
 
 	// Save index after importing and Force index updates
 	err = downloadSession.SaveIndex()

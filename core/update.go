@@ -113,7 +113,7 @@ func GetUpdatableMods(reg *Registry, pack Pack) (UpdateDataList, error) {
 func UpdateSingleMod(reg *Registry, pack Pack, mod *Mod) error {
 	reg = resolveRegistry(reg)
 
-	updater, err := mod.GetUpdater()
+	updater, err := mod.GetUpdater(reg)
 	if err != nil {
 		return err
 	}

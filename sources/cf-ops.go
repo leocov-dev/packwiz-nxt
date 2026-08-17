@@ -154,7 +154,7 @@ func buildInstalledIdList(pack core.Pack) ([]uint32, error) {
 	var installedIDList []uint32
 	for _, mod := range pack.GetModsList() {
 		var updateData CfExportData
-		err := mod.DecodeNamedModSourceData("curseforge", updateData)
+		err := mod.DecodeNamedModSourceData("curseforge", &updateData)
 		if err != nil {
 			return nil, err
 		}

@@ -16,7 +16,14 @@ type ghApiClient struct {
 	logger     core.Logger
 }
 
-var ghDefaultClient = ghApiClient{&http.Client{Timeout: core.DefaultHTTPTimeout}, core.PrintLogger{}}
+var ghDefaultClient = *NewGithubClient(&http.Client{Timeout: core.DefaultHTTPTimeout}, core.PrintLogger{})
+
+// NewGithubClient constructs a GitHub API client using the given httpClient,
+// allowing tests to inject an httpClient pointed at an httptest.Server in place
+// of the real GitHub API.
+func NewGithubClient(httpClient *http.Client, logger core.Logger) *ghApiClient {
+	return &ghApiClient{httpClient, logger}
+}
 
 // GetGithubClient returns the default GitHub API client, mirroring
 // GetCurseforgeClient/GetModrinthClient.

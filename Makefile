@@ -19,6 +19,9 @@ lint:
 tidy:
 	@go mod tidy
 
+generate:
+	@go run github.com/vektra/mockery/v2@v2.53.6
+
 .NOTPARALLEL:
 
-.PHONY: fmtcheck fmt tidy test
+.PHONY: fmtcheck fmt tidy test generate

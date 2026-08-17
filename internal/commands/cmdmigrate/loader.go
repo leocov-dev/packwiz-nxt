@@ -43,20 +43,26 @@ var loaderCommand = &cobra.Command{
 		}
 
 		if args[0] == "recommended" {
-			// TODO: Figure out a way to get the recommended version, this is Forge only
-			// Ensure we're on Forge
-			if !slices.Contains(currentLoaders, "forge") {
-				shared.Exitln("The recommended loader version is only available on Forge!")
+			var recommendedVer string
+			var loader core.ModLoaderComponent
+			if currentLoaders[0] == "forge" {
+				// Forge is the only loader with a "recommended" version distinct from
+				// latest - everything else falls back to latest below.
+				loader = core.ModLoaders["forge"]
+				var err error
+				recommendedVer, err = core.GetForgeRecommended(mcVersion)
+				if err != nil {
+					shared.Exitf("Error getting recommended Forge version: %s\n", err)
+				}
+				if recommendedVer == "" {
+					shared.Exitln("Error getting recommended Forge version!")
+				}
+			} else {
+				fmt.Printf("%s has no separate \"recommended\" version, using latest instead\n",
+					core.ComponentToFriendlyName(currentLoaders[0]))
+				_, recommendedVer, loader = getVersionsForLoader(currentLoaders[0], mcVersion)
 			}
-			// We'll be updating to the recommended loader version
-			recommendedVer, err := core.GetForgeRecommended(mcVersion)
-			if err != nil {
-				shared.Exitf("Error getting recommended Forge version: %s\n", err)
-			}
-			if recommendedVer == "" {
-				shared.Exitln("Error getting recommended Forge version!")
-			}
-			if ok := updatePackToVersion(recommendedVer, modpack, core.ModLoaders["forge"]); !ok {
+			if ok := updatePackToVersion(recommendedVer, modpack, loader); !ok {
 				shared.Exitln()
 			}
 			// Write the pack to disk

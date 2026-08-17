@@ -1,0 +1,12 @@
+with-expecter: true
+dir: "core/mocks"
+outpkg: mocks
+resolve-type-alias: false
+disable-version-string: true
+issue-845-fix: true
+packages:
+  github.com/leocov-dev/packwiz-nxt/core:
+    interfaces:
+      Updater:
+      MetaDownloader:
+      MetaDownloaderData:

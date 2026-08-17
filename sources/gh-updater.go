@@ -9,7 +9,14 @@ import (
 )
 
 func init() {
-	core.AddUpdater(ghUpdater{})
+	RegisterGithub(core.DefaultRegistry)
+}
+
+// RegisterGithub registers the GitHub Updater on reg. Library consumers building an
+// isolated *core.Registry (instead of relying on core.DefaultRegistry) should call this
+// - or sources.RegisterAll - explicitly.
+func RegisterGithub(reg *core.Registry) {
+	reg.AddUpdater(ghUpdater{})
 }
 
 type ghUpdateData struct {

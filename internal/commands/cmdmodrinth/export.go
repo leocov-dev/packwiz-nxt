@@ -48,7 +48,7 @@ var exportCmd = &cobra.Command{
 			}
 		}
 
-		session, err := fileio.CreateDownloadSession(mods, []string{"sha1", "sha512", "length-bytes"})
+		session, err := fileio.CreateDownloadSession(nil, mods, []string{"sha1", "sha512", "length-bytes"})
 		if err != nil {
 			shared.Exitf("Error retrieving external files: %v\n", err)
 		}

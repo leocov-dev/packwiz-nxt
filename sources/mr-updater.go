@@ -11,7 +11,14 @@ import (
 )
 
 func init() {
-	core.AddUpdater(mrUpdater{})
+	RegisterModrinth(core.DefaultRegistry)
+}
+
+// RegisterModrinth registers the Modrinth Updater on reg. Library consumers building an
+// isolated *core.Registry (instead of relying on core.DefaultRegistry) should call this
+// - or sources.RegisterAll - explicitly.
+func RegisterModrinth(reg *core.Registry) {
+	reg.AddUpdater(mrUpdater{})
 }
 
 type mrUpdateData struct {

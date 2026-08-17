@@ -102,7 +102,7 @@ func getHash(ctx context.Context, url string) (string, error) {
 		},
 	}
 
-	session, err := fileio.CreateDownloadSession([]*core.Mod{dlMod}, []string{"sha256"})
+	session, err := fileio.CreateDownloadSession(nil, []*core.Mod{dlMod}, []string{"sha256"})
 	if err != nil {
 		return "", err
 	}

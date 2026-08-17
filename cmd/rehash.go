@@ -32,7 +32,7 @@ var rehashCmd = &cobra.Command{
 			shared.Exitf("Hash format '%s' is not supported\n", args[0])
 		}
 
-		session, err := fileio.CreateDownloadSession(pack.GetModsList(), []string{args[0]})
+		session, err := fileio.CreateDownloadSession(nil, pack.GetModsList(), []string{args[0]})
 		if err != nil {
 			shared.Exitf("Error retrieving external files: %v\n", err)
 		}
