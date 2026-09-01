@@ -8,8 +8,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
@@ -346,16 +348,31 @@ const cacheHashFormat = core.DefaultHashFormat
 
 // cacheLatestVersion is the current CacheIndex schema/content version. Bumped to 2 to
 // mark the fix for the zero-byte-cache-entry bug in downloadNewFile; see
-// pruneOrphanedEntries for the accompanying migration.
-const cacheLatestVersion = 2
+// pruneOrphanedEntries for the accompanying migration. Bumped to 3 for the addition of
+// LastAccess (see loadCacheIndex's backfill for older indexes).
+const cacheLatestVersion = 3
 
 // CacheIndex tracks previously-downloaded files in the local cache, keyed by hash,
 // so subsequent downloads can be satisfied from disk instead of the network.
 type CacheIndex struct {
-	Version     uint32
-	Hashes      map[string][]string
+	Version uint32
+	Hashes  map[string][]string
+	// LastAccess holds a unix-seconds timestamp per entry, parallel to
+	// Hashes[cacheHashFormat] by index. Used by EvictLRU to pick eviction candidates.
+	LastAccess  []int64
 	cachePath   string
 	nextHashIdx int
+}
+
+// touch records hashIdx as accessed just now, growing LastAccess if needed.
+func (c *CacheIndex) touch(hashIdx int) {
+	now := time.Now().Unix()
+	if hashIdx < len(c.LastAccess) {
+		c.LastAccess[hashIdx] = now
+		return
+	}
+	c.LastAccess = append(c.LastAccess, make([]int64, hashIdx-len(c.LastAccess)+1)...)
+	c.LastAccess[hashIdx] = now
 }
 
 // pruneOrphanedEntries drops cache entries whose backing file is missing or empty -
@@ -380,6 +397,7 @@ func (c *CacheIndex) pruneOrphanedEntries() int {
 	for hashFormat, v := range c.Hashes {
 		c.Hashes[hashFormat] = removeIndices(v, toRemove)
 	}
+	c.LastAccess = removeIndices(c.LastAccess, toRemove)
 	return len(toRemove)
 }
 
@@ -389,6 +407,72 @@ func (c *CacheIndex) pruneOrphanedEntries() int {
 // that's since been corrupted by manual deletion or a crash mid-download.
 func (c *CacheIndex) PruneOrphaned() int {
 	return c.pruneOrphanedEntries()
+}
+
+// EvictLRU removes least-recently-used cache entries (deleting their backing files) until
+// the total size of the remaining cached files is at or under maxTotalBytes. Entries whose
+// backing file can't be stat'd are left alone - PruneOrphaned handles those. Returns the
+// number of entries removed and the number of bytes freed. maxTotalBytes <= 0 evicts every
+// statable entry.
+func (c *CacheIndex) EvictLRU(maxTotalBytes int64) (removed int, freedBytes int64, err error) {
+	cacheHashes := c.Hashes[cacheHashFormat]
+
+	type evictCandidate struct {
+		idx        int
+		size       int64
+		lastAccess int64
+	}
+	var candidates []evictCandidate
+	var totalSize int64
+	for i, hash := range cacheHashes {
+		if hash == "" {
+			continue
+		}
+		stat, statErr := os.Stat(filepath.Join(c.cachePath, hash[:2], hash[2:]))
+		if statErr != nil {
+			continue
+		}
+		lastAccess := int64(0)
+		if i < len(c.LastAccess) {
+			lastAccess = c.LastAccess[i]
+		}
+		candidates = append(candidates, evictCandidate{idx: i, size: stat.Size(), lastAccess: lastAccess})
+		totalSize += stat.Size()
+	}
+
+	if totalSize <= maxTotalBytes {
+		return 0, 0, nil
+	}
+
+	sort.Slice(candidates, func(a, b int) bool {
+		return candidates[a].lastAccess < candidates[b].lastAccess
+	})
+
+	var toRemove []int
+	for _, cand := range candidates {
+		if totalSize <= maxTotalBytes {
+			break
+		}
+		toRemove = append(toRemove, cand.idx)
+		totalSize -= cand.size
+		freedBytes += cand.size
+	}
+	sort.Ints(toRemove)
+
+	for _, idx := range toRemove {
+		hash := cacheHashes[idx]
+		if rmErr := os.Remove(filepath.Join(c.cachePath, hash[:2], hash[2:])); rmErr != nil && !os.IsNotExist(rmErr) {
+			return 0, 0, fmt.Errorf("failed to remove cached file %s: %w", hash, rmErr)
+		}
+	}
+
+	for hashFormat, v := range c.Hashes {
+		c.Hashes[hashFormat] = removeIndices(v, toRemove)
+	}
+	c.LastAccess = removeIndices(c.LastAccess, toRemove)
+
+	removed = len(toRemove)
+	return
 }
 
 type CacheIndexHandle struct {
@@ -412,6 +496,7 @@ func (c *CacheIndex) GetHandleFromHash(hashFormat string, hash string) *CacheInd
 	if hasStoredHashFmt {
 		hashIdx := slices.Index(storedHashFmtList, strings.ToLower(hash))
 		if hashIdx > -1 {
+			c.touch(hashIdx)
 			return &CacheIndexHandle{
 				index:   c,
 				hashIdx: hashIdx,
@@ -434,6 +519,7 @@ func (c *CacheIndex) GetHandleFromHashForce(hashFormat string, hash string) (*Ca
 		// Rehash every file that doesn't have this hash with this hash
 		for hashIdx, curHash := range storedHashFmtList {
 			if strings.EqualFold(curHash, hash) {
+				c.touch(hashIdx)
 				return &CacheIndexHandle{
 					index:   c,
 					hashIdx: hashIdx,
@@ -446,6 +532,7 @@ func (c *CacheIndex) GetHandleFromHashForce(hashFormat string, hash string) (*Ca
 					return nil, fmt.Errorf("failed to rehash %s: %w", c.Hashes[cacheHashFormat][hashIdx], err)
 				}
 				if strings.EqualFold(storedHashFmtList[hashIdx], hash) {
+					c.touch(hashIdx)
 					return &CacheIndexHandle{
 						index:   c,
 						hashIdx: hashIdx,
@@ -465,6 +552,7 @@ func (c *CacheIndex) GetHandleFromHashForce(hashFormat string, hash string) (*Ca
 				return nil, fmt.Errorf("failed to rehash %s: %w", cacheHash, err)
 			}
 			if strings.EqualFold(storedHashFmtList[hashIdx], hash) {
+				c.touch(hashIdx)
 				return &CacheIndexHandle{
 					index:   c,
 					hashIdx: hashIdx,
@@ -636,6 +724,7 @@ func (h *CacheIndexHandle) UpdateIndex() (warnings []error) {
 			hashList[h.hashIdx] = h.Hashes[hashFormat]
 		}
 	}
+	h.index.touch(h.hashIdx)
 	return
 }
 
@@ -646,24 +735,27 @@ func (h *CacheIndexHandle) Remove() {
 			h.index.Hashes[hashFormat] = slices.Delete(hashList, h.hashIdx, h.hashIdx+1)
 		}
 	}
+	if h.hashIdx < len(h.index.LastAccess) {
+		h.index.LastAccess = slices.Delete(h.index.LastAccess, h.hashIdx, h.hashIdx+1)
+	}
 	return
 }
 
-// removeIndices returns hashList with the (ascending, 0-indexed) positions in indices
+// removeIndices returns list with the (ascending, 0-indexed) positions in indices
 // removed. indices must be sorted ascending - callers build it that way by construction
-// (appending as they scan hashList in order).
-func removeIndices(hashList []string, indices []int) []string {
+// (appending as they scan list in order, or by sorting before calling).
+func removeIndices[T any](list []T, indices []int) []T {
 	write := 0
 	next := 0
-	for read, v := range hashList {
+	for read, v := range list {
 		if next < len(indices) && read == indices[next] {
 			next++
 			continue
 		}
-		hashList[write] = v
+		list[write] = v
 		write++
 	}
-	return hashList[:write]
+	return list[:write]
 }
 
 func removeEmpty(hashList []string) ([]string, []int) {
@@ -737,6 +829,21 @@ func loadCacheIndex() (CacheIndex, error) {
 				cacheIndex.Hashes[hashFormat] = removeIndices(v, removedEntries)
 			}
 		}
+		cacheIndex.LastAccess = removeIndices(cacheIndex.LastAccess, removedEntries)
+	}
+
+	// Backfill LastAccess for any entry that predates its introduction (or any index
+	// otherwise short/nil here), using the backing file's mtime as a proxy for its last
+	// access time so a first EvictLRU call after upgrading is meaningfully LRU rather than
+	// evicting in arbitrary/index order.
+	for i := len(cacheIndex.LastAccess); i < len(cacheIndex.Hashes[cacheHashFormat]); i++ {
+		ts := time.Now().Unix()
+		if hash := cacheIndex.Hashes[cacheHashFormat][i]; hash != "" {
+			if stat, statErr := os.Stat(filepath.Join(cachePath, hash[:2], hash[2:])); statErr == nil {
+				ts = stat.ModTime().Unix()
+			}
+		}
+		cacheIndex.LastAccess = append(cacheIndex.LastAccess, ts)
 	}
 
 	cacheIndex.nextHashIdx = len(cacheIndex.Hashes[cacheHashFormat])

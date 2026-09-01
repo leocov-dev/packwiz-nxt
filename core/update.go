@@ -68,12 +68,32 @@ func (ud UpdateDataList) Append(source string, mod *Mod, cachedState interface{}
 	ud[source] = data
 }
 
-// GetUpdatableMods checks all of pack's mods for available updates, using the
-// Updaters registered in reg (or DefaultRegistry, if reg is nil).
-func GetUpdatableMods(reg *Registry, pack Pack) (UpdateDataList, error) {
+// UpdateCheckResult carries the per-mod outcome of a dry-run compatibility
+// check, as returned by CheckAllMods. Err is non-nil if this mod's check
+// failed - the other check-result fields are then zero-valued and should be
+// ignored.
+type UpdateCheckResult struct {
+	Mod             *Mod
+	Source          string
+	UpdateAvailable bool
+	UpdateString    string
+	CachedState     any
+	Err             error
+}
+
+// CheckAllMods checks all of pack's mods for available updates, using the
+// Updaters registered in reg (or DefaultRegistry, if reg is nil). Unlike
+// GetUpdatableMods, a failure checking one mod (or one source's whole batch)
+// does not abort the rest of the check - it is reported on the affected
+// mod(s)' UpdateCheckResult.Err instead, so a single unresolvable mod doesn't
+// hide the results for every other mod in the pack. Pinned mods are still
+// included in the results (CheckAllMods does not filter them, unlike
+// GetUpdatableMods) so a caller can distinguish "pinned, update available but
+// would be skipped" from "up to date".
+func CheckAllMods(reg *Registry, pack Pack) ([]UpdateCheckResult, error) {
 	reg = resolveRegistry(reg)
 
-	updatable := make(UpdateDataList)
+	var results []UpdateCheckResult
 
 	updateMap := BuildUpdateMap(reg, pack.GetModsList())
 
@@ -84,24 +104,51 @@ func GetUpdatableMods(reg *Registry, pack Pack) (UpdateDataList, error) {
 		}
 		checks, err := updater.CheckUpdate(mods, pack)
 		if err != nil {
-			return nil, err
+			for _, mod := range mods {
+				results = append(results, UpdateCheckResult{Mod: mod, Source: source, Err: err})
+			}
+			continue
 		}
 
 		for i, check := range checks {
-			mod := mods[i]
+			results = append(results, UpdateCheckResult{
+				Mod:             mods[i],
+				Source:          source,
+				UpdateAvailable: check.UpdateAvailable,
+				UpdateString:    check.UpdateString,
+				CachedState:     check.CachedState,
+				Err:             check.Error,
+			})
+		}
+	}
 
-			if check.Error != nil {
-				return nil, fmt.Errorf("failed to check for updates for mod: %s - %s\n", mod.Slug, check.Error.Error())
+	return results, nil
+}
+
+// GetUpdatableMods checks all of pack's mods for available updates, using the
+// Updaters registered in reg (or DefaultRegistry, if reg is nil).
+func GetUpdatableMods(reg *Registry, pack Pack) (UpdateDataList, error) {
+	reg = resolveRegistry(reg)
+
+	results, err := CheckAllMods(reg, pack)
+	if err != nil {
+		return nil, err
+	}
+
+	updatable := make(UpdateDataList)
+
+	for _, r := range results {
+		if r.Err != nil {
+			return nil, fmt.Errorf("failed to check for updates for mod: %s - %s\n", r.Mod.Slug, r.Err.Error())
+		}
+
+		if r.UpdateAvailable {
+			if r.Mod.Pin {
+				reg.logger.Infof("skipping pinned mod: %s\n", r.Mod.Slug)
+				continue
 			}
 
-			if check.UpdateAvailable {
-				if mod.Pin {
-					reg.logger.Infof("skipping pinned mod: %s\n", mod.Slug)
-					continue
-				}
-
-				updatable.Append(source, mod, check.CachedState)
-			}
+			updatable.Append(r.Source, r.Mod, r.CachedState)
 		}
 	}
 

@@ -84,6 +84,23 @@ func TestCacheIndex_GetHandleFromHash(t *testing.T) {
 	})
 }
 
+// TestCacheIndex_Touch confirms that both writing a new entry and hitting an existing one
+// via GetHandleFromHash record a LastAccess timestamp - EvictLRU relies on this to know
+// what's actually least-recently-used.
+func TestCacheIndex_Touch(t *testing.T) {
+	index := newTestCacheIndex(t)
+	writeThroughHandle(t, index, "content a")
+
+	require.Len(t, index.LastAccess, 1)
+	assert.NotZero(t, index.LastAccess[0], "UpdateIndex should have touched the new entry")
+
+	index.LastAccess[0] = 0
+	hash := sha256Hex("content a")
+	handle := index.GetHandleFromHash(cacheHashFormat, hash)
+	require.NotNil(t, handle)
+	assert.NotZero(t, index.LastAccess[0], "GetHandleFromHash should touch on a hit")
+}
+
 func TestCacheIndex_GetHandleFromHashForce(t *testing.T) {
 	index := newTestCacheIndex(t)
 	writeThroughHandle(t, index, "content b")
