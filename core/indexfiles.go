@@ -180,6 +180,15 @@ func (f *IndexFiles) toTomlRep() (IndexFilesTomlRepresentation, error) {
 		}
 	}
 
+	sortIndexFilesTomlRepresentation(rep)
+
+	return rep, nil
+}
+
+// sortIndexFilesTomlRepresentation sorts index file entries deterministically by
+// File then Alias, so repeated serializations of the same data produce identical
+// bytes (and therefore identical hashes).
+func sortIndexFilesTomlRepresentation(rep IndexFilesTomlRepresentation) {
 	slices.SortFunc(rep, func(a IndexFile, b IndexFile) int {
 		if a.File == b.File {
 			if a.Alias == b.Alias {
@@ -197,6 +206,4 @@ func (f *IndexFiles) toTomlRep() (IndexFilesTomlRepresentation, error) {
 			}
 		}
 	})
-
-	return rep, nil
 }

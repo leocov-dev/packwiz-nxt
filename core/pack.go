@@ -178,6 +178,8 @@ func (p *Pack) getIndexRepr() (IndexTomlRepresentation, error) {
 		repr.Files = append(repr.Files, entry)
 	}
 
+	sortIndexFilesTomlRepresentation(repr.Files)
+
 	return repr, nil
 }
 
