@@ -36,10 +36,10 @@ func TestCheckAllMods_MixedAvailability(t *testing.T) {
 	updater.EXPECT().GetName().Return("mock-source")
 	updater.EXPECT().
 		CheckUpdate(mockModsContaining(modA, modB), pack).
-		Return([]core.UpdateCheck{
-			{UpdateAvailable: true, UpdateString: "a-1.0.0 -> a-1.0.1"},
-			{UpdateAvailable: false},
-		}, nil).
+		RunAndReturn(checksByMod(map[*core.Mod]core.UpdateCheck{
+			modA: {UpdateAvailable: true, UpdateString: "a-1.0.0 -> a-1.0.1"},
+			modB: {UpdateAvailable: false},
+		})).
 		Once()
 	reg.AddUpdater(updater)
 
@@ -71,10 +71,10 @@ func TestCheckAllMods_PerModError(t *testing.T) {
 	updater.EXPECT().GetName().Return("mock-source")
 	updater.EXPECT().
 		CheckUpdate(mockModsContaining(modA, modB), pack).
-		Return([]core.UpdateCheck{
-			{UpdateAvailable: false, Error: checkErr},
-			{UpdateAvailable: true},
-		}, nil).
+		RunAndReturn(checksByMod(map[*core.Mod]core.UpdateCheck{
+			modA: {UpdateAvailable: false, Error: checkErr},
+			modB: {UpdateAvailable: true},
+		})).
 		Once()
 	reg.AddUpdater(updater)
 
@@ -256,10 +256,10 @@ func TestCheckAllMods_PropagatesLatestVersion(t *testing.T) {
 	updater.EXPECT().GetName().Return("mock-source")
 	updater.EXPECT().
 		CheckUpdate(mockModsContaining(modA, modB), pack).
-		Return([]core.UpdateCheck{
-			{UpdateAvailable: true, UpdateString: "a", LatestVersion: "1.0.1"},
-			{UpdateAvailable: false},
-		}, nil).
+		RunAndReturn(checksByMod(map[*core.Mod]core.UpdateCheck{
+			modA: {UpdateAvailable: true, UpdateString: "a", LatestVersion: "1.0.1"},
+			modB: {UpdateAvailable: false},
+		})).
 		Once()
 	reg.AddUpdater(updater)
 
@@ -270,4 +270,16 @@ func TestCheckAllMods_PropagatesLatestVersion(t *testing.T) {
 	bySlug := indexBySlug(results)
 	assert.Equal(t, "1.0.1", bySlug["mod-a"].LatestVersion)
 	assert.Empty(t, bySlug["mod-b"].LatestVersion)
+}
+
+// checksByMod builds a CheckUpdate result function that answers per mod, so
+// tests do not depend on the (map-ordered) order in which pack mods are passed.
+func checksByMod(byMod map[*core.Mod]core.UpdateCheck) func([]*core.Mod, core.Pack) ([]core.UpdateCheck, error) {
+	return func(mods []*core.Mod, _ core.Pack) ([]core.UpdateCheck, error) {
+		out := make([]core.UpdateCheck, len(mods))
+		for i, m := range mods {
+			out[i] = byMod[m]
+		}
+		return out, nil
+	}
 }
