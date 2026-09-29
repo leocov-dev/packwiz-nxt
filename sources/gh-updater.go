@@ -107,7 +107,9 @@ func (u ghUpdater) DoUpdate(mods []*core.Mod, cachedState []interface{}) error {
 			Hash:       hash,
 		}
 		mod.Update["github"]["tag"] = modState.Tag
-		mod.Version = modState.Tag
+		if v := GitHubVersionString(Release{TagName: modState.Tag}); v != "" {
+			mod.Version = v
+		}
 	}
 
 	return nil

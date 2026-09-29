@@ -169,4 +169,5 @@ func TestInstallMod(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "mod.jar", mod.FileName)
 	assert.NotEmpty(t, mod.Download.Hash)
+	assert.Equal(t, "v1.0", mod.Version)
 }

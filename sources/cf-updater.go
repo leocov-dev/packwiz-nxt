@@ -364,7 +364,12 @@ func (u CfUpdater) CheckUpdate(mods []*core.Mod, pack core.Pack) ([]core.UpdateC
 		fileID, fileInfoData, fileName := CfFindLatestFile(modInfos[i], mcVersions, packLoaders)
 		if fileID != project.FileID && fileID != 0 {
 			// Update (or downgrade, if changing to an older version) available!
-			latestVersion := fileName
+			// The display name is only known when the file came from
+			// LatestFiles. Files from GameVersionLatestFiles carry no display
+			// name, and resolving it would cost a network call per mod, so
+			// LatestVersion stays empty (unknown) rather than reporting a file
+			// name that is not comparable to the installed display name.
+			latestVersion := ""
 			if fileInfoData != nil {
 				latestVersion = CurseforgeVersionString(*fileInfoData)
 			}
@@ -410,7 +415,9 @@ func (u CfUpdater) DoUpdate(mods []*core.Mod, cachedState []interface{}) error {
 
 		m.Update["curseforge"]["project-id"] = modState.ID
 		m.Update["curseforge"]["file-id"] = fileInfoData.ID
-		m.Version = CurseforgeVersionString(fileInfoData)
+		if v := CurseforgeVersionString(fileInfoData); v != "" {
+			m.Version = v
+		}
 	}
 
 	return nil

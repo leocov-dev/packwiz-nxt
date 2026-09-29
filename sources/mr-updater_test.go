@@ -59,6 +59,7 @@ func TestMrUpdater_CheckUpdate(t *testing.T) {
 		require.Len(t, results, 1)
 		assert.True(t, results[0].UpdateAvailable)
 		assert.Equal(t, "old.jar -> new.jar", results[0].UpdateString)
+		assert.Equal(t, "2.0", results[0].LatestVersion)
 	})
 
 	t.Run("no update when version matches installed", func(t *testing.T) {
@@ -72,6 +73,7 @@ func TestMrUpdater_CheckUpdate(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, results, 1)
 		assert.False(t, results[0].UpdateAvailable)
+		assert.Empty(t, results[0].LatestVersion)
 	})
 
 	t.Run("decode failure is reported per-mod", func(t *testing.T) {
@@ -89,8 +91,10 @@ func TestMrUpdater_DoUpdate(t *testing.T) {
 	fileURL := "https://example.com/new.jar"
 	primary := true
 	versionID := "v2"
+	versionNumber := "2.0"
 	version := &modrinthApi.Version{
-		ID: &versionID,
+		ID:            &versionID,
+		VersionNumber: &versionNumber,
 		Files: []*modrinthApi.File{{
 			Filename: &filename,
 			URL:      &fileURL,
@@ -108,4 +112,36 @@ func TestMrUpdater_DoUpdate(t *testing.T) {
 	assert.Equal(t, "deadbeef", mod.Download.Hash)
 	assert.Equal(t, "sha512", mod.Download.HashFormat)
 	assert.Equal(t, &versionID, mod.Update["modrinth"]["version"])
+	assert.Equal(t, "2.0", mod.Version)
+}
+
+func TestMrUpdater_DoUpdate_VersionPreservation(t *testing.T) {
+	filename := "new.jar"
+	fileURL := "https://example.com/new.jar"
+	primary := true
+	versionID := "v2"
+	newFiles := func(hashes map[string]string) []*modrinthApi.File {
+		return []*modrinthApi.File{{Filename: &filename, URL: &fileURL, Primary: &primary, Hashes: hashes}}
+	}
+
+	t.Run("failing DoUpdate leaves Version untouched", func(t *testing.T) {
+		mod := mrTestMod("Test Mod", "abc", "v1")
+		mod.Version = "1.0"
+		vn := "2.0"
+		version := &modrinthApi.Version{ID: &versionID, VersionNumber: &vn, Files: newFiles(map[string]string{})}
+
+		err := mrUpdater{}.DoUpdate([]*core.Mod{mod}, []interface{}{mrCachedStateStore{ProjectID: "abc", Version: version}})
+		require.Error(t, err)
+		assert.Equal(t, "1.0", mod.Version)
+	})
+
+	t.Run("empty version string keeps known Version", func(t *testing.T) {
+		mod := mrTestMod("Test Mod", "abc", "v1")
+		mod.Version = "1.0"
+		version := &modrinthApi.Version{ID: &versionID, Files: newFiles(map[string]string{"sha512": "deadbeef"})}
+
+		err := mrUpdater{}.DoUpdate([]*core.Mod{mod}, []interface{}{mrCachedStateStore{ProjectID: "abc", Version: version}})
+		require.NoError(t, err)
+		assert.Equal(t, "1.0", mod.Version)
+	})
 }
