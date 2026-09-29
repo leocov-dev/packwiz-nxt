@@ -82,6 +82,7 @@ func (u ghUpdater) CheckUpdate(mods []*core.Mod, _ core.Pack) ([]core.UpdateChec
 		results[i] = core.UpdateCheck{
 			UpdateAvailable: true,
 			UpdateString:    mod.FileName + " -> " + newFile.Name,
+			LatestVersion:   newRelease.TagName,
 			CachedState:     ghCachedStateStore{data.Slug, newRelease.TagName, newFile},
 		}
 	}
@@ -106,6 +107,7 @@ func (u ghUpdater) DoUpdate(mods []*core.Mod, cachedState []interface{}) error {
 			Hash:       hash,
 		}
 		mod.Update["github"]["tag"] = modState.Tag
+		mod.Version = modState.Tag
 	}
 
 	return nil

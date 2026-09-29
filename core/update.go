@@ -77,8 +77,11 @@ type UpdateCheckResult struct {
 	Source          string
 	UpdateAvailable bool
 	UpdateString    string
-	CachedState     any
-	Err             error
+	// LatestVersion is the human-readable latest available version, if the
+	// updater reports one (see UpdateCheck.LatestVersion).
+	LatestVersion string
+	CachedState   any
+	Err           error
 }
 
 // CheckAllMods checks all of pack's mods for available updates, using the
@@ -116,6 +119,7 @@ func CheckAllMods(reg *Registry, pack Pack) ([]UpdateCheckResult, error) {
 				Source:          source,
 				UpdateAvailable: check.UpdateAvailable,
 				UpdateString:    check.UpdateString,
+				LatestVersion:   check.LatestVersion,
 				CachedState:     check.CachedState,
 				Err:             check.Error,
 			})

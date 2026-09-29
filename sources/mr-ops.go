@@ -242,8 +242,25 @@ func createModrinthMod(
 		download,
 		nil,
 	)
+	mod.Version = ModrinthVersionString(version)
 
 	return mod, nil
+}
+
+// ModrinthVersionString returns the human-readable version of a Modrinth
+// version: version_number, falling back to the version name. Empty if neither
+// is available.
+func ModrinthVersionString(version *modrinthApi.Version) string {
+	if version == nil {
+		return ""
+	}
+	if version.VersionNumber != nil && *version.VersionNumber != "" {
+		return *version.VersionNumber
+	}
+	if version.Name != nil {
+		return *version.Name
+	}
+	return ""
 }
 
 func getModrinthProjectSlug(project *modrinthApi.Project) string {

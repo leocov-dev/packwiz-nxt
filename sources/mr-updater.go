@@ -83,6 +83,7 @@ func (u mrUpdater) CheckUpdate(mods []*core.Mod, pack core.Pack) ([]core.UpdateC
 		results[i] = core.UpdateCheck{
 			UpdateAvailable: true,
 			UpdateString:    mod.FileName + " -> " + *newFilename,
+			LatestVersion:   ModrinthVersionString(newVersion),
 			CachedState:     mrCachedStateStore{data.ProjectID, newVersion},
 		}
 	}
@@ -109,6 +110,7 @@ func (u mrUpdater) DoUpdate(mods []*core.Mod, cachedState []interface{}) error {
 			Hash:       hash,
 		}
 		mod.Update["modrinth"]["version"] = version.ID
+		mod.Version = ModrinthVersionString(version)
 	}
 
 	return nil

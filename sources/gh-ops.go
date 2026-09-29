@@ -154,6 +154,12 @@ func selectReleaseAsset(assets []Asset, regex string) (Asset, error) {
 	return files[0], nil
 }
 
+// GitHubVersionString returns the human-readable version of a GitHub
+// release: its tag name.
+func GitHubVersionString(release Release) string {
+	return release.TagName
+}
+
 func installRelease(
 	repo Repo,
 	release Release,
@@ -204,6 +210,7 @@ func installRelease(
 		download,
 		nil,
 	)
+	mod.Version = GitHubVersionString(release)
 
 	return mod, nil
 }
