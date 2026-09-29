@@ -133,7 +133,10 @@ type UpdateCheck struct {
 	// a version change (1.0.0 -> 1.0.1), or a file name change (thanos-skin-1.0.0.jar -> thanos-skin-1.0.1.jar).
 	UpdateString string
 	// LatestVersion is the human-readable version string of the latest
-	// available version (empty if unknown or no update is available).
+	// available version. Empty if unknown or no update is available. This is
+	// best-effort: CurseForge reports it only when the display name is
+	// available without an extra request, so it may be empty even when
+	// UpdateAvailable is true.
 	LatestVersion string
 	// CachedState can be used to preserve per-mod state between CheckUpdate and DoUpdate (e.g. file metadata)
 	CachedState any

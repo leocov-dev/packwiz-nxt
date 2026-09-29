@@ -72,8 +72,9 @@ func TestModrinthNewMod(t *testing.T) {
 
 	newVersion := func(hashes map[string]string) *modrinthApi.Version {
 		return &modrinthApi.Version{
-			ID:      strPtr("version123"),
-			Loaders: []string{"fabric"},
+			ID:            strPtr("version123"),
+			VersionNumber: strPtr("4.2.0"),
+			Loaders:       []string{"fabric"},
 			Files: []*modrinthApi.File{
 				{
 					Filename: strPtr("jei-1.20.1.jar"),
@@ -99,6 +100,20 @@ func TestModrinthNewMod(t *testing.T) {
 		assert.Equal(t, "mods", mod.ModType)
 		assert.Equal(t, "sha512", mod.Download.HashFormat)
 		assert.Equal(t, "abc512", mod.Download.Hash)
+		assert.Equal(t, "4.2.0", mod.Version)
+	})
+
+	t.Run("dependency creation sets Version", func(t *testing.T) {
+		store := ModrinthDepMetadataStore{
+			ProjectInfo: newProject("required", "required"),
+			VersionInfo: newVersion(map[string]string{"sha512": "abc512"}),
+		}
+		store.FileInfo = store.VersionInfo.Files[0]
+
+		mods, err := createModrinthDependencies([]string{"fabric"}, []ModrinthDepMetadataStore{store})
+		require.NoError(t, err)
+		require.Len(t, mods, 1)
+		assert.Equal(t, "4.2.0", mods[0].Version)
 	})
 
 	t.Run("unsupported both sides falls back to universal", func(t *testing.T) {

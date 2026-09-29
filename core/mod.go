@@ -17,9 +17,12 @@ type Mod struct {
 
 	// Version is the human-readable installed version (e.g. Modrinth
 	// version_number, CurseForge file display name, GitHub release tag).
-	// It is populated in memory by sources when a mod is created or updated.
-	// It is never part of the pack's TOML metadata: ToModMeta does not copy
-	// it, so it cannot affect the marshalled .pw.toml bytes or index hashes.
+	// It is in-memory only and never serialized: ToModMeta does not copy it,
+	// so it cannot affect the marshalled .pw.toml bytes or index hashes.
+	// Sources set it when they create or update a mod. It is empty for mods
+	// loaded via FromModMeta, for URL mods, and for any path that does not go
+	// through the sources helpers. Consumers that need it must persist it
+	// themselves.
 	Version string
 
 	// for index

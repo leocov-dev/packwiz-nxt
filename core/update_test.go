@@ -240,3 +240,34 @@ func mockModsContaining(mods ...*core.Mod) interface{} {
 		return true
 	})
 }
+
+// TestCheckAllMods_PropagatesLatestVersion confirms the updater-reported
+// LatestVersion reaches the UpdateCheckResult for each mod.
+func TestCheckAllMods_PropagatesLatestVersion(t *testing.T) {
+	reg := core.NewRegistry()
+	pack := core.Pack{Versions: map[string]string{"minecraft": "1.20.1"}}
+
+	modA := modWithUpdate("mod-a", "mock-source", false)
+	modB := modWithUpdate("mod-b", "mock-source", false)
+	pack.SetMod(modA)
+	pack.SetMod(modB)
+
+	updater := mocks.NewMockUpdater(t)
+	updater.EXPECT().GetName().Return("mock-source")
+	updater.EXPECT().
+		CheckUpdate(mockModsContaining(modA, modB), pack).
+		Return([]core.UpdateCheck{
+			{UpdateAvailable: true, UpdateString: "a", LatestVersion: "1.0.1"},
+			{UpdateAvailable: false},
+		}, nil).
+		Once()
+	reg.AddUpdater(updater)
+
+	results, err := core.CheckAllMods(reg, pack)
+	require.NoError(t, err)
+	require.Len(t, results, 2)
+
+	bySlug := indexBySlug(results)
+	assert.Equal(t, "1.0.1", bySlug["mod-a"].LatestVersion)
+	assert.Empty(t, bySlug["mod-b"].LatestVersion)
+}

@@ -49,6 +49,35 @@ func TestCfUpdater_CheckUpdate(t *testing.T) {
 		require.Len(t, results, 1)
 		assert.True(t, results[0].UpdateAvailable)
 		assert.Equal(t, "old.jar -> new.jar", results[0].UpdateString)
+		// Chosen from latestFiles without displayName: falls back to file name.
+		assert.Equal(t, "new.jar", results[0].LatestVersion)
+	})
+
+	t.Run("LatestVersion is the display name when latestFiles has one", func(t *testing.T) {
+		httpClient := newTestHTTPClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"data":[{"id":1,"latestFiles":[{"id":2,"fileName":"new.jar","displayName":"Test Mod 2.0","gameVersions":["1.20.1"]}]}]}`))
+		}))
+		withCfClient(t, httpClient)
+
+		results, err := CfUpdater{}.CheckUpdate([]*core.Mod{cfTestMod("Test Mod", 1, 1)}, pack)
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		assert.Equal(t, "Test Mod 2.0", results[0].LatestVersion)
+	})
+
+	t.Run("LatestVersion is empty when only gameVersionLatestFiles knows the file", func(t *testing.T) {
+		httpClient := newTestHTTPClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"data":[{"id":1,"latestFilesIndexes":[{"gameVersion":"1.20.1","fileId":2,"filename":"new.jar","releaseType":1,"modLoader":0}]}]}`))
+		}))
+		withCfClient(t, httpClient)
+
+		results, err := CfUpdater{}.CheckUpdate([]*core.Mod{cfTestMod("Test Mod", 1, 1)}, pack)
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		assert.True(t, results[0].UpdateAvailable)
+		assert.Empty(t, results[0].LatestVersion)
 	})
 
 	t.Run("no update available when current file is already latest", func(t *testing.T) {
@@ -97,6 +126,26 @@ func TestCfUpdater_DoUpdate(t *testing.T) {
 	assert.Equal(t, "new.jar", mod.FileName)
 	assert.Equal(t, uint32(1), mod.Update["curseforge"]["project-id"])
 	assert.Equal(t, uint32(2), mod.Update["curseforge"]["file-id"])
+	// No displayName: falls back to the file name.
+	assert.Equal(t, "new.jar", mod.Version)
+}
+
+func TestCfUpdater_DoUpdate_FailureLeavesVersion(t *testing.T) {
+	httpClient := newTestHTTPClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		// Wrong file ID: GetFileInfo rejects the response.
+		_, _ = w.Write([]byte(`{"data":{"id":99,"modId":1,"fileName":"new.jar"}}`))
+	}))
+	withCfClient(t, httpClient)
+
+	mod := cfTestMod("Test Mod", 1, 1)
+	mod.Version = "1.0"
+	cachedState := []interface{}{
+		cachedStateStore{CfModInfo{ID: 1, Name: "Test Mod"}, 2, nil},
+	}
+
+	require.Error(t, CfUpdater{}.DoUpdate([]*core.Mod{mod}, cachedState))
+	assert.Equal(t, "1.0", mod.Version)
 }
 
 func TestCfDownloader_GetFilesMetadata(t *testing.T) {

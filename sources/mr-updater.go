@@ -110,7 +110,9 @@ func (u mrUpdater) DoUpdate(mods []*core.Mod, cachedState []interface{}) error {
 			Hash:       hash,
 		}
 		mod.Update["modrinth"]["version"] = version.ID
-		mod.Version = ModrinthVersionString(version)
+		if v := ModrinthVersionString(version); v != "" {
+			mod.Version = v
+		}
 	}
 
 	return nil
