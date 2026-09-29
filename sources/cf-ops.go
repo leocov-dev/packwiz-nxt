@@ -200,6 +200,15 @@ func CurseforgeModInfoFromID(
 	return modInfo, fileInfo, nil
 }
 
+// CurseforgeVersionString returns the human-readable version of a CurseForge
+// file: its display name, falling back to the file name.
+func CurseforgeVersionString(fileInfo CfModFileInfo) string {
+	if fileInfo.FriendlyName != "" {
+		return fileInfo.FriendlyName
+	}
+	return fileInfo.FileName
+}
+
 func CurseforgeNewMod(modInfo CfModInfo, fileInfo CfModFileInfo, optionalDisabled bool) (*core.Mod, error) {
 	updateMap := make(core.ModUpdate)
 	var err error
@@ -222,7 +231,7 @@ func CurseforgeNewMod(modInfo CfModInfo, fileInfo CfModFileInfo, optionalDisable
 		}
 	}
 
-	return core.NewMod(
+	mod := core.NewMod(
 		modInfo.Slug,
 		modInfo.Name,
 		fileInfo.FileName,
@@ -238,7 +247,10 @@ func CurseforgeNewMod(modInfo CfModInfo, fileInfo CfModFileInfo, optionalDisable
 			Mode:       core.ModeCF,
 		},
 		optional,
-	), nil
+	)
+	mod.Version = CurseforgeVersionString(fileInfo)
+
+	return mod, nil
 }
 
 func CurseforgeModInfoFromSlug(

@@ -132,6 +132,9 @@ type UpdateCheck struct {
 	// UpdateString is a string that details the update in some way to the user. Usually this will be in the form of
 	// a version change (1.0.0 -> 1.0.1), or a file name change (thanos-skin-1.0.0.jar -> thanos-skin-1.0.1.jar).
 	UpdateString string
+	// LatestVersion is the human-readable version string of the latest
+	// available version (empty if unknown or no update is available).
+	LatestVersion string
 	// CachedState can be used to preserve per-mod state between CheckUpdate and DoUpdate (e.g. file metadata)
 	CachedState any
 	// Error stores an error for this specific mod

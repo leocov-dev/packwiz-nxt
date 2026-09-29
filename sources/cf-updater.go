@@ -364,9 +364,14 @@ func (u CfUpdater) CheckUpdate(mods []*core.Mod, pack core.Pack) ([]core.UpdateC
 		fileID, fileInfoData, fileName := CfFindLatestFile(modInfos[i], mcVersions, packLoaders)
 		if fileID != project.FileID && fileID != 0 {
 			// Update (or downgrade, if changing to an older version) available!
+			latestVersion := fileName
+			if fileInfoData != nil {
+				latestVersion = CurseforgeVersionString(*fileInfoData)
+			}
 			results[i] = core.UpdateCheck{
 				UpdateAvailable: true,
 				UpdateString:    m.FileName + " -> " + fileName,
+				LatestVersion:   latestVersion,
 				CachedState:     cachedStateStore{modInfos[i], fileID, fileInfoData},
 			}
 		} else {
@@ -405,6 +410,7 @@ func (u CfUpdater) DoUpdate(mods []*core.Mod, cachedState []interface{}) error {
 
 		m.Update["curseforge"]["project-id"] = modState.ID
 		m.Update["curseforge"]["file-id"] = fileInfoData.ID
+		m.Version = CurseforgeVersionString(fileInfoData)
 	}
 
 	return nil
