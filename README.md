@@ -1,5 +1,7 @@
 # packwiz-nxt
 
+> This code was developed with assistance from LLM AI coding agents.
+
 This is a refactored [packwiz/packwiz](https://github.com/packwiz/packwiz). 
 This repo focuses on changing the codebase so that packwiz can be used as a 
 library without needing to write to the file system.
