@@ -16,6 +16,7 @@ type quiltFile struct {
 		ID       string         `json:"id"`
 		Version  string         `json:"version"`
 		Provides []quiltProvide `json:"provides"`
+		Jars     []string       `json:"jars"`
 		Depends  []quiltDep     `json:"depends"`
 		Breaks   []quiltDep     `json:"breaks"`
 		Metadata struct {
@@ -27,8 +28,8 @@ type quiltFile struct {
 	} `json:"minecraft"`
 }
 
-// quiltProvide is a string id or an object with an "id".
-type quiltProvide struct{ ID string }
+// quiltProvide is a string id or an object with an "id" and optional "version".
+type quiltProvide struct{ ID, Version string }
 
 // UnmarshalJSON implements json.Unmarshaler.
 func (p *quiltProvide) UnmarshalJSON(b []byte) error {
@@ -37,12 +38,13 @@ func (p *quiltProvide) UnmarshalJSON(b []byte) error {
 		return json.Unmarshal(b, &p.ID)
 	}
 	var obj struct {
-		ID string `json:"id"`
+		ID      string `json:"id"`
+		Version string `json:"version"`
 	}
 	if err := json.Unmarshal(b, &obj); err != nil {
 		return err
 	}
-	p.ID = obj.ID
+	p.ID, p.Version = obj.ID, obj.Version
 	return nil
 }
 
@@ -121,6 +123,17 @@ func (quiltParser) Parse(data []byte) (LoaderMeta, error) {
 	for _, p := range q.Provides {
 		if p.ID != "" {
 			m.Provides = append(m.Provides, p.ID)
+			if p.Version != "" {
+				if m.ProvidesVersions == nil {
+					m.ProvidesVersions = map[string]string{}
+				}
+				m.ProvidesVersions[p.ID] = p.Version
+			}
+		}
+	}
+	for _, j := range q.Jars {
+		if j != "" {
+			m.NestedJars = append(m.NestedJars, j)
 		}
 	}
 	m.Dependencies = append(m.Dependencies, quiltDependencies(q.ID, q.Depends, KindDepends)...)

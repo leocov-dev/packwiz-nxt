@@ -13,16 +13,19 @@ type fabricParser struct{}
 func (fabricParser) Path() string { return "fabric.mod.json" }
 
 type fabricFile struct {
-	ID          string                `json:"id"`
-	Version     string                `json:"version"`
-	Name        string                `json:"name"`
-	Environment string                `json:"environment"`
-	Provides    []string              `json:"provides"`
-	Depends     map[string]stringList `json:"depends"`
-	Recommends  map[string]stringList `json:"recommends"`
-	Suggests    map[string]stringList `json:"suggests"`
-	Breaks      map[string]stringList `json:"breaks"`
-	Conflicts   map[string]stringList `json:"conflicts"`
+	ID          string   `json:"id"`
+	Version     string   `json:"version"`
+	Name        string   `json:"name"`
+	Environment string   `json:"environment"`
+	Provides    []string `json:"provides"`
+	Jars        []struct {
+		File string `json:"file"`
+	} `json:"jars"`
+	Depends    map[string]stringList `json:"depends"`
+	Recommends map[string]stringList `json:"recommends"`
+	Suggests   map[string]stringList `json:"suggests"`
+	Breaks     map[string]stringList `json:"breaks"`
+	Conflicts  map[string]stringList `json:"conflicts"`
 }
 
 func (fabricParser) Parse(data []byte) (LoaderMeta, error) {
@@ -43,6 +46,11 @@ func (fabricParser) Parse(data []byte) (LoaderMeta, error) {
 		Mods:                 []Mod{newMod(f.ID, f.Version)},
 		Provides:             f.Provides,
 		Environment:          fabricEnvironment(f.Environment),
+	}
+	for _, j := range f.Jars {
+		if j.File != "" {
+			m.NestedJars = append(m.NestedJars, j.File)
+		}
 	}
 	groups := []struct {
 		kind      DependencyKind
