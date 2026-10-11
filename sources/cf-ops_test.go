@@ -152,6 +152,17 @@ func TestCurseforgeFindMissingDependencies(t *testing.T) {
 		assert.Equal(t, "dep.jar", mods[0].FileName)
 	})
 
+	t.Run("ignores mods from other sources and skips installed dependencies", func(t *testing.T) {
+		mixed := core.Pack{Versions: map[string]string{"minecraft": "1.20.1"}}
+		mixed.SetMod(&core.Mod{Slug: "searchables", Name: "Searchables", Update: core.ModUpdate{"modrinth": {"mod-id": "abc"}}})
+		mixed.SetMod(&core.Mod{Slug: "manual", Name: "Manual", Update: core.ModUpdate{}})
+		mixed.SetMod(&core.Mod{Slug: "dep-mod", Name: "Dep Mod", Update: core.ModUpdate{"curseforge": {"project-id": 99, "file-id": 100}}})
+
+		mods, err := CurseforgeFindMissingDependencies(mixed, fileInfoData, "1.20.1")
+		require.NoError(t, err)
+		assert.Empty(t, mods)
+	})
+
 	t.Run("no required dependencies returns no mods, no network call", func(t *testing.T) {
 		mods, err := CurseforgeFindMissingDependencies(pack, CfModFileInfo{}, "1.20.1")
 		require.NoError(t, err)

@@ -150,9 +150,15 @@ func buildDependencyQueue(
 	return depIDPendingQueue
 }
 
+// buildInstalledIdList returns the CurseForge project ids of the pack's mods.
+// Mods from other sources (Modrinth, GitHub, manual) have no CurseForge data
+// and are skipped.
 func buildInstalledIdList(pack core.Pack) ([]uint32, error) {
 	var installedIDList []uint32
 	for _, mod := range pack.GetModsList() {
+		if _, ok := mod.Update["curseforge"]; !ok {
+			continue
+		}
 		var updateData CfExportData
 		err := mod.DecodeNamedModSourceData("curseforge", &updateData)
 		if err != nil {
