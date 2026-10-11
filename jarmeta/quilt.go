@@ -66,13 +66,13 @@ func (v *quiltVersions) UnmarshalJSON(b []byte) error {
 	return json.Unmarshal(b, &v.Any)
 }
 
-// quiltDep is a string id or an object. Nested arrays (alternative
-// dependency groups) are recorded as skipped.
+// quiltDep is a string id, an object, or an array of those (an alternative
+// group, held in AnyOf).
 type quiltDep struct {
 	ID       string
 	Versions quiltVersions
 	Optional bool
-	skip     bool
+	AnyOf    []quiltDep
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -85,8 +85,7 @@ func (d *quiltDep) UnmarshalJSON(b []byte) error {
 	case '"':
 		return json.Unmarshal(b, &d.ID)
 	case '[':
-		d.skip = true
-		return nil
+		return json.Unmarshal(b, &d.AnyOf)
 	}
 	var obj struct {
 		ID       string        `json:"id"`
@@ -124,25 +123,39 @@ func (quiltParser) Parse(data []byte) (LoaderMeta, error) {
 			m.Provides = append(m.Provides, p.ID)
 		}
 	}
-	add := func(deps []quiltDep, kind DependencyKind) {
-		for _, d := range deps {
-			if d.skip || d.ID == "" {
+	m.Dependencies = append(m.Dependencies, quiltDependencies(q.ID, q.Depends, KindDepends)...)
+	m.Dependencies = append(m.Dependencies, quiltDependencies(q.ID, q.Breaks, KindBreaks)...)
+	return m, nil
+}
+
+// quiltDependencies converts decoded entries to Dependencies. An alternative
+// group becomes a Dependency with empty ID and AnyOf set; empty groups and
+// id-less entries are dropped.
+func quiltDependencies(owner string, deps []quiltDep, kind DependencyKind) []Dependency {
+	var out []Dependency
+	for _, d := range deps {
+		dep := Dependency{
+			Owner:     owner,
+			Kind:      kind,
+			Mandatory: kind == KindDepends && !d.Optional,
+			Side:      SideBoth,
+		}
+		if d.AnyOf != nil {
+			dep.AnyOf = quiltDependencies(owner, d.AnyOf, kind)
+			if len(dep.AnyOf) == 0 {
 				continue
 			}
-			m.Dependencies = append(m.Dependencies, Dependency{
-				Owner:            q.ID,
-				ID:               d.ID,
-				Kind:             kind,
-				VersionRanges:    d.Versions.Any,
-				VersionRangesAll: d.Versions.All,
-				Mandatory:        kind == KindDepends && !d.Optional,
-				Side:             SideBoth,
-			})
+		} else {
+			if d.ID == "" {
+				continue
+			}
+			dep.ID = d.ID
+			dep.VersionRanges = d.Versions.Any
+			dep.VersionRangesAll = d.Versions.All
 		}
+		out = append(out, dep)
 	}
-	add(q.Depends, KindDepends)
-	add(q.Breaks, KindBreaks)
-	return m, nil
+	return out
 }
 
 func quiltEnvironment(s string) Environment {

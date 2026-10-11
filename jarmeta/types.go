@@ -59,14 +59,16 @@ const (
 
 // Well-known dependency ids that phase-2 consumers interpret specially.
 const (
-	IDMinecraft     = "minecraft"
-	IDFabricLoader  = "fabricloader"
-	IDQuiltLoader   = "quilt_loader"
-	IDForge         = "forge"
-	IDNeoForge      = "neoforge"
-	IDJava          = "java"
-	placeholderMark = "${"
+	IDMinecraft    = "minecraft"
+	IDFabricLoader = "fabricloader"
+	IDQuiltLoader  = "quilt_loader"
+	IDForge        = "forge"
+	IDNeoForge     = "neoforge"
+	IDJava         = "java"
 )
+
+// placeholderMark begins an unexpanded build-time placeholder in a version.
+const placeholderMark = "${"
 
 // Mod is one mod declared in a metadata file. Fabric and Quilt declare one;
 // Forge and NeoForge may declare several [[mods]] tables.
@@ -99,6 +101,12 @@ type Dependency struct {
 	Mandatory bool
 	// Side is the Forge/NeoForge per-dependency side; SideBoth otherwise.
 	Side Side
+	// AnyOf is set only for a Quilt alternative group (a nested array in
+	// depends/breaks): the relation holds for ANY of the listed members. A
+	// group has an empty ID and no ranges of its own; each member is a full
+	// Dependency with the same Owner and Kind. FindDependency never matches a
+	// group, so consumers needing alternatives must inspect AnyOf explicitly.
+	AnyOf []Dependency
 }
 
 // LoaderMeta is the metadata one loader's file declares for a jar.
@@ -118,7 +126,9 @@ type LoaderMeta struct {
 	Provides []string
 	// Dependencies of every declared mod, in a deterministic order.
 	Dependencies []Dependency
-	// Environment is the declared side of the whole mod.
+	// Environment is the declared side of the whole mod. Forge and NeoForge
+	// declare side only per dependency (Dependency.Side), so they always
+	// report EnvBoth here.
 	Environment Environment
 	// ModLoader is the Forge/NeoForge language loader ("javafml"...); empty otherwise.
 	ModLoader string

@@ -43,8 +43,15 @@ func defaultParsers() []formatParser {
 // LoaderMeta per loader found. Only the known metadata entries (exact paths)
 // are read, each capped at MaxEntrySize.
 //
-// It returns ErrNoMetadata when none exist, and an error wrapping ErrMalformed
-// when the archive or any metadata file is invalid.
+// Result contract: the returned slice and error are NOT mutually exclusive.
+//   - ErrNoMetadata (and a nil slice) when no supported metadata file exists.
+//   - An error wrapping ErrMalformed and a nil slice when the archive itself
+//     cannot be opened.
+//   - Otherwise every metadata file that parsed successfully is returned, and
+//     if any file failed (unreadable, oversized, invalid) the error is an
+//     errors.Join of one ErrMalformed-wrapping error per failed file. A
+//     multi-loader jar with one broken file therefore still yields the other
+//     loaders' metadata. Callers must inspect the slice even when err != nil.
 func Parse(r io.ReaderAt, size int64) ([]LoaderMeta, error) {
 	return parseWith(r, size, defaultParsers())
 }
@@ -55,7 +62,10 @@ func parseWith(r io.ReaderAt, size int64, parsers []formatParser) ([]LoaderMeta,
 		return nil, fmt.Errorf("%w: opening jar: %w", ErrMalformed, err)
 	}
 
-	var out []LoaderMeta
+	var (
+		out  []LoaderMeta
+		errs []error
+	)
 	for _, p := range parsers {
 		f := findEntry(zr, p.Path())
 		if f == nil {
@@ -63,18 +73,20 @@ func parseWith(r io.ReaderAt, size int64, parsers []formatParser) ([]LoaderMeta,
 		}
 		data, err := readEntry(f)
 		if err != nil {
-			return nil, fmt.Errorf("%w: reading %s: %w", ErrMalformed, p.Path(), err)
+			errs = append(errs, fmt.Errorf("%w: reading %s: %w", ErrMalformed, p.Path(), err))
+			continue
 		}
 		meta, err := p.Parse(data)
 		if err != nil {
-			return nil, fmt.Errorf("%w: parsing %s: %w", ErrMalformed, p.Path(), err)
+			errs = append(errs, fmt.Errorf("%w: parsing %s: %w", ErrMalformed, p.Path(), err))
+			continue
 		}
 		out = append(out, meta)
 	}
-	if len(out) == 0 {
+	if len(out) == 0 && len(errs) == 0 {
 		return nil, ErrNoMetadata
 	}
-	return out, nil
+	return out, errors.Join(errs...)
 }
 
 func findEntry(zr *zip.Reader, name string) *zip.File {
@@ -97,8 +109,13 @@ func readEntry(f *zip.File) ([]byte, error) {
 		return nil, fmt.Errorf("opening entry: %w", err)
 	}
 	defer rc.Close()
+	return readCapped(rc)
+}
 
-	data, err := io.ReadAll(io.LimitReader(rc, MaxEntrySize+1))
+// readCapped reads r fully but fails with ErrEntryTooLarge once more than
+// MaxEntrySize bytes are produced.
+func readCapped(r io.Reader) ([]byte, error) {
+	data, err := io.ReadAll(io.LimitReader(r, MaxEntrySize+1))
 	if err != nil {
 		return nil, fmt.Errorf("reading entry: %w", err)
 	}

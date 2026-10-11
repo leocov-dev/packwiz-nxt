@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 )
 
 type fabricParser struct{}
@@ -54,7 +56,7 @@ func (fabricParser) Parse(data []byte) (LoaderMeta, error) {
 		{KindConflicts, false, f.Conflicts},
 	}
 	for _, g := range groups {
-		for _, id := range sortedKeys(g.deps) {
+		for _, id := range slices.Sorted(maps.Keys(g.deps)) {
 			m.Dependencies = append(m.Dependencies, Dependency{
 				Owner:         f.ID,
 				ID:            id,

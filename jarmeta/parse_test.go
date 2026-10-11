@@ -220,7 +220,35 @@ func TestParseQuilt(t *testing.T) {
 	assert.Equal(t, []string{"1", "2"}, findDep(t, m, "x", KindDepends).VersionRanges)
 	findDep(t, m, "evil", KindBreaks)
 	_, ok = m.FindDependency("alt1", KindDepends)
-	assert.False(t, ok, "nested alternative groups are skipped")
+	assert.False(t, ok, "alternative groups are not matched by FindDependency")
+
+	var group Dependency
+	for _, d := range m.Dependencies {
+		if len(d.AnyOf) > 0 {
+			group = d
+		}
+	}
+	require.Len(t, group.AnyOf, 2)
+	assert.Empty(t, group.ID)
+	assert.Equal(t, KindDepends, group.Kind)
+	assert.Equal(t, "qmod", group.Owner)
+	assert.True(t, group.Mandatory)
+	assert.Equal(t, "alt1", group.AnyOf[0].ID)
+	assert.Equal(t, "alt2", group.AnyOf[1].ID)
+	assert.Equal(t, KindDepends, group.AnyOf[1].Kind)
+}
+
+func TestParseQuiltBreaksGroupAndEmptyGroup(t *testing.T) {
+	metas, err := parseJar(t, entry{"quilt.mod.json",
+		`{"quilt_loader":{"id":"q","depends":[[]],"breaks":[["a",{"id":"b","versions":"<1"}]]}}`})
+	require.NoError(t, err)
+	m := metas[0]
+	require.Len(t, m.Dependencies, 1, "empty group dropped")
+	g := m.Dependencies[0]
+	assert.Equal(t, KindBreaks, g.Kind)
+	require.Len(t, g.AnyOf, 2)
+	assert.Equal(t, "a", g.AnyOf[0].ID)
+	assert.Equal(t, []string{"<1"}, g.AnyOf[1].VersionRanges)
 }
 
 func TestParseForge(t *testing.T) {
@@ -289,6 +317,41 @@ func TestParseMultiLoader(t *testing.T) {
 	assert.ElementsMatch(t, []Loader{LoaderFabric, LoaderNeoForge}, loaders)
 }
 
+func TestParseMultiLoaderPartialFailure(t *testing.T) {
+	metas, err := parseJar(t,
+		entry{"fabric.mod.json", fabricJSON},
+		entry{"quilt.mod.json", "{not json"},
+		entry{"META-INF/mods.toml", "[[mods"},
+	)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrMalformed)
+	assert.False(t, errors.Is(err, ErrNoMetadata))
+	assert.Contains(t, err.Error(), "quilt.mod.json")
+	assert.Contains(t, err.Error(), "META-INF/mods.toml")
+	require.Len(t, metas, 1)
+	assert.Equal(t, LoaderFabric, metas[0].Loader)
+}
+
+func TestParseForgeTomlWithNeoForgeDependency(t *testing.T) {
+	const neo = "[[mods]]\nmodId = \"m\"\n[[dependencies.m]]\nmodId = \"neoforge\"\nmandatory = true\nversionRange = \"[47,)\"\n"
+	const both = neo + "[[dependencies.m]]\nmodId = \"forge\"\nmandatory = true\n"
+
+	metas, err := parseJar(t, entry{"META-INF/mods.toml", neo})
+	require.NoError(t, err)
+	assert.Equal(t, LoaderNeoForge, metas[0].Loader)
+	ld, ok := metas[0].LoaderDependency()
+	require.True(t, ok)
+	assert.Equal(t, "neoforge", ld.ID)
+
+	metas, err = parseJar(t, entry{"META-INF/mods.toml", both})
+	require.NoError(t, err)
+	assert.Equal(t, LoaderForge, metas[0].Loader)
+
+	metas, err = parseJar(t, entry{"META-INF/mods.toml", forgeTOML})
+	require.NoError(t, err)
+	assert.Equal(t, LoaderForge, metas[0].Loader)
+}
+
 func TestParseNoMetadata(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -353,10 +416,21 @@ func TestParseEntryTooLarge(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestParseEntryDeclaredSizeLies(t *testing.T) {
+func TestReadCappedEnforcesLimit(t *testing.T) {
+	// The reader yields more than MaxEntrySize regardless of any declared size.
+	_, err := readCapped(strings.NewReader(strings.Repeat("x", MaxEntrySize+1)))
+	assert.ErrorIs(t, err, ErrEntryTooLarge)
+
+	data, err := readCapped(strings.NewReader(strings.Repeat("x", MaxEntrySize)))
+	require.NoError(t, err)
+	assert.Len(t, data, MaxEntrySize)
+}
+
+// The standard library already rejects a deflate entry whose header lies about
+// its size, so such a jar must fail as malformed before reaching the limiter.
+func TestParseEntryDeclaredSizeLiesDeflate(t *testing.T) {
 	payload := `{"id":"a","pad":"` + strings.Repeat("x", MaxEntrySize+100) + `"}`
 
-	// Build a zip whose header claims a tiny size but whose data is large.
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
 	zw.RegisterCompressor(zip.Deflate, func(w io.Writer) (io.WriteCloser, error) {
@@ -368,15 +442,8 @@ func TestParseEntryDeclaredSizeLies(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, zw.Close())
 
-	raw := buf.Bytes()
-	zr, err := zip.NewReader(bytes.NewReader(raw), int64(len(raw)))
-	require.NoError(t, err)
-	// sanity: real declared size is large
-	require.Greater(t, zr.File[0].UncompressedSize64, uint64(MaxEntrySize))
-
-	// Patch the central directory uncompressed size down to 10 bytes.
-	patched := patchUncompressedSize(t, raw, 10)
-	zr, err = zip.NewReader(bytes.NewReader(patched), int64(len(patched)))
+	patched := patchUncompressedSize(t, buf.Bytes(), 10)
+	zr, err := zip.NewReader(bytes.NewReader(patched), int64(len(patched)))
 	require.NoError(t, err)
 	require.Equal(t, uint64(10), zr.File[0].UncompressedSize64)
 

@@ -3,6 +3,8 @@ package jarmeta
 import (
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/pelletier/go-toml/v2"
@@ -38,6 +40,9 @@ type forgeDep struct {
 	Side         string `toml:"side"`
 }
 
+// Parse decodes the file. A META-INF/mods.toml that depends on the "neoforge"
+// mod id and not on "forge" (NeoForge 1.20.1 jars) is reported as
+// LoaderNeoForge rather than LoaderForge.
 func (p forgeParser) Parse(data []byte) (LoaderMeta, error) {
 	var f forgeFile
 	if err := toml.Unmarshal(data, &f); err != nil {
@@ -65,7 +70,7 @@ func (p forgeParser) Parse(data []byte) (LoaderMeta, error) {
 		m.Mods = append(m.Mods, newMod(mod.ModID, mod.Version))
 	}
 
-	for _, owner := range sortedKeys(f.Dependencies) {
+	for _, owner := range slices.Sorted(maps.Keys(f.Dependencies)) {
 		for _, d := range f.Dependencies[owner] {
 			if d.ModID == "" {
 				continue
@@ -84,7 +89,18 @@ func (p forgeParser) Parse(data []byte) (LoaderMeta, error) {
 			m.Dependencies = append(m.Dependencies, dep)
 		}
 	}
+	// NeoForge 1.20.1 jars still ship META-INF/mods.toml, but depend on the
+	// "neoforge" mod id instead of "forge". Report those as NeoForge.
+	if m.Loader == LoaderForge && hasDependencyOn(m, IDNeoForge) && !hasDependencyOn(m, IDForge) {
+		m.Loader = LoaderNeoForge
+	}
 	return m, nil
+}
+
+func hasDependencyOn(m LoaderMeta, id string) bool {
+	return slices.ContainsFunc(m.Dependencies, func(d Dependency) bool {
+		return d.ID == id && d.Kind == KindDepends
+	})
 }
 
 // forgeKind maps NeoForge "type" (preferred) or Forge "mandatory" (default
