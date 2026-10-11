@@ -138,7 +138,7 @@ func TestCheckFindings(t *testing.T) {
 			name:   "forge file-level loader range mismatch",
 			target: Target{MinecraftVersion: "1.20.1", Loader: jarmeta.LoaderForge, LoaderVersion: "47.2.0"},
 			entries: []Entry{entry("m", jarmeta.LoaderMeta{
-				Loader: jarmeta.LoaderForge, ModID: "m", Mods: []jarmeta.Mod{{ID: "m"}},
+				Loader: jarmeta.LoaderForge, ModID: "m", Mods: []jarmeta.Mod{{ID: "m"}}, ModLoader: "javafml",
 				LoaderVersionRange: "[48,)",
 			})},
 			want: []string{"error:loader_version_mismatch:m"},
@@ -405,10 +405,10 @@ func TestCheckFindings(t *testing.T) {
 			want: []string{"error:duplicate_mod_id:one", "error:duplicate_mod_id:two"},
 		},
 		{
-			name:    "same slug twice does not crash",
+			name:    "same slug twice is not a duplicate",
 			target:  fabricTarget,
 			entries: []Entry{entry("x", fabricMeta("same", "1.0")), entry("x", fabricMeta("same", "1.0"))},
-			want:    []string{"error:duplicate_mod_id:x", "error:duplicate_mod_id:x"},
+			want:    []string{},
 		},
 		{
 			name:    "no metadata",
@@ -449,7 +449,7 @@ func TestCheckFindings(t *testing.T) {
 				m.Environment = jarmeta.EnvClient
 				return m
 			}()}}},
-			want: []string{"info:client_only_on_server:c"},
+			want: []string{"info:side_mismatch:c"},
 		},
 		{
 			name:   "server only mod on client side",
@@ -459,7 +459,7 @@ func TestCheckFindings(t *testing.T) {
 				m.Environment = jarmeta.EnvServer
 				return m
 			}()}}},
-			want: []string{"info:client_only_on_server:s"},
+			want: []string{"info:side_mismatch:s"},
 		},
 		{
 			name:   "client only mod on client side is fine",
@@ -500,10 +500,11 @@ func TestCheckOrderDeterministic(t *testing.T) {
 		entry("a", fabricMeta("a", "1.0", dep("a", "missing"))),
 		{Slug: "w", ParseErr: errors.New("boom")},
 	}
+	// the unreadable jar "w" may hold the missing mods, so those are warnings
 	want := []string{
-		"error:missing_dependency:a",
 		"error:mc_version_mismatch:b",
-		"error:missing_dependency:b",
+		"warning:missing_dependency:a",
+		"warning:missing_dependency:b",
 		"warning:parse_error:w",
 		"info:no_metadata:z-lib",
 	}

@@ -2,6 +2,7 @@ package compat
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
@@ -18,6 +19,13 @@ import (
 //   - space separated terms are ANDed; "||" separates alternatives
 //
 // Versions are compared as SemVer, so "1.21-pre1" sorts below "1.21". A
+// trailing "x" or "*" component in a comparator operand counts as zero
+// (">=1.20.x" is ">=1.20.0").
+//
+// Limitation: Fabric normalizes Minecraft pre-release names before matching
+// ("1.21-pre1" becomes "1.21-beta.1", "1.21-rc1" becomes "1.21-rc.1"). That
+// normalization is not implemented; such versions are compared as written, so
+// results for pre-release Minecraft versions may differ from Fabric's. A
 // version that is not SemVer (a snapshot such as "24w14a") can only be
 // compared for exact string equality; any other predicate yields
 // ErrInvalidVersion. Build metadata ("+build.1") is ignored. This is not
@@ -188,17 +196,44 @@ func parseBound(s string) (bound, error) {
 	if s == "" {
 		return b, ErrInvalidRange
 	}
-	core := s
-	if i := strings.IndexAny(core, "-+"); i >= 0 {
-		core = core[:i]
+	s, b.parts = zeroTrailingWildcards(s)
+	if b.parts == 0 {
+		return b, ErrInvalidRange
 	}
-	b.parts = strings.Count(core, ".") + 1
 	v, err := parseSemver(s)
 	if err != nil {
 		return b, nil // non-semver operand: v stays nil
 	}
 	b.v = v
 	return b, nil
+}
+
+// zeroTrailingWildcards replaces trailing "x", "X" or "*" components of the
+// numeric part of s with "0" and returns the result with the number of
+// components that were not wildcards. A wildcard followed by a non-wildcard
+// component is left as is (and fails to parse later).
+func zeroTrailingWildcards(s string) (string, int) {
+	core, suffix := s, ""
+	if i := strings.IndexAny(s, "-+"); i >= 0 {
+		core, suffix = s[:i], s[i:]
+	}
+	parts := strings.Split(core, ".")
+	fixed := len(parts)
+	for i, p := range parts {
+		if p == "x" || p == "X" || p == "*" {
+			fixed = i
+			break
+		}
+	}
+	for _, p := range parts[fixed:] {
+		if p != "x" && p != "X" && p != "*" {
+			return s, len(parts)
+		}
+	}
+	for i := fixed; i < len(parts); i++ {
+		parts[i] = "0"
+	}
+	return strings.Join(parts, ".") + suffix, fixed
 }
 
 func parseSemver(s string) (*semver.Version, error) {
@@ -252,15 +287,9 @@ func matchWildcard(term string, prefix []string, version string) (bool, error) {
 	}
 	want := make([]uint64, len(prefix))
 	for i, p := range prefix {
-		var n uint64
-		if p == "" {
+		n, err := strconv.ParseUint(p, 10, 64)
+		if err != nil {
 			return false, fmt.Errorf("%w: %q", ErrInvalidRange, term)
-		}
-		for _, c := range p {
-			if c < '0' || c > '9' {
-				return false, fmt.Errorf("%w: %q", ErrInvalidRange, term)
-			}
-			n = n*10 + uint64(c-'0')
 		}
 		want[i] = n
 	}

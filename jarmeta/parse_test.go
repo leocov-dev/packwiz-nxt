@@ -21,6 +21,7 @@ const fabricJSON = `{
   "name": "Example",
   "environment": "client",
   "provides": ["example-alias"],
+  "jars": [{"file": "META-INF/jars/lib-1.0.jar"}, {"file": "META-INF/jars/other.jar"}],
   "entrypoints": {"main": ["a.B"]},
   "somethingUnknown": {"x": 1},
   "depends": {
@@ -43,6 +44,7 @@ const quiltJSON = `{
     "version": "0.9.0",
     "metadata": {"name": "Q Mod"},
     "provides": ["alias", {"id": "alias2", "version": "1"}],
+    "jars": ["nested/a.jar", "nested/b.jar"],
     "depends": [
       "plain_dep",
       {"id": "minecraft", "versions": ">=1.20"},
@@ -168,6 +170,8 @@ func TestParseFabric(t *testing.T) {
 	assert.False(t, m.VersionIsPlaceholder)
 	assert.Equal(t, EnvClient, m.Environment)
 	assert.Equal(t, []string{"example-alias"}, m.Provides)
+	assert.Nil(t, m.ProvidesVersions)
+	assert.Equal(t, []string{"META-INF/jars/lib-1.0.jar", "META-INF/jars/other.jar"}, m.NestedJars)
 	assert.Equal(t, []Mod{{ID: "examplemod", Version: "1.2.3"}}, m.Mods)
 
 	mc := findDep(t, m, "minecraft", KindDepends)
@@ -201,6 +205,8 @@ func TestParseQuilt(t *testing.T) {
 	assert.Equal(t, "Q Mod", m.Name)
 	assert.Equal(t, EnvServer, m.Environment)
 	assert.Equal(t, []string{"alias", "alias2"}, m.Provides)
+	assert.Equal(t, map[string]string{"alias2": "1"}, m.ProvidesVersions)
+	assert.Equal(t, []string{"nested/a.jar", "nested/b.jar"}, m.NestedJars)
 
 	plain := findDep(t, m, "plain_dep", KindDepends)
 	assert.Empty(t, plain.VersionRanges)

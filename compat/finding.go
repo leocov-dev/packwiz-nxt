@@ -43,7 +43,8 @@ const (
 	// excludes the pack loader version. Skipped when Target.LoaderVersion is empty.
 	CodeLoaderVersionMismatch Code = "loader_version_mismatch"
 	// CodeMissingDependency (error): a mandatory dependency is not provided
-	// by any entry of the pack.
+	// by any entry of the pack. A warning instead when the provider may be
+	// hidden: a nested jar or an unreadable jar is present (see Check).
 	CodeMissingDependency Code = "missing_dependency"
 	// CodeDependencyVersion (error): a mandatory dependency is present but
 	// its version does not satisfy the declared range.
@@ -59,20 +60,30 @@ const (
 	CodeNoMetadata Code = "no_metadata"
 	// CodeParseError (warning): the jar or its metadata could not be (fully) read.
 	CodeParseError Code = "parse_error"
-	// CodeClientOnlyOnServer (info): the jar declares an environment that
-	// does not match the pack side of the entry.
-	CodeClientOnlyOnServer Code = "client_only_on_server"
+	// CodeSideMismatch (info): the jar declares an environment (client or
+	// server only) that does not match the pack side of the entry.
+	CodeSideMismatch Code = "side_mismatch"
 	// CodeUnevaluableRange (info): a declared version range could not be
 	// parsed, so the check depending on it was skipped.
 	CodeUnevaluableRange Code = "unevaluable_range"
 )
 
 // Target is what the pack runs on.
+//
+// Limitation: Minecraft pre-release and release-candidate names are compared
+// as written. Fabric normalizes them for its own matching ("1.21-pre1"
+// becomes "1.21-beta.1", "1.21-rc1" becomes "1.21-rc.1"); that normalization
+// is not implemented, so Fabric/Quilt ranges that name such versions may be
+// misjudged. Maven ranges (Forge, NeoForge) are not evaluated against
+// snapshots and pre-releases at all.
 type Target struct {
 	MinecraftVersion string
 	Loader           jarmeta.Loader
-	// LoaderVersion may be empty, which skips loader version checks. Use the
-	// bare loader version ("0.15.11", "47.2.0", "21.1.172").
+	// LoaderVersion may be empty, which skips loader version checks. It
+	// should be the bare loader version ("0.15.11", "47.2.0", "21.1.172"), not
+	// a decorated name such as "forge-47.2.0". A qualifier such as "-beta" on
+	// a NeoForge version ("21.1.172-beta") compares below the release under
+	// Maven ordering, so a range like "[21.1.172,)" does not accept it.
 	LoaderVersion string
 }
 

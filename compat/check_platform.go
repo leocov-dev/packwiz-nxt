@@ -3,9 +3,15 @@ package compat
 import (
 	"errors"
 	"fmt"
+	"regexp"
+	"strings"
 
 	"github.com/leocov-dev/packwiz-nxt/jarmeta"
 )
+
+// forgeJavaFML is the Forge language provider whose loaderVersion range is
+// a range over the Forge version.
+const forgeJavaFML = "javafml"
 
 // isPlatformID reports ids that name the game, the runtime or a loader
 // rather than a mod in the pack.
@@ -49,10 +55,15 @@ func platformDeps(r *resolved, id string) []jarmeta.Dependency {
 
 // checkMinecraftVersion reports a jar whose minecraft requirement excludes
 // the pack Minecraft version. Skipped when the pack version is empty or not
-// comparable.
+// comparable, and for Maven ranges (Forge, NeoForge) when the pack version is
+// a snapshot, pre-release or release candidate: Maven ordering has no sound
+// answer for them.
 func checkMinecraftVersion(c *checkContext, e *resolved) []Finding {
 	mc := c.target.MinecraftVersion
 	if mc == "" {
+		return nil
+	}
+	if _, maven := e.matcher.(MavenMatcher); maven && !isMavenComparable(mc) {
 		return nil
 	}
 	var out []Finding
@@ -72,17 +83,20 @@ func checkMinecraftVersion(c *checkContext, e *resolved) []Finding {
 	return out
 }
 
-// loaderChecks lists, per metadata loader, which version constraints apply
-// to the pack loader version: the dependency id on the loader, and for Forge
-// the file-level loaderVersion range. NeoForge's file-level range names the
-// language provider version (not the NeoForge version) and is ignored.
+// checkLoaderVersion reports a jar whose requirement on the loader excludes
+// the pack loader version. Per metadata loader, the constraints are the
+// dependency id on the loader and, for Forge mods using the "javafml"
+// language provider, the file-level loaderVersion range. For other language
+// providers (kotlinforforge, lowcodefml...) and for NeoForge the file-level
+// range names the language provider version, not the loader version, and is
+// ignored.
 func checkLoaderVersion(c *checkContext, e *resolved) []Finding {
 	lv := c.target.LoaderVersion
 	if lv == "" || e.viaFabric || e.meta.Loader != c.target.Loader {
 		return nil
 	}
 	deps := platformDeps(e, loaderDepID(e.meta.Loader))
-	if e.meta.Loader == jarmeta.LoaderForge && e.meta.LoaderVersionRange != "" {
+	if e.meta.Loader == jarmeta.LoaderForge && e.meta.ModLoader == forgeJavaFML && e.meta.LoaderVersionRange != "" {
 		deps = append(deps, jarmeta.Dependency{
 			ID: jarmeta.IDForge, Kind: jarmeta.KindDepends, Mandatory: true,
 			VersionRanges: []string{e.meta.LoaderVersionRange},
@@ -103,6 +117,25 @@ func checkLoaderVersion(c *checkContext, e *resolved) []Finding {
 		}
 	}
 	return out
+}
+
+var mcSnapshot = regexp.MustCompile(`^\d+w\d+[a-z]$`)
+
+// isMavenComparable reports whether a Minecraft version can be ordered by
+// Maven rules. Snapshots ("24w14a") and pre-releases ("1.21-pre1",
+// "1.21-rc1") cannot: Maven would rank them above or inconsistently with
+// the release they precede.
+func isMavenComparable(mc string) bool {
+	lower := strings.ToLower(mc)
+	if mcSnapshot.MatchString(lower) {
+		return false
+	}
+	for _, q := range []string{"-pre", "-rc", "-snapshot"} {
+		if strings.Contains(lower, q) {
+			return false
+		}
+	}
+	return true
 }
 
 func loaderDepID(l jarmeta.Loader) string {

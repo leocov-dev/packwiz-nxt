@@ -1,8 +1,8 @@
 package compat
 
 import (
-	"cmp"
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -21,7 +21,8 @@ const (
 type depOutcome struct {
 	state depState
 	dep   jarmeta.Dependency
-	// found lists the versions of the providers that were present.
+	// found lists the versions of the providers that were present, ordered
+	// by provider slug.
 	found []string
 }
 
@@ -33,6 +34,9 @@ func (c *checkContext) resolveDependency(e *resolved, dep jarmeta.Dependency) (d
 	provs := c.providers[dep.ID]
 	if len(provs) == 0 {
 		out.state = depMissing
+		if c.fabricAPIModule(e, dep.ID) {
+			out.state = depOK // bundled in the Fabric API; not verifiable
+		}
 		return out, nil
 	}
 	var extra []Finding
@@ -55,6 +59,44 @@ func (c *checkContext) resolveDependency(e *resolved, dep jarmeta.Dependency) (d
 	}
 	out.state = depBadVersion
 	return out, extra
+}
+
+// Fabric API ids. Its modules ship as nested jars inside the API mod, so they
+// are never providers of their own.
+const (
+	idFabricAPI = "fabric-api"
+	idQuiltFAPI = "quilted_fabric_api"
+)
+
+// fabricModuleID matches the id of a Fabric API module: "fabric-api-base" or
+// "fabric-<name>-v<N>" (such as "fabric-resource-loader-v0"). Unrelated mods
+// whose id merely starts with "fabric-" (fabric-language-kotlin) do not match.
+var fabricModuleID = regexp.MustCompile(`^fabric-api-base$|^fabric-.+-v\d+$`)
+
+// fabricAPIModule reports whether id is a module of a Fabric API that is
+// present in the pack, so the dependency is satisfied by a nested jar.
+func (c *checkContext) fabricAPIModule(e *resolved, id string) bool {
+	if e.meta.Loader != jarmeta.LoaderFabric && e.meta.Loader != jarmeta.LoaderQuilt {
+		return false
+	}
+	if !fabricModuleID.MatchString(id) && !strings.HasPrefix(id, "quilted_fabric") {
+		return false
+	}
+	return len(c.providers[idFabricAPI]) > 0 || len(c.providers[idQuiltFAPI]) > 0
+}
+
+// missingNote explains why a missing dependency may not really be missing:
+// it may sit in a nested jar or in a jar that could not be read. Empty when
+// neither applies.
+func (c *checkContext) missingNote() string {
+	var notes []string
+	if len(c.nestedSlugs) > 0 {
+		notes = append(notes, "may be bundled inside "+strings.Join(c.nestedSlugs, ", "))
+	}
+	if len(c.unreadable) > 0 {
+		notes = append(notes, "unreadable jar present: "+strings.Join(c.unreadable, ", "))
+	}
+	return strings.Join(notes, "; ")
 }
 
 // ignorable reports dependencies that are not checked against pack entries.
@@ -82,7 +124,7 @@ func checkDependencies(c *checkContext, e *resolved) []Finding {
 		out = append(out, extra...)
 		switch res.state {
 		case depMissing:
-			out = append(out, missingFinding(e, dep))
+			out = append(out, c.missingFinding(e, dep))
 		case depBadVersion:
 			out = append(out, versionFinding(e, res))
 		}
@@ -123,19 +165,35 @@ func (c *checkContext) checkGroup(e *resolved, group jarmeta.Dependency) []Findi
 	if anyPresent {
 		code, what = CodeDependencyVersion, "no alternative dependency has a matching version"
 	}
-	return append(extra, Finding{
+	f := Finding{
 		Severity: SeverityError, Code: code, Slug: e.Slug,
 		Message: fmt.Sprintf("%s: one of %s is required", what, strings.Join(alts, ", ")),
 		Detail:  map[string]string{"alternatives": strings.Join(alts, " | ")},
-	})
+	}
+	if code == CodeMissingDependency {
+		f = c.softenMissing(f)
+	}
+	return append(extra, f)
 }
 
-func missingFinding(e *resolved, dep jarmeta.Dependency) Finding {
-	return Finding{
+func (c *checkContext) missingFinding(e *resolved, dep jarmeta.Dependency) Finding {
+	f := Finding{
 		Severity: SeverityError, Code: CodeMissingDependency, Slug: e.Slug,
 		Message: fmt.Sprintf("required mod %q (%s) is not in the pack", dep.ID, describeRanges(dep)),
 		Detail:  map[string]string{"dependency": dep.ID, "required": describeRanges(dep)},
 	}
+	return c.softenMissing(f)
+}
+
+// softenMissing downgrades a missing-dependency finding to a warning with an
+// explanatory note when the provider may be hidden from the check.
+func (c *checkContext) softenMissing(f Finding) Finding {
+	if note := c.missingNote(); note != "" {
+		f.Severity = SeverityWarning
+		f.Message += " (" + note + ")"
+		f.Detail["note"] = note
+	}
+	return f
 }
 
 func versionFinding(e *resolved, res depOutcome) Finding {
@@ -203,39 +261,29 @@ func (c *checkContext) incompatibility(e *resolved, dep jarmeta.Dependency) (Fin
 	return Finding{}, false
 }
 
-// checkDuplicateIDs reports mod ids declared by more than one entry. One
-// finding per involved entry, so each mod can link to its own problem.
+// checkDuplicateIDs reports mod ids (declared or provided) offered by more
+// than one distinct entry. One finding per involved slug, so each mod can
+// link to its own problem. The same slug listed twice is one mod.
 func checkDuplicateIDs(c *checkContext) []Finding {
-	byID := map[string][]*resolved{}
-	for i := range c.entries {
-		e := &c.entries[i]
-		seen := map[string]bool{}
-		for _, m := range e.meta.Mods {
-			if m.ID != "" && !seen[m.ID] {
-				seen[m.ID] = true
-				byID[m.ID] = append(byID[m.ID], e)
-			}
-		}
-	}
-	ids := make([]string, 0, len(byID))
-	for id, es := range byID {
-		if len(es) > 1 {
-			ids = append(ids, id)
-		}
+	ids := make([]string, 0, len(c.providers))
+	for id := range c.providers {
+		ids = append(ids, id)
 	}
 	slices.Sort(ids)
 	var out []Finding
 	for _, id := range ids {
-		es := byID[id]
-		slugs := make([]string, len(es))
-		for i, e := range es {
-			slugs[i] = e.Slug
+		slugs := make([]string, 0, len(c.providers[id]))
+		for _, p := range c.providers[id] {
+			slugs = append(slugs, p.entry.Slug)
 		}
-		slices.SortFunc(es, func(a, b *resolved) int { return cmp.Compare(a.Slug, b.Slug) })
 		slices.Sort(slugs)
-		for _, e := range es {
+		slugs = slices.Compact(slugs)
+		if len(slugs) < 2 {
+			continue
+		}
+		for _, slug := range slugs {
 			out = append(out, Finding{
-				Severity: SeverityError, Code: CodeDuplicateModID, Slug: e.Slug,
+				Severity: SeverityError, Code: CodeDuplicateModID, Slug: slug,
 				Message: fmt.Sprintf("mod id %q is provided by multiple mods: %s", id, strings.Join(slugs, ", ")),
 				Detail:  map[string]string{"mod_id": id, "slugs": strings.Join(slugs, ",")},
 			})

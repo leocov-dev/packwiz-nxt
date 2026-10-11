@@ -60,6 +60,18 @@ func TestFabricMatcher(t *testing.T) {
 		{"comparator garbage bound", ">=abc", "1.0.0", false, ErrInvalidRange},
 		{"bare operator", ">=", "1.0.0", false, ErrInvalidRange},
 		{"bad wildcard", "1.x.3", "1.0.0", false, ErrInvalidRange},
+		{"wildcard integer overflow", "99999999999999999999.x", "1.0.0", false, ErrInvalidRange},
+		{"wildcard minor overflow", "1.99999999999999999999.x", "1.0.0", false, ErrInvalidRange},
+		{"comparator trailing x in", ">=1.20.x", "1.20.4", true, nil},
+		{"comparator trailing x below", ">=1.20.x", "1.19.4", false, nil},
+		{"comparator trailing star", "<1.21.*", "1.20.9", true, nil},
+		{"comparator trailing x upper", "<1.21.x", "1.21.0", false, nil},
+		{"tilde trailing x in", "~1.20.x", "1.20.6", true, nil},
+		{"tilde trailing x out", "~1.20.x", "1.21.0", false, nil},
+		{"caret trailing x in", "^1.20.x", "1.99.0", true, nil},
+		{"caret trailing x out", "^1.20.x", "2.0.0", false, nil},
+		{"tilde minor wildcard", "~1.x", "1.9.0", true, nil},
+		{"comparator all wildcard", ">=x", "1.0.0", false, ErrInvalidRange},
 		{"failing term wins over bad term", "<1.0 >=zzz", "2.0.0", false, nil},
 	}
 	for _, tc := range tests {

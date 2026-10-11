@@ -1,6 +1,7 @@
 package compat
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"slices"
@@ -29,6 +30,17 @@ import (
 //     minecraft and the loader are checked against the Target instead.
 //   - Entries that carry no usable metadata cannot provide mod ids, so a
 //     dependency on a library shipped without metadata is reported missing.
+//     That finding is downgraded to a warning, with a note in Detail["note"],
+//     when the mod may be hidden from the check: some entry declares nested
+//     (jar-in-jar) jars, which are never opened, or some entry's jar could not
+//     be read. On Fabric and Quilt packs a dependency on a Fabric API module
+//     (such as "fabric-resource-loader-v0") counts as satisfied when the
+//     Fabric API itself is in the pack.
+//   - Quilt "provides" entries use their own declared version; one declared
+//     without a version has an unknown version. Fabric provides share the
+//     version of the providing mod.
+//   - Mod ids (including provided ids) offered by more than one distinct
+//     entry are reported as duplicates; the same slug listed twice is one mod.
 //   - A version that is empty, a build placeholder or not comparable is
 //     "unknown": no version finding is produced for it.
 func Check(target Target, entries []Entry) []Finding {
@@ -84,10 +96,17 @@ type provider struct {
 }
 
 type checkContext struct {
-	target    Target
-	entries   []resolved
+	target  Target
+	entries []resolved
+	// providers maps a mod id to the entries answering to it, sorted by slug
+	// so results do not depend on input order.
 	providers map[string][]provider
-	findings  []Finding
+	// nestedSlugs lists (sorted) the entries that declare nested jars.
+	nestedSlugs []string
+	// unreadable lists (sorted) the slugs of entries dropped because their
+	// jar could not be read; they may be the provider of a missing mod.
+	unreadable []string
+	findings   []Finding
 }
 
 func (c *checkContext) add(fs ...Finding) {
@@ -106,12 +125,32 @@ func newContext(target Target, entries []Entry) *checkContext {
 		c.add(fs...)
 		if r != nil {
 			c.entries = append(c.entries, *r)
+		} else if isReadError(en.ParseErr) {
+			c.unreadable = append(c.unreadable, en.Slug)
 		}
 	}
 	for i := range c.entries {
 		c.indexProviders(&c.entries[i])
+		if len(c.entries[i].meta.NestedJars) > 0 {
+			c.nestedSlugs = append(c.nestedSlugs, c.entries[i].Slug)
+		}
+	}
+	for _, ps := range c.providers {
+		slices.SortStableFunc(ps, func(a, b provider) int {
+			return cmp.Or(cmp.Compare(a.entry.Slug, b.entry.Slug), cmp.Compare(a.version, b.version))
+		})
+	}
+	for _, list := range []*[]string{&c.nestedSlugs, &c.unreadable} {
+		slices.Sort(*list)
+		*list = slices.Compact(*list)
 	}
 	return c
+}
+
+// isReadError reports a parse error that means the jar was damaged or
+// unreadable, as opposed to simply carrying no loader metadata.
+func isReadError(err error) bool {
+	return err != nil && !errors.Is(err, jarmeta.ErrNoMetadata)
 }
 
 func (c *checkContext) indexProviders(r *resolved) {
@@ -125,13 +164,26 @@ func (c *checkContext) indexProviders(r *resolved) {
 			entry: r, version: m.Version, versionKnown: usableVersion(m.Version, m.VersionIsPlaceholder),
 		})
 	}
-	ver := usableVersion(r.meta.Version, r.meta.VersionIsPlaceholder)
 	for _, id := range r.meta.Provides {
 		if id == "" || seen[id] {
 			continue
 		}
 		seen[id] = true
-		c.providers[id] = append(c.providers[id], provider{entry: r, version: r.meta.Version, versionKnown: ver})
+		c.providers[id] = append(c.providers[id], providedBy(r, id))
+	}
+}
+
+// providedBy builds the provider record for an id in meta.Provides. Quilt
+// provides carry their own version, which is unknown when not declared;
+// Fabric provides share the version of the providing mod.
+func providedBy(r *resolved, id string) provider {
+	if r.meta.Loader == jarmeta.LoaderQuilt {
+		v := r.meta.ProvidesVersions[id]
+		return provider{entry: r, version: v, versionKnown: usableVersion(v, false)}
+	}
+	return provider{
+		entry: r, version: r.meta.Version,
+		versionKnown: usableVersion(r.meta.Version, r.meta.VersionIsPlaceholder),
 	}
 }
 
@@ -143,7 +195,7 @@ func usableVersion(v string, placeholder bool) bool {
 // per-entry findings that stop an entry from being checked further.
 func resolve(target Target, en Entry) (*resolved, []Finding) {
 	var out []Finding
-	if en.ParseErr != nil && !errors.Is(en.ParseErr, jarmeta.ErrNoMetadata) {
+	if isReadError(en.ParseErr) {
 		out = append(out, Finding{
 			Severity: SeverityWarning, Code: CodeParseError, Slug: en.Slug,
 			Message: "mod jar could not be fully read: " + en.ParseErr.Error(),

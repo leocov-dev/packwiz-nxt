@@ -124,6 +124,19 @@ type LoaderMeta struct {
 	Mods []Mod
 	// Provides are extra ids the primary mod also answers to.
 	Provides []string
+	// ProvidesVersions holds the version declared for a provided id, keyed by
+	// id, for ids whose declaration carries one. Only Quilt declares
+	// per-provide versions ({"id": "...", "version": "..."}); a Quilt provide
+	// without a version is absent from the map, and consumers must not assume
+	// it shares the primary mod's version. Fabric provides always share the
+	// mod's version, so the map is nil for Fabric (and for Forge/NeoForge).
+	ProvidesVersions map[string]string
+	// NestedJars are the jar-in-jar paths the metadata declares (Fabric
+	// "jars", Quilt "quilt_loader.jars"), exactly as written. The nested jars
+	// are not opened or parsed, so the mods they contain are invisible to the
+	// caller. Forge and NeoForge do not declare nested jars in their
+	// metadata, so this is empty for them.
+	NestedJars []string
 	// Dependencies of every declared mod, in a deterministic order.
 	Dependencies []Dependency
 	// Environment is the declared side of the whole mod. Forge and NeoForge

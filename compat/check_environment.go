@@ -15,7 +15,7 @@ func checkEnvironment(_ *checkContext, e *resolved) []Finding {
 	case env == jarmeta.EnvClient && e.Side == core.ServerSide,
 		env == jarmeta.EnvServer && e.Side == core.ClientSide:
 		return []Finding{{
-			Severity: SeverityInfo, Code: CodeClientOnlyOnServer, Slug: e.Slug,
+			Severity: SeverityInfo, Code: CodeSideMismatch, Slug: e.Slug,
 			Message: fmt.Sprintf("mod declares environment %q but is set to side %q in the pack", env, e.Side),
 			Detail:  map[string]string{"environment": string(env), "side": string(e.Side)},
 		}}
