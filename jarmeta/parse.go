@@ -61,7 +61,19 @@ func parseWith(r io.ReaderAt, size int64, parsers []formatParser) ([]LoaderMeta,
 	if err != nil {
 		return nil, fmt.Errorf("%w: opening jar: %w", ErrMalformed, err)
 	}
+	out, err := parseZip(zr, parsers)
+	if len(out) > 0 {
+		err = errors.Join(err, attachNested(zr, parsers, out))
+	}
+	if len(out) == 0 && err == nil {
+		return nil, ErrNoMetadata
+	}
+	return out, err
+}
 
+// parseZip reads the loader metadata files of an open archive. Nested jars
+// are not followed.
+func parseZip(zr *zip.Reader, parsers []formatParser) ([]LoaderMeta, error) {
 	var (
 		out  []LoaderMeta
 		errs []error
@@ -82,9 +94,6 @@ func parseWith(r io.ReaderAt, size int64, parsers []formatParser) ([]LoaderMeta,
 			continue
 		}
 		out = append(out, meta)
-	}
-	if len(out) == 0 && len(errs) == 0 {
-		return nil, ErrNoMetadata
 	}
 	return out, errors.Join(errs...)
 }

@@ -27,6 +27,15 @@ func withNested(m jarmeta.LoaderMeta, jars ...string) jarmeta.LoaderMeta {
 	return m
 }
 
+func withBundled(m jarmeta.LoaderMeta, ids ...string) jarmeta.LoaderMeta {
+	for _, id := range ids {
+		m.NestedJars = append(m.NestedJars, id+".jar")
+		m.Bundled = append(m.Bundled, jarmeta.Mod{ID: id, Version: "1.0"})
+	}
+	m.NestedOpened = len(ids)
+	return m
+}
+
 func forgeMeta(id string, deps ...jarmeta.Dependency) jarmeta.LoaderMeta {
 	return jarmeta.LoaderMeta{
 		Loader: jarmeta.LoaderForge, ModID: id, Mods: []jarmeta.Mod{{ID: id}},

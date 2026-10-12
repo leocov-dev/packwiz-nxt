@@ -131,12 +131,17 @@ type LoaderMeta struct {
 	// it shares the primary mod's version. Fabric provides always share the
 	// mod's version, so the map is nil for Fabric (and for Forge/NeoForge).
 	ProvidesVersions map[string]string
-	// NestedJars are the jar-in-jar paths the metadata declares (Fabric
-	// "jars", Quilt "quilt_loader.jars"), exactly as written. The nested jars
-	// are not opened or parsed, so the mods they contain are invisible to the
-	// caller. Forge and NeoForge do not declare nested jars in their
-	// metadata, so this is empty for them.
+	// NestedJars are the jar-in-jar paths the jar declares, exactly as
+	// written: Fabric "jars", Quilt "quilt_loader.jars", and for Forge and
+	// NeoForge the META-INF/jarjar/metadata.json manifest. Parse opens them
+	// one level deep; see Bundled and NestedOpened.
 	NestedJars []string
+	// NestedOpened counts the NestedJars Parse could open and read. When it
+	// is less than len(NestedJars), some bundled mods are invisible.
+	NestedOpened int
+	// Bundled are the mods declared by the opened nested jars (one level
+	// deep; jars nested inside them are not followed).
+	Bundled []Mod
 	// Dependencies of every declared mod, in a deterministic order.
 	Dependencies []Dependency
 	// Environment is the declared side of the whole mod. Forge and NeoForge

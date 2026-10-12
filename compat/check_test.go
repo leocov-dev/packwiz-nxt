@@ -8,6 +8,7 @@ import (
 
 	"github.com/leocov-dev/packwiz-nxt/core"
 	"github.com/leocov-dev/packwiz-nxt/jarmeta"
+	"github.com/stretchr/testify/assert"
 )
 
 // fabricMeta builds a Fabric LoaderMeta with the usual platform requirements.
@@ -597,4 +598,36 @@ func TestCheckRealisticFabricPack(t *testing.T) {
 	if got[0].Detail["found"] != "0.92.2+1.20.1" || got[0].Detail["dependency"] != "fabric-api" {
 		t.Fatalf("unexpected detail: %v", got[0].Detail)
 	}
+}
+
+func TestCheckBundledMods(t *testing.T) {
+	t.Run("bundled mod satisfies dependency", func(t *testing.T) {
+		got := Check(fabricTarget, []Entry{
+			entry("m", fabricMeta("m", "1.0", dep("m", "somelib", ">=1.0"))),
+			entry("n", withBundled(fabricMeta("n", "1.0"), "somelib")),
+		})
+		assert.Empty(t, got)
+	})
+	t.Run("bundled version out of range is reported", func(t *testing.T) {
+		got := Check(fabricTarget, []Entry{
+			entry("m", fabricMeta("m", "1.0", dep("m", "somelib", ">=2.0"))),
+			entry("n", withBundled(fabricMeta("n", "1.0"), "somelib")),
+		})
+		assert.Equal(t, []string{"error:dependency_version:m"}, codes(got))
+	})
+	t.Run("same lib bundled twice or alongside is not a duplicate", func(t *testing.T) {
+		got := Check(fabricTarget, []Entry{
+			entry("a", withBundled(fabricMeta("a", "1.0"), "lib")),
+			entry("b", withBundled(fabricMeta("b", "1.0"), "lib")),
+			entry("lib", fabricMeta("lib", "1.0")),
+		})
+		assert.Empty(t, got)
+	})
+	t.Run("fully opened nested jars do not downgrade a missing dependency", func(t *testing.T) {
+		got := Check(fabricTarget, []Entry{
+			entry("m", fabricMeta("m", "1.0", dep("m", "other"))),
+			entry("n", withBundled(fabricMeta("n", "1.0"), "somelib")),
+		})
+		assert.Equal(t, []string{"error:missing_dependency:m"}, codes(got))
+	})
 }

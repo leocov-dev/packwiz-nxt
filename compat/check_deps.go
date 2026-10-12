@@ -274,7 +274,9 @@ func checkDuplicateIDs(c *checkContext) []Finding {
 	for _, id := range ids {
 		slugs := make([]string, 0, len(c.providers[id]))
 		for _, p := range c.providers[id] {
-			slugs = append(slugs, p.entry.Slug)
+			if !p.bundled {
+				slugs = append(slugs, p.entry.Slug)
+			}
 		}
 		slices.Sort(slugs)
 		slugs = slices.Compact(slugs)
