@@ -73,14 +73,33 @@ func checkMinecraftVersion(c *checkContext, e *resolved) []Finding {
 		case err != nil:
 			out = append(out, unevaluable(e, dep, err))
 		case v == verdictNo:
-			return append(out, Finding{
+			f := Finding{
 				Severity: SeverityError, Code: CodeMCVersionMismatch, Slug: e.Slug,
 				Message: fmt.Sprintf("mod requires Minecraft %s but the pack uses %s", describeRanges(dep), mc),
 				Detail:  map[string]string{"pack_version": mc, "required": describeRanges(dep)},
-			})
+			}
+			if excludedAtUpperBound(e, dep, mc) {
+				f.Severity = SeverityWarning
+				f.Detail["note"] = "the pack version is the exclusive upper bound of the declared range; mods often declare it this way and still run on that version"
+			}
+			return append(out, f)
 		}
 	}
 	return out
+}
+
+// excludedAtUpperBound reports whether every range of the dependency that
+// excludes mc does so only because mc is its exclusive upper bound.
+func excludedAtUpperBound(r *resolved, dep jarmeta.Dependency, mc string) bool {
+	if _, maven := r.matcher.(MavenMatcher); !maven || len(dep.VersionRangesAll) > 0 || len(dep.VersionRanges) == 0 {
+		return false
+	}
+	for _, rng := range dep.VersionRanges {
+		if !excludesOnlyAtUpperBound(rng, mc) {
+			return false
+		}
+	}
+	return true
 }
 
 // checkLoaderVersion reports a jar whose requirement on the loader excludes

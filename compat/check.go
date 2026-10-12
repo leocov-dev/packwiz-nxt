@@ -21,6 +21,9 @@ import (
 //   - Quilt packs accept Fabric metadata when a jar has no Quilt metadata.
 //     Loader version checks are skipped for such jars (Quilt and Fabric
 //     loader versions are different numbering schemes).
+//   - A Forge/NeoForge Minecraft requirement that excludes the pack version
+//     only because it is the exclusive upper bound ("[1.21,1.21.1)" on
+//     1.21.1) is a warning, not an error: mods declare such ranges and run.
 //   - Only mandatory "depends" relations are reported. Optional, recommends
 //     and suggests relations are ignored.
 //   - A Forge/NeoForge dependency whose Side is CLIENT is ignored for entries
