@@ -631,3 +631,32 @@ func TestCheckBundledMods(t *testing.T) {
 		assert.Equal(t, []string{"error:missing_dependency:m"}, codes(got))
 	})
 }
+
+func TestCheckMinecraftExclusiveUpperBound(t *testing.T) {
+	neo := Target{MinecraftVersion: "1.21.1", Loader: jarmeta.LoaderNeoForge}
+	mod := func(rng string) []Entry {
+		m := forgeMeta("m", dep("m", "minecraft", rng))
+		m.Loader = jarmeta.LoaderNeoForge
+		return []Entry{entry("m", m)}
+	}
+	tests := []struct {
+		rng  string
+		want []string
+	}{
+		{"[1.21,1.21.1)", []string{"warning:mc_version_mismatch:m"}},
+		{"[1.21, 1.21.1)", []string{"warning:mc_version_mismatch:m"}},
+		{"[1.20,1.21)", []string{"error:mc_version_mismatch:m"}},
+		{"[1.21.2,1.21.4)", []string{"error:mc_version_mismatch:m"}},
+		{"[1.21,1.21.1]", []string{}},
+		{"[1.21,1.22)", []string{}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.rng, func(t *testing.T) {
+			assert.Equal(t, tc.want, codes(Check(neo, mod(tc.rng))))
+		})
+	}
+	t.Run("note", func(t *testing.T) {
+		got := Check(neo, mod("[1.21,1.21.1)"))
+		assert.Contains(t, got[0].Detail["note"], "exclusive upper bound")
+	})
+}

@@ -284,3 +284,30 @@ func cmpOrdered(a, b uint64) int {
 	}
 	return 0
 }
+
+// excludesOnlyAtUpperBound reports whether the Maven range excludes version
+// solely because it is the exclusive upper bound of an interval whose lower
+// bound it meets, such as "[1.21,1.21.1)" and "1.21.1". Authors write such
+// ranges to mean "the 1.21 line" and the mods run on that version, so callers
+// treat the mismatch as doubtful rather than certain.
+func excludesOnlyAtUpperBound(rangeExpr, version string) bool {
+	expr := strings.TrimSpace(rangeExpr)
+	if expr == "" || (expr[0] != '[' && expr[0] != '(') {
+		return false
+	}
+	intervals, err := parseMavenRange(expr)
+	if err != nil {
+		return false
+	}
+	vt, ok := tokenizeVersion(strings.TrimSpace(version))
+	if !ok {
+		return false
+	}
+	for _, iv := range intervals {
+		if iv.hasHi && !iv.hiIncl && compareTokens(vt, iv.hi) == 0 &&
+			(!iv.hasLo || compareTokens(vt, iv.lo) >= 0) {
+			return true
+		}
+	}
+	return false
+}
