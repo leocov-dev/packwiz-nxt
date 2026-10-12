@@ -32,8 +32,11 @@ import (
 //     dependency on a library shipped without metadata is reported missing.
 //     That finding is downgraded to a warning, with a note in Detail["note"],
 //     when the mod may be hidden from the check: some entry declares nested
-//     (jar-in-jar) jars, which are never opened, or some entry's jar could not
-//     be read. On Fabric and Quilt packs a dependency on a Fabric API module
+//     (jar-in-jar) jars that could not be opened, or some entry's jar could
+//     not be read.
+//   - Mods inside nested jars (opened one level deep) count as provided ids.
+//     They are ignored by the duplicate id check, since mods commonly bundle
+//     the same library. On Fabric and Quilt packs a dependency on a Fabric API module
 //     (such as "fabric-resource-loader-v0") counts as satisfied when the
 //     Fabric API itself is in the pack.
 //   - Quilt "provides" entries use their own declared version; one declared
@@ -93,6 +96,8 @@ type provider struct {
 	version string
 	// versionKnown is false for empty or placeholder versions.
 	versionKnown bool
+	// bundled marks a mod found inside a nested (jar-in-jar) jar of entry.
+	bundled bool
 }
 
 type checkContext struct {
@@ -131,7 +136,7 @@ func newContext(target Target, entries []Entry) *checkContext {
 	}
 	for i := range c.entries {
 		c.indexProviders(&c.entries[i])
-		if len(c.entries[i].meta.NestedJars) > 0 {
+		if m := c.entries[i].meta; len(m.NestedJars) > m.NestedOpened {
 			c.nestedSlugs = append(c.nestedSlugs, c.entries[i].Slug)
 		}
 	}
@@ -170,6 +175,16 @@ func (c *checkContext) indexProviders(r *resolved) {
 		}
 		seen[id] = true
 		c.providers[id] = append(c.providers[id], providedBy(r, id))
+	}
+	for _, m := range r.meta.Bundled {
+		if m.ID == "" || seen[m.ID] {
+			continue
+		}
+		seen[m.ID] = true
+		c.providers[m.ID] = append(c.providers[m.ID], provider{
+			entry: r, version: m.Version, versionKnown: usableVersion(m.Version, m.VersionIsPlaceholder),
+			bundled: true,
+		})
 	}
 }
 
