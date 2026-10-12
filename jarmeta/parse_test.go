@@ -158,6 +158,14 @@ func findDep(t *testing.T, m LoaderMeta, id string, kind DependencyKind) Depende
 	return d
 }
 
+func TestParseFabricRawNewlineInString(t *testing.T) {
+	raw := "{\"id\":\"a\",\"version\":\"1\",\"description\":\"line1\nline2\ttab\"}"
+	metas, err := parseJar(t, entry{"fabric.mod.json", raw})
+	require.NoError(t, err)
+	require.Len(t, metas, 1)
+	assert.Equal(t, "a", metas[0].ModID)
+}
+
 func TestParseFabric(t *testing.T) {
 	metas, err := parseJar(t, entry{"fabric.mod.json", fabricJSON}, entry{"a/B.class", "x"})
 	require.NoError(t, err)

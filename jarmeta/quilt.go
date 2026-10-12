@@ -103,7 +103,7 @@ func (d *quiltDep) UnmarshalJSON(b []byte) error {
 
 func (quiltParser) Parse(data []byte) (LoaderMeta, error) {
 	var f quiltFile
-	if err := json.Unmarshal(data, &f); err != nil {
+	if err := unmarshalLenient(data, &f); err != nil {
 		return LoaderMeta{}, fmt.Errorf("decoding json: %w", err)
 	}
 	q := f.Loader

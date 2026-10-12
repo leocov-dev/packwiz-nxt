@@ -1,7 +1,6 @@
 package jarmeta
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
@@ -30,7 +29,7 @@ type fabricFile struct {
 
 func (fabricParser) Parse(data []byte) (LoaderMeta, error) {
 	var f fabricFile
-	if err := json.Unmarshal(data, &f); err != nil {
+	if err := unmarshalLenient(data, &f); err != nil {
 		return LoaderMeta{}, fmt.Errorf("decoding json: %w", err)
 	}
 	if f.ID == "" {

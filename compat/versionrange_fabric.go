@@ -118,6 +118,21 @@ func fabricTerm(term, version string) (bool, error) {
 		}
 	}
 
+	if c, ok := compareDotted(version, rest); ok {
+		switch op {
+		case "", "=":
+			return c == 0, nil
+		case ">=":
+			return c >= 0, nil
+		case ">":
+			return c > 0, nil
+		case "<=":
+			return c <= 0, nil
+		case "<":
+			return c < 0, nil
+		}
+	}
+
 	v, verr := parseSemver(version)
 
 	switch op {
@@ -304,4 +319,48 @@ func matchWildcard(term string, prefix []string, version string) (bool, error) {
 		}
 	}
 	return true, nil
+}
+
+// compareDotted compares two plain dotted-numeric versions (build metadata
+// ignored) when at least one has more than three components, which SemVer
+// parsing rejects but Fabric accepts ("0.12.15.1"). Missing components count
+// as zero. ok is false when either side is not plain dotted-numeric or both
+// fit in three components, leaving those to the SemVer path.
+func compareDotted(a, b string) (c int, ok bool) {
+	pa, oka := dottedParts(a)
+	pb, okb := dottedParts(b)
+	if !oka || !okb || (len(pa) <= 3 && len(pb) <= 3) {
+		return 0, false
+	}
+	for i := 0; i < max(len(pa), len(pb)); i++ {
+		var x, y uint64
+		if i < len(pa) {
+			x = pa[i]
+		}
+		if i < len(pb) {
+			y = pb[i]
+		}
+		switch {
+		case x < y:
+			return -1, true
+		case x > y:
+			return 1, true
+		}
+	}
+	return 0, true
+}
+
+func dottedParts(s string) ([]uint64, bool) {
+	if i := strings.Index(s, "+"); i >= 0 {
+		s = s[:i]
+	}
+	var out []uint64
+	for _, p := range strings.Split(s, ".") {
+		n, err := strconv.ParseUint(p, 10, 64)
+		if err != nil {
+			return nil, false
+		}
+		out = append(out, n)
+	}
+	return out, true
 }
